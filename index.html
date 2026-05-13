@@ -313,7 +313,7 @@ const SP500 = ["MMM","AOS","ABT","ABBV","ACN","ADBE","AMD","AES","AFL","A","APD"
 const WATCHLIST = ["SOFI","NKE","AAPL","NVDA","AMD","TSLA","META","GOOGL","MSFT","AMZN","JPM","BAC","PLTR","CRWD","UBER","HOOD","INTC","NOK","CELH","F"];
 
 // Small cap catalyst universe — stocks $3-$25, known for explosive moves on news
-const SMALLCAP = ["MRAM","SOUN","IONQ","PLUG","FUBO","JOBY","ASTR","SPCE","NKLA","WKHS","RIDE","GOEV","ARVL","REE","XPEV","NIO","LCID","FFIE","MULN","IDEX","ILUS","CENN","GFAI","ONDS","SOPA","BFRI","INPX","GXII","DARE","PSTV","VVOS","WTRH","LIZI","MOTS","ISPC","AEYE","CLNN","CLRO","RVNC","PRTK","AMTX","GFAI","XXII","NRXP","ATNF","MDJH","BLNK","CHPT","EVGO","STEM","ARRY","SUNW","NOVA","SHLS","FLNC","REZI","ENPH","RUN","FSLR","SEDG","CSIQ","DQ","JKS","MAXN","POWI","SPWR","AEVA","LAZR","LIDR","OUST","MVIS","INVZ","VLDR","AEYE","VNET","CLPS","CIFS","AIXI","KOSS","EXPR","BBBY","CLOV","WISH","WKHS","GOEV","OCGN","NVAX","VXRT","INO","SRNE","CODX","ATOS","SENS","PRPL","SKLZ","APPS","CRSR","LMND","OPEN","ROOT","DKNG","PENN","RBLX","HOOD","MAPS","CTRA","ACHR","LILM","EVTL","BLADE","NUVL","RXRX","DNLI","BEAM","EDIT","CRSP","NTLA","PACB","TDOC","HIMS","PSNL","CLOV","ALLO","FATE","KRTX","VERV","GRPH","ARCT","SGEN"];
+const SMALLCAP = ["MRAM","SOUN","IONQ","PLUG","FUBO","JOBY","XPEV","NIO","LCID","IDEX","ILUS","GFAI","ONDS","SOPA","BFRI","INPX","GXII","DARE","PSTV","VVOS","WTRH","LIZI","MOTS","ISPC","AEYE","CLNN","CLRO","RVNC","PRTK","AMTX","GFAI","XXII","NRXP","ATNF","MDJH","BLNK","CHPT","EVGO","STEM","ARRY","SUNW","NOVA","SHLS","FLNC","REZI","ENPH","RUN","FSLR","SEDG","CSIQ","DQ","JKS","MAXN","POWI","SPWR","AEVA","LAZR","LIDR","OUST","MVIS","INVZ","VLDR","AEYE","VNET","CLPS","CIFS","AIXI","KOSS","EXPR","CLOV","WISH","OCGN","NVAX","VXRT","INO","SRNE","CODX","ATOS","SENS","PRPL","SKLZ","APPS","CRSR","LMND","OPEN","ROOT","DKNG","PENN","RBLX","HOOD","MAPS","CTRA","ACHR","LILM","EVTL","BLADE","NUVL","RXRX","DNLI","BEAM","EDIT","CRSP","NTLA","PACB","TDOC","HIMS","PSNL","CLOV","ALLO","FATE","KRTX","VERV","GRPH","ARCT","SGEN"];
 
 // ── State ───────────────────────────────────────────────────
 let rResults=[], cResults=[], stopReq=false, isRunning=false;
@@ -695,8 +695,8 @@ async function startCatalystScan(){
         log("  "+sym.padEnd(6)+" "+r.score+"/5 | Vol:"+r.volSpike.toFixed(1)+"x | $"+r.price.toFixed(2),"","c");
       }
     }catch(e){
-      if(e.message.startsWith("SKIP:")||e.message.includes("Grow or Venture")){
-        log("⚠ "+sym+" skipped","warn","c");
+      if(e.message.startsWith("SKIP:")||e.message.includes("Grow or Venture")||e.message.includes("missing or invalid")||e.message.includes("not found")){
+        log("⚠ "+sym+" skipped (invalid/delisted)","warn","c");
       } else if(e.message.includes("All keys rate limited")){
         log("All keys limited — waiting 62s...","warn","c");
         await countdown(62,"c"); i--; continue;
