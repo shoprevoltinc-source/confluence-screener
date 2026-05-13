@@ -132,6 +132,27 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
+     WATCHLIST MANAGER (collapsible)
+═══════════════════════════════════════════════════════════ -->
+<div id="wl-bar" style="background:#060a13;border-bottom:1px solid #0b1a2e;padding:6px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+  <span style="font-size:10px;color:#00C853;font-weight:700;cursor:pointer" onclick="toggleWLManager()">📋 WATCHLIST <span id="wl-count" style="color:#546E7A"></span> ▾</span>
+  <div id="wl-tags" style="display:flex;gap:4px;flex-wrap:wrap;flex:1"></div>
+  <button onclick="toggleWLManager()" style="background:transparent;border:1px solid #1e3a5f;color:#78909C;padding:3px 8px;font-family:monospace;font-size:9px;cursor:pointer;border-radius:3px">EDIT</button>
+</div>
+
+<div id="wl-manager" style="display:none;background:#0a1218;border-bottom:2px solid #00C85333;padding:12px 14px">
+  <div style="font-size:10px;color:#00C853;font-weight:700;margin-bottom:10px;letter-spacing:1px">📋 MANAGE WATCHLIST</div>
+  <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    <input type="text" id="wl-input" placeholder="Add ticker e.g. SOFI" style="width:130px;text-transform:uppercase" onkeydown="if(event.key==='Enter')addToWatchlist()">
+    <button onclick="addToWatchlist()" style="background:#00C853;color:#000;border:none;padding:5px 12px;font-family:monospace;font-size:10px;font-weight:700;cursor:pointer;border-radius:3px">+ ADD</button>
+    <button onclick="clearWatchlist()" style="background:transparent;color:#FF5252;border:1px solid #FF525244;padding:5px 10px;font-family:monospace;font-size:9px;cursor:pointer;border-radius:3px">CLEAR ALL</button>
+    <button onclick="resetWatchlist()" style="background:transparent;color:#546E7A;border:1px solid #1e3a5f;padding:5px 10px;font-family:monospace;font-size:9px;cursor:pointer;border-radius:3px">RESET DEFAULT</button>
+  </div>
+  <div id="wl-edit-tags" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+  <div style="margin-top:8px;font-size:9px;color:#37474F">Click × on any ticker to remove it · Changes saved automatically</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
      TAB 1: RECOVERY SCREENER
 ═══════════════════════════════════════════════════════════ -->
 <div class="tab-panel active" id="panel-recovery">
@@ -194,17 +215,22 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
 <div class="results" id="r-results"><div class="empty">6-condition technical recovery system · RSI + WR + EMA21 + 52w pullback · Click any card → TradingView</div></div>
 
 <div class="debug-panel">
-  <div style="font-size:10px;color:#FF9800;font-weight:700;margin-bottom:8px">🔍 DEBUG</div>
-  <div>
-    <button class="dbtn" onclick="debugRecovery('SOFI')">SOFI</button>
-    <button class="dbtn" onclick="debugRecovery('NKE')">NKE</button>
-    <button class="dbtn" onclick="debugRecovery('INTC')">INTC</button>
-    <button class="dbtn" onclick="debugRecovery('CELH')">CELH</button>
-    <button class="dbtn" onclick="debugRecovery('AAPL')">AAPL</button>
-    <input type="text" id="r-customDebug" placeholder="TICKER" style="width:80px;font-size:10px;padding:4px">
-    <button class="dbtn" onclick="debugRecovery(document.getElementById('r-customDebug').value.trim().toUpperCase())">TEST →</button>
+  <div style="font-size:10px;color:#FF9800;font-weight:700;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="toggleDebug('r')">
+    <span>🔍 DEBUG — Single Stock Test</span>
+    <span id="r-debug-arrow" style="color:#546E7A;font-size:12px">▾</span>
   </div>
-  <pre class="dout" id="r-dout">Click a ticker to test.</pre>
+  <div id="r-debug-body">
+    <div style="margin-bottom:6px">
+      <button class="dbtn" onclick="debugRecovery('SOFI')">SOFI</button>
+      <button class="dbtn" onclick="debugRecovery('NKE')">NKE</button>
+      <button class="dbtn" onclick="debugRecovery('INTC')">INTC</button>
+      <button class="dbtn" onclick="debugRecovery('CELH')">CELH</button>
+      <button class="dbtn" onclick="debugRecovery('AAPL')">AAPL</button>
+      <input type="text" id="r-customDebug" placeholder="TICKER" style="width:80px;font-size:10px;padding:4px">
+      <button class="dbtn" onclick="debugRecovery(document.getElementById('r-customDebug').value.trim().toUpperCase())">TEST →</button>
+    </div>
+  </div>
+  <pre class="dout" id="r-dout" style="margin-top:6px">Click a ticker to test.</pre>
 </div>
 </div><!-- end tab-panel recovery -->
 
@@ -271,17 +297,22 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
 <div class="results" id="c-results"><div class="empty">⚡ Finds MRAM-type setups — small cap stocks going flat then exploding on news/earnings<br><br>Add custom tickers or use the Small Cap Watchlist · Results appear live</div></div>
 
 <div class="debug-panel">
-  <div style="font-size:10px;color:#FF9800;font-weight:700;margin-bottom:8px">🔍 DEBUG CATALYST</div>
-  <div>
-    <button class="dbtn" onclick="debugCatalyst('MRAM')">MRAM</button>
-    <button class="dbtn" onclick="debugCatalyst('SOUN')">SOUN</button>
-    <button class="dbtn" onclick="debugCatalyst('IONQ')">IONQ</button>
-    <button class="dbtn" onclick="debugCatalyst('PLUG')">PLUG</button>
-    <button class="dbtn" onclick="debugCatalyst('SOFI')">SOFI</button>
-    <input type="text" id="c-customDebug" placeholder="TICKER" style="width:80px;font-size:10px;padding:4px">
-    <button class="dbtn" onclick="debugCatalyst(document.getElementById('c-customDebug').value.trim().toUpperCase())">TEST →</button>
+  <div style="font-size:10px;color:#FF9800;font-weight:700;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="toggleDebug('c')">
+    <span>🔍 DEBUG — Catalyst Test</span>
+    <span id="c-debug-arrow" style="color:#546E7A;font-size:12px">▾</span>
   </div>
-  <pre class="dout" id="c-dout">Click a ticker to test catalyst conditions.</pre>
+  <div id="c-debug-body">
+    <div style="margin-bottom:6px">
+      <button class="dbtn" onclick="debugCatalyst('MRAM')">MRAM</button>
+      <button class="dbtn" onclick="debugCatalyst('SOUN')">SOUN</button>
+      <button class="dbtn" onclick="debugCatalyst('IONQ')">IONQ</button>
+      <button class="dbtn" onclick="debugCatalyst('PLUG')">PLUG</button>
+      <button class="dbtn" onclick="debugCatalyst('SOFI')">SOFI</button>
+      <input type="text" id="c-customDebug" placeholder="TICKER" style="width:80px;font-size:10px;padding:4px">
+      <button class="dbtn" onclick="debugCatalyst(document.getElementById('c-customDebug').value.trim().toUpperCase())">TEST →</button>
+    </div>
+  </div>
+  <pre class="dout" id="c-dout" style="margin-top:6px">Click a ticker to test catalyst conditions.</pre>
 </div>
 </div><!-- end tab-panel catalyst -->
 
@@ -310,10 +341,87 @@ function updateKeyStatus(){
 
 // ── Ticker Lists ────────────────────────────────────────────
 const SP500 = ["MMM","AOS","ABT","ABBV","ACN","ADBE","AMD","AES","AFL","A","APD","AKAM","ALB","ARE","ALGN","ALLE","LNT","ALL","GOOGL","GOOG","MO","AMZN","AMCR","AEE","AAL","AEP","AXP","AIG","AMT","AWK","AMP","AME","AMGN","APH","ADI","ANSS","AON","APA","AAPL","AMAT","APTV","ADM","ANET","AJG","AIZ","T","ATO","ADSK","ADP","AZO","AVB","AVY","BKR","BALL","BAC","BK","BBWI","BAX","BDX","WRB","BRK/B","BBY","BIO","BIIB","BLK","BX","BA","BKNG","BWA","BSX","BMY","AVGO","BR","BLDR","BG","CDNS","CPT","CPB","COF","CAH","KMX","CCL","CARR","CAT","CBOE","CBRE","CDW","CE","COR","CNC","CF","CRL","SCHW","CHTR","CVX","CMG","CB","CHD","CI","CINF","CTAS","CSCO","C","CFG","CLX","CME","CMS","KO","CTSH","CL","CMCSA","CAG","COP","ED","STZ","COO","CPRT","GLW","CTVA","CSGP","COST","CTRA","CRWD","CCI","CSX","CMI","CVS","DHR","DRI","DVA","DAY","DE","DAL","DVN","DXCM","FANG","DLR","DFS","DG","DLTR","D","DPZ","DOV","DOW","DHI","DTE","DUK","DD","EMN","ETN","EBAY","ECL","EIX","EW","EA","ELV","EMR","ENPH","ETR","EOG","EPAM","EQT","EFX","EQIX","EQR","ESS","EL","ETSY","EG","EVRG","ES","EXC","EXPE","EXPD","EXR","XOM","FFIV","FDS","FICO","FAST","FRT","FDX","FIS","FITB","FSLR","FE","FI","FMC","F","FTNT","FTV","FOXA","FOX","BEN","FCX","GRMN","IT","GE","GD","GIS","GM","GPC","GILD","GS","HAL","HIG","HAS","HCA","HSIC","HSY","HES","HPE","HLT","HOLX","HD","HON","HRL","HST","HWM","HPQ","HUBB","HUM","HBAN","HII","IBM","IEX","IDXX","ITW","INCY","IR","PODD","INTC","ICE","IFF","IP","IPG","INTU","ISRG","IVZ","IQV","IRM","JCI","JPM","K","KDP","KEY","KEYS","KMB","KIM","KMI","KLAC","KHC","KR","LHX","LH","LRCX","LW","LVS","LDOS","LEN","LLY","LIN","LYV","LKQ","LMT","L","LOW","LULU","LYB","MTB","MRO","MPC","MKTX","MAR","MMC","MLM","MAS","MA","MTCH","MKC","MCD","MCK","MDT","MRK","META","MET","MTD","MGM","MCHP","MU","MSFT","MAA","MRNA","MHK","MOH","TAP","MDLZ","MPWR","MNST","MCO","MS","MOS","MSI","MSCI","NDAQ","NTAP","NFLX","NEM","NEE","NKE","NI","NDSN","NSC","NTRS","NOC","NCLH","NRG","NUE","NVDA","NVR","NXPI","ORLY","OXY","ODFL","OMC","ON","OKE","ORCL","OTIS","PCAR","PKG","PLTR","PANW","PARA","PH","PAYX","PAYC","PYPL","PNR","PEP","PFE","PCG","PM","PSX","PNW","PNC","POOL","PPG","PPL","PFG","PG","PGR","PLD","PRU","PEG","PTC","PSA","PHM","PWR","QCOM","DGX","RL","RJF","RTX","O","REG","REGN","RF","RSG","RMD","RVTY","ROK","ROL","ROP","ROST","RCL","SPGI","CRM","SBAC","SLB","STX","SRE","NOW","SHW","SPG","SWKS","SJM","SNA","SO","LUV","SWK","SBUX","STT","STLD","STE","SYK","SYF","SNPS","SYY","TMUS","TROW","TTWO","TPR","TRGP","TGT","TEL","TDY","TFX","TER","TSLA","TXN","TXT","TMO","TJX","TSCO","TT","TDG","TRV","TRMB","TFC","TYL","TSN","USB","UBER","UDR","ULTA","UNP","UAL","UPS","URI","UNH","UHS","VLO","VTR","VRSN","VRSK","VZ","VRTX","VTRS","V","VMC","WAB","WBA","WMT","DIS","WBD","WM","WAT","WEC","WFC","WELL","WST","WDC","WY","WMB","WTW","GWW","WYNN","XEL","XYL","YUM","ZBRA","ZBH","ZTS"];
-const WATCHLIST = ["SOFI","NKE","AAPL","NVDA","AMD","TSLA","META","GOOGL","MSFT","AMZN","JPM","BAC","PLTR","CRWD","UBER","HOOD","INTC","NOK","CELH","F"];
+const DEFAULT_WATCHLIST = ["SOFI","NKE","AAPL","NVDA","AMD","TSLA","META","GOOGL","MSFT","AMZN","JPM","BAC","PLTR","CRWD","UBER","HOOD","INTC","NOK","CELH","F"];
+let WATCHLIST = loadWatchlist();
+
+function loadWatchlist(){
+  try{
+    const saved = localStorage.getItem("cs_watchlist");
+    return saved ? JSON.parse(saved) : [...DEFAULT_WATCHLIST];
+  }catch(e){ return [...DEFAULT_WATCHLIST]; }
+}
+function saveWatchlist(){
+  try{ localStorage.setItem("cs_watchlist", JSON.stringify(WATCHLIST)); }catch(e){}
+}
+function addToWatchlist(){
+  const input = document.getElementById("wl-input");
+  const sym = input.value.trim().toUpperCase().replace(/[^A-Z0-9./\-]/g,"");
+  if(!sym) return;
+  if(WATCHLIST.includes(sym)){ input.value=""; return; }
+  WATCHLIST.push(sym);
+  saveWatchlist();
+  input.value="";
+  renderWatchlistUI();
+}
+function removeFromWatchlist(sym){
+  WATCHLIST = WATCHLIST.filter(s=>s!==sym);
+  saveWatchlist();
+  renderWatchlistUI();
+}
+function clearWatchlist(){
+  if(!confirm("Clear entire watchlist?")) return;
+  WATCHLIST=[];
+  saveWatchlist();
+  renderWatchlistUI();
+}
+function resetWatchlist(){
+  WATCHLIST=[...DEFAULT_WATCHLIST];
+  saveWatchlist();
+  renderWatchlistUI();
+}
+function toggleWLManager(){
+  const m=document.getElementById("wl-manager");
+  m.style.display=m.style.display==="none"?"block":"none";
+  if(m.style.display==="block") renderWatchlistUI();
+}
+function renderWatchlistUI(){
+  // Update count
+  document.getElementById("wl-count").textContent="("+WATCHLIST.length+")";
+  // Top bar preview tags (read-only)
+  const bar=document.getElementById("wl-tags");
+  bar.innerHTML=WATCHLIST.slice(0,12).map(s=>`<span style="font-size:8px;padding:1px 6px;border-radius:3px;border:1px solid #1e3a5f;color:#546E7A">${s}</span>`).join("")
+    +(WATCHLIST.length>12?`<span style="font-size:8px;color:#37474F">+${WATCHLIST.length-12} more</span>`:"");
+  // Edit tags with remove buttons
+  const edit=document.getElementById("wl-edit-tags");
+  edit.innerHTML=WATCHLIST.map(s=>`
+    <span style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:#0d1f35;border:1px solid #1e3a5f;border-radius:4px;font-size:10px;color:#e0e8ff">
+      ${s}
+      <span onclick="removeFromWatchlist('${s}')" style="cursor:pointer;color:#FF5252;font-weight:700;margin-left:2px;font-size:11px" title="Remove">×</span>
+    </span>`).join("");
+}
 
 // Small cap catalyst universe — stocks $3-$25, known for explosive moves on news
-const SMALLCAP = ["MRAM","SOUN","IONQ","PLUG","FUBO","JOBY","XPEV","NIO","LCID","IDEX","ILUS","GFAI","ONDS","SOPA","BFRI","INPX","GXII","DARE","PSTV","VVOS","WTRH","LIZI","MOTS","ISPC","AEYE","CLNN","CLRO","RVNC","PRTK","AMTX","GFAI","XXII","NRXP","ATNF","MDJH","BLNK","CHPT","EVGO","STEM","ARRY","SUNW","NOVA","SHLS","FLNC","REZI","ENPH","RUN","FSLR","SEDG","CSIQ","DQ","JKS","MAXN","POWI","SPWR","AEVA","LAZR","LIDR","OUST","MVIS","INVZ","VLDR","AEYE","VNET","CLPS","CIFS","AIXI","KOSS","EXPR","CLOV","WISH","OCGN","NVAX","VXRT","INO","SRNE","CODX","ATOS","SENS","PRPL","SKLZ","APPS","CRSR","LMND","OPEN","ROOT","DKNG","PENN","RBLX","HOOD","MAPS","CTRA","ACHR","LILM","EVTL","BLADE","NUVL","RXRX","DNLI","BEAM","EDIT","CRSP","NTLA","PACB","TDOC","HIMS","PSNL","CLOV","ALLO","FATE","KRTX","VERV","GRPH","ARCT","SGEN"];
+const SMALLCAP = [
+  // Defense & Gov contracts (MRAM-type explosive moves)
+  "MRAM","KTOS","AVAV","RCAT","ACHR","JOBY","ASTS","LUNR","RDW","SPIR",
+  "BBAI","DRS","CACI","SAIC","LDOS","BWXT","HWM","TDG","AXON","CDRE",
+  // AI & Quantum computing
+  "SOUN","IONQ","RGTI","QUBT","ARQQ","CRKN","VRNT","LPSN","MTTR","AAOI",
+  "COHU","FORM","SMTC","ONTO","ACMR","IIVI","VIAV","CEVA","PLAB","DIOD",
+  // Biotech / Pharma catalysts
+  "RXRX","DNLI","BEAM","EDIT","CRSP","NTLA","VERV","NUVL","ALLO","HIMS",
+  "OCGN","NVAX","VXRT","INO","PSNL","BLUE","ARVN","PRTA","IMVT","KYMR",
+  "MGNX","PTGX","RCKT","SAGE","YMAB","DAWN","TGTX","IOVA","APLS","FOLD",
+  // Clean energy (real companies with contracts)
+  "BLNK","CHPT","EVGO","STEM","ARRY","NOVA","SHLS","FLNC","BLDP","FCEL",
+  "PLUG","RUN","CSIQ","DQ","JKS","BE","CWEN","GPRE","VNET","AMRC",
+  // Fintech & Consumer growth
+  "SOFI","HOOD","AFRM","UPST","DAVE","MQ","LMND","ROOT","DKNG","PENN",
+  "RBLX","SKLZ","MAPS","IREN","MSTR","CIFR","RIOT","MARA","HUT","CLSK",
+  // Small/mid tech with momentum history
+  "APPS","CRSR","GTLB","BILL","ZI","DOCS","FOUR","RELY","TASK","ALKT",
+  "JAMF","WEAV","CFLT","SPSC","ASAN","BRZE","SEMR","DOMO","SPRK","INFA"
+];
 
 // ── State ───────────────────────────────────────────────────
 let rResults=[], cResults=[], stopReq=false, isRunning=false;
@@ -783,10 +891,32 @@ async function debugCatalyst(sym){
       s.score>=4?"\n⚡ HIGH PROBABILITY CATALYST SETUP — CHECK CHART + NEWS":""
     ].join("\n");
   }catch(e){out.style.color="#FF5252";out.textContent=sym+" ERROR: "+e.message;}
+  collapseDebugAfterTest("c");
 }
 
 // ── Utilities ──────────────────────────────────────────────
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+function toggleDebug(panel){
+  const body=document.getElementById(panel+"-debug-body");
+  const arrow=document.getElementById(panel+"-debug-arrow");
+  const collapsed=body.style.display==="none";
+  body.style.display=collapsed?"block":"none";
+  arrow.textContent=collapsed?"▾":"▸";
+}
+function collapseDebugAfterTest(panel){
+  // Collapse the debug panel body after test runs — user can expand again via header
+  const body=document.getElementById(panel+"-debug-body");
+  const arrow=document.getElementById(panel+"-debug-arrow");
+  if(body&&arrow){
+    // Keep pre visible by moving it outside the collapsible body
+    // Simple: just collapse and show arrow hint
+    setTimeout(()=>{
+      body.style.display="none";
+      arrow.textContent="▸ (click to expand)";
+    }, 800); // small delay so user sees result before collapse
+  }
+}
 function stopScan(){stopReq=true;document.getElementById("stopBtn").disabled=true;document.getElementById("catStopBtn").disabled=true;log("Stop requested...","warn",activeTab==="recovery"?"r":"c");}
 
 async function countdown(secs,panel){
@@ -801,6 +931,7 @@ async function countdown(secs,panel){
 }
 
 loadSaved();
+renderWatchlistUI();
 </script>
 </body>
 </html>
