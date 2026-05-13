@@ -81,7 +81,7 @@ pre#dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
   <div class="hdr-top">
     <div>
       <div class="logo">CONFLUENCE<span>SCREENER</span></div>
-      <div class="subtitle">TWELVE DATA · BATCH MODE · S&P 500 READY · AUTO-SAVE</div>
+      <div class="subtitle">YAHOO FINANCE · NO RATE LIMITS · S&P 500 · AUTO-SAVE</div>
     </div>
     <div class="hstats">
       <div class="hs"><div class="hs-v" id="h-scanned">0</div><div class="hs-l">SCANNED</div></div>
@@ -170,10 +170,10 @@ pre#dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
 </div>
 
 <script>
-const TDKEY = "fceed7ef4b7847d38e1ecd0bddcad5eb";
-const TDBASE = "https://api.twelvedata.com";
-const BATCH_SIZE = 7;      // 7 per batch leaves 1 credit buffer under 8/min limit
-const BATCH_WAIT = 62000;  // ms to wait between batches
+// Yahoo Finance — free, no key, no rate limits, works from https://
+// No batch needed — fetch each stock directly, fast
+const BATCH_SIZE = 503;   // process all at once, no rate limit waits
+const BATCH_WAIT = 0;
 
 const SP500 = ["MMM","AOS","ABT","ABBV","ACN","ADBE","AMD","AES","AFL","A","APD","ABNB","AKAM","ALB","ARE","ALGN","ALLE","LNT","ALL","GOOGL","GOOG","MO","AMZN","AMCR","AEE","AAL","AEP","AXP","AIG","AMT","AWK","AMP","AME","AMGN","APH","ADI","ANSS","AON","APA","AAPL","AMAT","APTV","ACGL","ADM","ANET","AJG","AIZ","T","ATO","ADSK","ADP","AZO","AVB","AVY","AXON","BKR","BALL","BAC","BK","BBWI","BAX","BDX","WRB","BRK/B","BBY","BIO","BIIB","BLK","BX","BA","BKNG","BWA","BSX","BMY","AVGO","BR","BLDR","BG","CDNS","CPT","CPB","COF","CAH","KMX","CCL","CARR","CAT","CBOE","CBRE","CDW","CE","COR","CNC","CDAY","CF","CRL","SCHW","CHTR","CVX","CMG","CB","CHD","CI","CINF","CTAS","CSCO","C","CFG","CLX","CME","CMS","KO","CTSH","CL","CMCSA","CAG","COP","ED","STZ","CEG","COO","CPRT","GLW","CPAY","CTVA","CSGP","COST","CTRA","CRWD","CCI","CSX","CMI","CVS","DHR","DRI","DVA","DAY","DE","DAL","DVN","DXCM","FANG","DLR","DFS","DG","DLTR","D","DPZ","DOV","DOW","DHI","DTE","DUK","DD","EMN","ETN","EBAY","ECL","EIX","EW","EA","ELV","EMR","ENPH","ETR","EOG","EPAM","EQT","EFX","EQIX","EQR","ESS","EL","ETSY","EG","EVRG","ES","EXC","EXPE","EXPD","EXR","XOM","FFIV","FDS","FICO","FAST","FRT","FDX","FIS","FITB","FSLR","FE","FI","FMC","F","FTNT","FTV","FOXA","FOX","BEN","FCX","GRMN","IT","GE","GEHC","GEV","GEN","GNRC","GD","GIS","GM","GPC","GILD","GS","HAL","HIG","HAS","HCA","HSIC","HSY","HES","HPE","HLT","HOLX","HD","HON","HRL","HST","HWM","HPQ","HUBB","HUM","HBAN","HII","IBM","IEX","IDXX","ITW","INCY","IR","PODD","INTC","ICE","IFF","IP","IPG","INTU","ISRG","IVZ","INVH","IQV","IRM","JCI","JPM","K","KVUE","KDP","KEY","KEYS","KMB","KIM","KMI","KLAC","KHC","KR","LHX","LH","LRCX","LW","LVS","LDOS","LEN","LLY","LIN","LYV","LKQ","LMT","L","LOW","LULU","LYB","MTB","MRO","MPC","MKTX","MAR","MMC","MLM","MAS","MA","MTCH","MKC","MCD","MCK","MDT","MRK","META","MET","MTD","MGM","MCHP","MU","MSFT","MAA","MRNA","MHK","MOH","TAP","MDLZ","MPWR","MNST","MCO","MS","MOS","MSI","MSCI","NDAQ","NTAP","NFLX","NEM","NEE","NKE","NI","NDSN","NSC","NTRS","NOC","NCLH","NRG","NUE","NVDA","NVR","NXPI","ORLY","OXY","ODFL","OMC","ON","OKE","ORCL","OTIS","PCAR","PKG","PLTR","PANW","PARA","PH","PAYX","PAYC","PYPL","PNR","PEP","PFE","PCG","PM","PSX","PNW","PNC","POOL","PPG","PPL","PFG","PG","PGR","PLD","PRU","PEG","PTC","PSA","PHM","PWR","QCOM","DGX","RL","RJF","RTX","O","REG","REGN","RF","RSG","RMD","RVTY","ROK","ROL","ROP","ROST","RCL","SPGI","CRM","SBAC","SLB","STX","SRE","NOW","SHW","SPG","SWKS","SJM","SNA","SOLV","SO","LUV","SWK","SBUX","STT","STLD","STE","SYK","SYF","SNPS","SYY","TMUS","TROW","TTWO","TPR","TRGP","TGT","TEL","TDY","TFX","TER","TSLA","TXN","TXT","TMO","TJX","TSCO","TT","TDG","TRV","TRMB","TFC","TYL","TSN","USB","UBER","UDR","ULTA","UNP","UAL","UPS","URI","UNH","UHS","VLO","VTR","VLTO","VRSN","VRSK","VZ","VRTX","VTRS","VICI","V","VST","VMC","WAB","WBA","WMT","DIS","WBD","WM","WAT","WEC","WFC","WELL","WST","WDC","WY","WMB","WTW","GWW","WYNN","XEL","XYL","YUM","ZBRA","ZBH","ZTS"];
 const WATCHLIST = ["SOFI","NKE","AAPL","NVDA","AMD","TSLA","META","GOOGL","MSFT","AMZN","JPM","BAC","PLTR","CRWD","UBER","HOOD","INTC","NOK","CELH","F"];
@@ -234,19 +234,19 @@ function log(msg,type=""){
   p.scrollTop=p.scrollHeight;
 }
 
-// ── Twelve Data batch fetch ────────────────────────────────
-// Fetches up to 8 symbols in one call — counts as 1 credit per symbol
+// ── Yahoo Finance fetch — free, no key, no rate limits ────────────────
 async function fetchBatch(symbols){
-  const url = TDBASE+"/time_series?symbol="+symbols.join(",")+"&interval=1day&outputsize=260&apikey="+TDKEY;
-  const r = await fetch(url);
-  if(!r.ok) throw new Error("HTTP "+r.status);
-  const d = await r.json();
-  // TD returns flat object for single symbol, keyed object for multiple
-  // Normalise: always return keyed by symbol
-  if(symbols.length===1){
-    return d; // caller uses batch.length===1 check
+  // Yahoo: one call per symbol, returns 1yr daily OHLCV
+  const results = {};
+  for(const sym of symbols){
+    const ySym = sym.replace(".","-");
+    const url = "https://query1.finance.yahoo.com/v8/finance/chart/"+ySym+"?interval=1d&range=1y";
+    const r = await fetch(url);
+    if(!r.ok) throw new Error("Yahoo HTTP "+r.status+" for "+sym);
+    const d = await r.json();
+    results[sym] = d;
   }
-  return d;
+  return results;
 }
 
 // ── Indicator math ────────────────────────────────────────
@@ -271,12 +271,18 @@ function calcEMA(c,p=21){
 }
 
 function scoreFromCandles(sym, data){
-  if(data.status==="error") throw new Error(data.message||"API error");
-  if(!data.values||!data.values.length) throw new Error("No data");
-  const vals=[...data.values].reverse();
-  const closes=vals.map(v=>parseFloat(v.close));
-  const highs =vals.map(v=>parseFloat(v.high));
-  const lows  =vals.map(v=>parseFloat(v.low));
+  // Parse Yahoo Finance v8 format
+  const res = data?.chart?.result?.[0];
+  if(!res) throw new Error("No Yahoo result");
+  const q = res.indicators?.quote?.[0];
+  if(!q) throw new Error("No Yahoo OHLCV");
+  const rawC=q.close, rawH=q.high, rawL=q.low;
+  // Filter out null bars
+  const valid=rawC.map((c,i)=>({c,h:rawH[i],l:rawL[i]})).filter(b=>b.c!=null&&b.h!=null&&b.l!=null);
+  if(!valid.length) throw new Error("No valid bars");
+  const closes=valid.map(b=>b.c);
+  const highs =valid.map(b=>b.h);
+  const lows  =valid.map(b=>b.l);
   if(closes.length<36) throw new Error("Not enough bars");
 
   const price   = closes[closes.length-1];
@@ -336,8 +342,7 @@ async function startScan(){
 
   log("Scan: "+tickers.length+" stocks · "+batches.length+" batches · min "+minScore+"/6","info");
   log("Batch size: "+BATCH_SIZE+" · Wait: "+BATCH_WAIT/1000+"s between batches","info");
-  const eta=Math.ceil(batches.length*(BATCH_WAIT/1000)/60);
-  log("Estimated time: ~"+eta+" min for full scan","info");
+  log("Estimated time: ~"+Math.ceil(tickers.length*0.12/60*100)/100+" min (Yahoo, no rate limits)","info");
 
   for(let bi=0;bi<batches.length;bi++){
     if(stopReq){log("Stopped.","warn");break;}
@@ -347,58 +352,32 @@ async function startScan(){
     document.getElementById("progPct").textContent=prog+"%";
     document.getElementById("progFill").style.width=prog+"%";
 
-    let batchData;
-    try{
-      batchData = await fetchBatch(batch);
-    }catch(e){
-      log("Batch fetch error: "+e.message+" — retrying after 62s","warn");
-      await runCountdown(62);
-      bi--; continue;
-    }
-
-    // Check if rate limit hit — TD returns status:"error" in JSON even on 200 OK
-    const firstKey = batch[0];
-    const firstData = batch.length===1 ? batchData : (batchData[firstKey]||{});
-    if(firstData.status==="error" && firstData.message && firstData.message.includes("API credits")){
-      log("Rate limit on batch — waiting 62s then retrying...","warn");
-      await runCountdown(62);
-      bi--; continue;
-    }
-
     for(const sym of batch){
       if(stopReq) break;
+      document.getElementById("progMsg").textContent="Scanning "+sym+" ("+(scanned+errCount+1)+"/"+tickers.length+")";
       try{
-        const data = batch.length===1 ? batchData : (batchData[sym]||{});
-        // Check per-symbol rate limit too
-        if(data.status==="error" && data.message && data.message.includes("API credits")){
-          log("Rate limit mid-batch — will retry remaining in next batch","warn");
-          break;
-        }
-        const r=scoreFromCandles(sym,data);
+        const ySym = sym.replace(".","-");
+        const url = "https://query1.finance.yahoo.com/v8/finance/chart/"+ySym+"?interval=1d&range=1y";
+        const r = await fetch(url);
+        if(!r.ok) throw new Error("Yahoo HTTP "+r.status);
+        const d = await r.json();
+        const result = scoreFromCandles(sym, d);
         scanned++;
-        if(r.score>=minScore){
-          results.push(r); renderResults();
-          log("✓ "+sym.padEnd(6)+" "+r.score+"/6 | RSI:"+r.rsi.toFixed(1)+" WR:"+r.wr.toFixed(1)+" | "+r.pctHi.toFixed(1)+"% off hi","ok");
+        if(result.score>=minScore){
+          results.push(result); renderResults();
+          log("✓ "+sym.padEnd(6)+" "+result.score+"/6 | RSI:"+result.rsi.toFixed(1)+" WR:"+result.wr.toFixed(1)+" | "+result.pctHi.toFixed(1)+"% off hi","ok");
         } else {
-          log("  "+sym.padEnd(6)+" "+r.score+"/6 | RSI:"+r.rsi.toFixed(1)+" WR:"+r.wr.toFixed(1));
+          log("  "+sym.padEnd(6)+" "+result.score+"/6 | RSI:"+result.rsi.toFixed(1)+" WR:"+result.wr.toFixed(1));
         }
       }catch(e){errCount++;log("✗ "+sym+": "+e.message,"err");}
       updateHdr();
+      await sleep(120); // tiny gap to avoid overwhelming Yahoo
     }
 
     // Save after each batch
     saveResults();
 
-    // Only wait if this was a full batch (used all credits)
-    // Partial batches don't hit the rate limit so no wait needed
-    const wasFull = batch.length >= BATCH_SIZE;
-    if(bi<batches.length-1 && !stopReq && wasFull){
-      log("Batch "+(bi+1)+" done ("+batch.length+" stocks) · waiting 62s...","warn");
-      await runCountdown(62);
-    } else if(bi<batches.length-1 && !stopReq){
-      log("Batch "+(bi+1)+" done ("+batch.length+" stocks, partial — no wait)","info");
-      await sleep(1000); // tiny pause to be safe
-    }
+    // Yahoo has no rate limits — no wait needed between batches
   }
 
   document.getElementById("progMsg").textContent="Done — "+scanned+" scanned, "+results.length+" passed";
@@ -507,15 +486,19 @@ async function debugStock(sym){
   if(!sym) return;
   const out=document.getElementById("dout");
   out.style.color="#00b0ff";
-  out.textContent="Fetching "+sym+"...";
+  out.textContent="Fetching "+sym+" from Yahoo Finance...";
   try{
-    const bd=await fetchBatch([sym]);
-    const data=bd[sym]||bd;
-    const s=scoreFromCandles(sym,data);
+    const ySym=sym.replace(".","-");
+    const url="https://query1.finance.yahoo.com/v8/finance/chart/"+ySym+"?interval=1d&range=1y";
+    const r=await fetch(url);
+    if(!r.ok) throw new Error("Yahoo HTTP "+r.status);
+    const d=await r.json();
+    const s=scoreFromCandles(sym,d);
+    const bars=d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(c=>c!=null).length||0;
     const p=(pass,lbl,val)=>(pass?"✅":"❌")+" "+lbl+": "+val;
     out.style.color=s.score>=4?"#00C853":s.score>=2?"#FFD600":"#90A4AE";
     out.textContent=[
-      "══ "+sym+" — "+((bd[sym]||bd).values||[]).length+" bars ══",
+      "══ "+sym+" — "+bars+" bars (Yahoo) ══",
       "Price: $"+s.price.toFixed(2)+"  (chg: "+s.change.toFixed(2)+"%)",
       "",
       p(s.c1,"C1 RSI14 < 45       ",s.rsi.toFixed(1)),
