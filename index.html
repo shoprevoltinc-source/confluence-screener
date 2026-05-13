@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Confluence Screener</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#05080f;color:#e0e8ff;font-family:'Courier New',monospace;padding-bottom:60px}
+.hdr{background:#070c18;border-bottom:1px solid #0b1a2e;padding:12px 16px;position:sticky;top:0;z-index:99}
+.hdr-top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.logo{font-size:15px;font-weight:700;color:#00C853;letter-spacing:2px}
+.logo span{color:#00b0ff;font-weight:400}
+.subtitle{font-size:8px;color:#00b0ff;margin-top:2px;letter-spacing:1px}
+.hstats{display:flex;gap:16px}
+.hs{text-align:center;cursor:default}
+.hs-v{font-size:18px;font-weight:700;color:#00b0ff}
+.hs-l{font-size:9px;color:#546E7A;letter-spacing:1px}
+.stats{display:flex;gap:16px;margin-top:8px;flex-wrap:wrap}
+.stat-n{font-size:18px;font-weight:700;line-height:1}
+.stat-l{font-size:8px;color:#546E7A;letter-spacing:1px;margin-left:3px}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 14px;background:#060a13;border-bottom:1px solid #0b1a2e}
+.controls label{font-size:10px;color:#78909C}
+.run-btn{background:linear-gradient(135deg,#00C853,#00E676);color:#000;border:none;padding:7px 18px;font-family:monospace;font-size:11px;font-weight:700;cursor:pointer;border-radius:4px;box-shadow:0 0 12px #00C85544}
+.run-btn:disabled{background:#0d1f35;color:#546E7A;cursor:not-allowed;box-shadow:none}
+.stop-btn{background:transparent;color:#FF5252;border:1px solid #FF525244;padding:6px 12px;font-family:monospace;font-size:10px;cursor:pointer;border-radius:4px}
+.clr-btn{background:transparent;color:#78909C;border:1px solid #1e3a5f;padding:6px 12px;font-family:monospace;font-size:10px;cursor:pointer;border-radius:4px}
+select,input[type=number],input[type=text]{background:#0a1525;border:1px solid #1e3a5f;color:#e0e8ff;padding:5px 8px;font-family:monospace;font-size:10px;border-radius:3px}
+.prog-wrap{padding:8px 16px;background:#060a13;border-bottom:1px solid #0b1a2e;display:none}
+.prog-top{display:flex;justify-content:space-between;margin-bottom:4px}
+.prog-msg{font-size:9px;color:#00b0ff}
+.prog-pct{font-size:9px;color:#546E7A}
+.prog-track{height:3px;background:#0b1a2e;border-radius:2px;overflow:hidden;margin-bottom:3px}
+.prog-fill{height:3px;background:linear-gradient(90deg,#00C853,#00E676);width:0%;transition:width 0.4s}
+.countdown{font-size:10px;color:#FFD600;font-weight:700;display:none;margin-top:2px}
+.filter-bar{padding:8px 14px;display:none;gap:5px;flex-wrap:wrap;align-items:center;background:#060a13;border-bottom:1px solid #0b1a2e}
+.chip{padding:4px 10px;font-family:monospace;font-size:9px;font-weight:700;cursor:pointer;border-radius:4px;border:1px solid #1e3a5f;background:transparent;color:#78909C}
+.chip.on{border-color:#00C85566;background:#00C85322;color:#00C853}
+.sort-select{background:#0a1525;border:1px solid #1e3a5f;color:#78909C;padding:3px 6px;font-family:monospace;font-size:9px;border-radius:3px;margin-left:8px}
+.results{padding:10px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.card{border-radius:8px;padding:13px 15px;border:1px solid #0b1a2e;background:#08101e;cursor:pointer;transition:border-color 0.15s,transform 0.1s}
+.card:hover{transform:translateY(-2px)}
+.card.s6{background:linear-gradient(135deg,#00C85314,#060d18);border-color:#00C85340;box-shadow:0 0 20px #00C85510}
+.card.s5{background:linear-gradient(135deg,#CCFF0008,#060d18);border-color:#CCFF0025}
+.card.s6:hover{border-color:#00C853}
+.card.s5:hover{border-color:#CCFF00}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.ticker{font-size:16px;font-weight:700;letter-spacing:1px;color:#fff}
+.tv-hint{font-size:8px;color:#546E7A;margin-top:2px}
+.price{font-size:15px;font-weight:700;color:#fff;text-align:right}
+.chg{font-size:10px;margin-top:1px;text-align:right}
+.cpos{color:#00C853}.cneg{color:#FF5252}
+.dots{display:flex;gap:4px;margin-bottom:7px;align-items:center}
+.dot{width:12px;height:12px;border-radius:3px;transition:opacity 0.2s}
+.score-txt{font-size:11px;font-weight:700;margin-left:4px}
+.bars{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:7px}
+.bar-lbl{font-size:9px;color:#78909C;margin-bottom:2px}
+.bar-row{display:flex;align-items:center;gap:5px}
+.bar-track{flex:1;height:3px;background:#0d1f35;border-radius:2px;overflow:hidden}
+.bar-fill{height:3px;border-radius:2px}
+.bar-val{font-size:10px;min-width:30px;font-family:monospace}
+.info-row{display:flex;gap:10px;font-size:9px;margin-bottom:7px;flex-wrap:wrap}
+.tags{padding-top:7px;border-top:1px solid #0b1a2e}
+.tag-row{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px}
+.tag{font-size:8px;padding:2px 6px;border-radius:3px}
+.tv-btn{display:inline-block;margin-top:5px;padding:4px 10px;background:#1565C0;color:#90CAF9;border:1px solid #1976D244;border-radius:3px;font-size:9px;font-weight:700;text-decoration:none;letter-spacing:1px}
+.tv-btn:hover{background:#1976D2;color:#fff}
+.log-panel{margin:8px 14px;padding:10px;background:#040709;border:1px solid #0b1a2e;border-radius:6px;max-height:140px;overflow-y:auto;font-size:10px}
+.ll{padding:1px 0;color:#546E7A}
+.ll.ok{color:#5cdb95}.ll.err{color:#FF5252}.ll.info{color:#00b0ff}.ll.warn{color:#FFD600}
+.debug-panel{margin:10px 14px;padding:12px;background:#0a1525;border:1px solid #FF980044;border-radius:6px}
+.dbtn{padding:4px 10px;background:#0d1f35;color:#00C853;border:1px solid #00C85333;border-radius:3px;cursor:pointer;font-family:monospace;font-size:10px;margin:2px}
+pre#dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margin-top:8px;max-height:240px;overflow-y:auto}
+.empty{text-align:center;padding:40px 20px;color:#546E7A;font-size:12px}
+.saved-banner{background:#00C85322;border:1px solid #00C85344;border-radius:4px;padding:5px 12px;font-size:9px;color:#00C853;margin:6px 14px;display:none}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-top">
+    <div>
+      <div class="logo">CONFLUENCE<span>SCREENER</span></div>
+      <div class="subtitle">TWELVE DATA · BATCH MODE · S&P 500 READY · AUTO-SAVE</div>
+    </div>
+    <div class="hstats">
+      <div class="hs"><div class="hs-v" id="h-scanned">0</div><div class="hs-l">SCANNED</div></div>
+      <div class="hs"><div class="hs-v" id="h-passed">0</div><div class="hs-l">PASSED</div></div>
+      <div class="hs"><div class="hs-v" id="h-top">—</div><div class="hs-l">TOP</div></div>
+      <div class="hs"><div class="hs-v" id="h-err">0</div><div class="hs-l">ERRORS</div></div>
+    </div>
+  </div>
+  <div class="stats" id="statsRow" style="display:none">
+    <span><span class="stat-n" id="cnt6" style="color:#00C853">0</span><span class="stat-l">PERFECT 6/6</span></span>
+    <span><span class="stat-n" id="cnt5" style="color:#CCFF00">0</span><span class="stat-l">STRONG 5/6</span></span>
+    <span><span class="stat-n" id="cnt4" style="color:#FFD600">0</span><span class="stat-l">WATCH 4/6</span></span>
+    <span style="margin-left:8px;font-size:9px;color:#546E7A" id="savedAt"></span>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="run-btn" id="runBtn" onclick="startScan()">▶ LIVE SCAN</button>
+  <button class="stop-btn" id="stopBtn" onclick="stopScan()" disabled>■ STOP</button>
+  <button class="clr-btn" onclick="clearSaved()">🗑 CLEAR SAVED</button>
+  <label>LIST</label>
+  <select id="listSel">
+    <option value="watchlist">Watchlist (20)</option>
+    <option value="sp500">S&P 500 (503)</option>
+    <option value="custom">Custom</option>
+  </select>
+  <label>MIN SCORE</label>
+  <select id="minSel">
+    <option value="3">3/6+</option>
+    <option value="4" selected>4/6+</option>
+    <option value="5">5/6+</option>
+    <option value="6">6/6</option>
+  </select>
+  <label>TICKERS</label>
+  <input type="text" id="customTk" placeholder="SOFI,NKE,AAPL" style="width:160px">
+</div>
+
+<div class="prog-wrap" id="progWrap">
+  <div class="prog-top">
+    <span class="prog-msg" id="progMsg">Scanning...</span>
+    <span class="prog-pct" id="progPct">0%</span>
+  </div>
+  <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+  <div class="countdown" id="countdown"></div>
+</div>
+
+<div class="saved-banner" id="savedBanner"></div>
+
+<div class="filter-bar" id="filterBar">
+  <span style="font-size:9px;color:#78909C">SCORE:</span>
+  <button class="chip on" onclick="setFilter('all',this)">ALL</button>
+  <button class="chip" onclick="setFilter(6,this)">6/6</button>
+  <button class="chip" onclick="setFilter(5,this)">5/6</button>
+  <button class="chip" onclick="setFilter(4,this)">4/6</button>
+  <button class="chip" onclick="setFilter(3,this)">3/6</button>
+  <select class="sort-select" id="sortSel" onchange="renderResults()">
+    <option value="score">Sort: Best Score</option>
+    <option value="pullback">Sort: Deepest Pullback</option>
+    <option value="rsi">Sort: Lowest RSI</option>
+    <option value="wr">Sort: Lowest WR</option>
+  </select>
+  <span style="font-size:9px;color:#37474F;margin-left:auto" id="resCount"></span>
+</div>
+
+<div class="log-panel" id="logPanel"></div>
+
+<div class="results" id="results">
+  <div class="empty" id="emptyState" style="grid-column:1/-1">
+    Press ▶ LIVE SCAN · Results appear live · Click any card to open TradingView chart
+  </div>
+</div>
+
+<div class="debug-panel">
+  <div style="font-size:10px;color:#FF9800;font-weight:700;margin-bottom:8px">🔍 DEBUG — Test Single Stock</div>
+  <div>
+    <button class="dbtn" onclick="debugStock('SOFI')">SOFI</button>
+    <button class="dbtn" onclick="debugStock('NKE')">NKE</button>
+    <button class="dbtn" onclick="debugStock('INTC')">INTC</button>
+    <button class="dbtn" onclick="debugStock('CELH')">CELH</button>
+    <button class="dbtn" onclick="debugStock('AAPL')">AAPL</button>
+    <button class="dbtn" onclick="debugStock('HOOD')">HOOD</button>
+    <input type="text" id="customDebug" placeholder="TICKER" style="width:80px;font-size:10px;padding:4px">
+    <button class="dbtn" onclick="debugStock(document.getElementById('customDebug').value.trim().toUpperCase())">TEST →</button>
+  </div>
+  <pre id="dout">Click a ticker to test.</pre>
+</div>
+
+<script>
+const TDKEY = "fceed7ef4b7847d38e1ecd0bddcad5eb";
+const TDBASE = "https://api.twelvedata.com";
+const BATCH_SIZE = 7;      // 7 per batch leaves 1 credit buffer under 8/min limit
+const BATCH_WAIT = 62000;  // ms to wait between batches
+
+const SP500 = ["MMM","AOS","ABT","ABBV","ACN","ADBE","AMD","AES","AFL","A","APD","ABNB","AKAM","ALB","ARE","ALGN","ALLE","LNT","ALL","GOOGL","GOOG","MO","AMZN","AMCR","AEE","AAL","AEP","AXP","AIG","AMT","AWK","AMP","AME","AMGN","APH","ADI","ANSS","AON","APA","AAPL","AMAT","APTV","ACGL","ADM","ANET","AJG","AIZ","T","ATO","ADSK","ADP","AZO","AVB","AVY","AXON","BKR","BALL","BAC","BK","BBWI","BAX","BDX","WRB","BRK/B","BBY","BIO","BIIB","BLK","BX","BA","BKNG","BWA","BSX","BMY","AVGO","BR","BLDR","BG","CDNS","CPT","CPB","COF","CAH","KMX","CCL","CARR","CAT","CBOE","CBRE","CDW","CE","COR","CNC","CDAY","CF","CRL","SCHW","CHTR","CVX","CMG","CB","CHD","CI","CINF","CTAS","CSCO","C","CFG","CLX","CME","CMS","KO","CTSH","CL","CMCSA","CAG","COP","ED","STZ","CEG","COO","CPRT","GLW","CPAY","CTVA","CSGP","COST","CTRA","CRWD","CCI","CSX","CMI","CVS","DHR","DRI","DVA","DAY","DE","DAL","DVN","DXCM","FANG","DLR","DFS","DG","DLTR","D","DPZ","DOV","DOW","DHI","DTE","DUK","DD","EMN","ETN","EBAY","ECL","EIX","EW","EA","ELV","EMR","ENPH","ETR","EOG","EPAM","EQT","EFX","EQIX","EQR","ESS","EL","ETSY","EG","EVRG","ES","EXC","EXPE","EXPD","EXR","XOM","FFIV","FDS","FICO","FAST","FRT","FDX","FIS","FITB","FSLR","FE","FI","FMC","F","FTNT","FTV","FOXA","FOX","BEN","FCX","GRMN","IT","GE","GEHC","GEV","GEN","GNRC","GD","GIS","GM","GPC","GILD","GS","HAL","HIG","HAS","HCA","HSIC","HSY","HES","HPE","HLT","HOLX","HD","HON","HRL","HST","HWM","HPQ","HUBB","HUM","HBAN","HII","IBM","IEX","IDXX","ITW","INCY","IR","PODD","INTC","ICE","IFF","IP","IPG","INTU","ISRG","IVZ","INVH","IQV","IRM","JCI","JPM","K","KVUE","KDP","KEY","KEYS","KMB","KIM","KMI","KLAC","KHC","KR","LHX","LH","LRCX","LW","LVS","LDOS","LEN","LLY","LIN","LYV","LKQ","LMT","L","LOW","LULU","LYB","MTB","MRO","MPC","MKTX","MAR","MMC","MLM","MAS","MA","MTCH","MKC","MCD","MCK","MDT","MRK","META","MET","MTD","MGM","MCHP","MU","MSFT","MAA","MRNA","MHK","MOH","TAP","MDLZ","MPWR","MNST","MCO","MS","MOS","MSI","MSCI","NDAQ","NTAP","NFLX","NEM","NEE","NKE","NI","NDSN","NSC","NTRS","NOC","NCLH","NRG","NUE","NVDA","NVR","NXPI","ORLY","OXY","ODFL","OMC","ON","OKE","ORCL","OTIS","PCAR","PKG","PLTR","PANW","PARA","PH","PAYX","PAYC","PYPL","PNR","PEP","PFE","PCG","PM","PSX","PNW","PNC","POOL","PPG","PPL","PFG","PG","PGR","PLD","PRU","PEG","PTC","PSA","PHM","PWR","QCOM","DGX","RL","RJF","RTX","O","REG","REGN","RF","RSG","RMD","RVTY","ROK","ROL","ROP","ROST","RCL","SPGI","CRM","SBAC","SLB","STX","SRE","NOW","SHW","SPG","SWKS","SJM","SNA","SOLV","SO","LUV","SWK","SBUX","STT","STLD","STE","SYK","SYF","SNPS","SYY","TMUS","TROW","TTWO","TPR","TRGP","TGT","TEL","TDY","TFX","TER","TSLA","TXN","TXT","TMO","TJX","TSCO","TT","TDG","TRV","TRMB","TFC","TYL","TSN","USB","UBER","UDR","ULTA","UNP","UAL","UPS","URI","UNH","UHS","VLO","VTR","VLTO","VRSN","VRSK","VZ","VRTX","VTRS","VICI","V","VST","VMC","WAB","WBA","WMT","DIS","WBD","WM","WAT","WEC","WFC","WELL","WST","WDC","WY","WMB","WTW","GWW","WYNN","XEL","XYL","YUM","ZBRA","ZBH","ZTS"];
+const WATCHLIST = ["SOFI","NKE","AAPL","NVDA","AMD","TSLA","META","GOOGL","MSFT","AMZN","JPM","BAC","PLTR","CRWD","UBER","HOOD","INTC","NOK","CELH","F"];
+const GRADES = {6:{l:"A+ PERFECT",bg:"#00C853",fg:"#000"},5:{l:"A STRONG",bg:"#CCFF00",fg:"#000"},4:{l:"B+ WATCH",bg:"#FFD600",fg:"#000"},3:{l:"B WEAK",bg:"#FF6D00",fg:"#fff"}};
+const LABELS = ["RSI<45","WR<-65","Above EMA21","EMA21 Rising","±10% EMA21","25%+ Off Hi"];
+
+let results=[], stopReq=false, isRunning=false, activeFilter="all", errCount=0, scanned=0;
+
+// ── localStorage save/load ─────────────────────────────────
+function saveResults(){
+  try{
+    localStorage.setItem("cs_results", JSON.stringify(results));
+    localStorage.setItem("cs_saved_at", new Date().toLocaleString());
+    showSavedBanner();
+  }catch(e){}
+}
+function loadSaved(){
+  try{
+    const raw=localStorage.getItem("cs_results");
+    const at=localStorage.getItem("cs_saved_at");
+    if(raw){
+      results=JSON.parse(raw);
+      if(results.length){
+        scanned=results.length;
+        document.getElementById("savedBanner").style.display="block";
+        document.getElementById("savedBanner").textContent="💾 Showing saved scan from "+at+" — "+results.length+" results. Press LIVE SCAN to refresh.";
+        document.getElementById("filterBar").style.display="flex";
+        document.getElementById("statsRow").style.display="flex";
+        renderResults(); updateHdr();
+      }
+    }
+  }catch(e){}
+}
+function clearSaved(){
+  try{localStorage.removeItem("cs_results");localStorage.removeItem("cs_saved_at");}catch(e){}
+  results=[]; scanned=0; errCount=0;
+  document.getElementById("savedBanner").style.display="none";
+  document.getElementById("filterBar").style.display="none";
+  document.getElementById("statsRow").style.display="none";
+  document.getElementById("results").innerHTML='<div class="empty" id="emptyState" style="grid-column:1/-1">Saved results cleared. Press ▶ LIVE SCAN to scan fresh.</div>';
+  updateHdr();
+}
+function showSavedBanner(){
+  const b=document.getElementById("savedBanner");
+  b.style.display="block";
+  b.textContent="💾 Auto-saved "+results.length+" results at "+new Date().toLocaleTimeString();
+  document.getElementById("savedAt").textContent="saved "+new Date().toLocaleTimeString();
+}
+
+// ── Logging ────────────────────────────────────────────────
+function log(msg,type=""){
+  const p=document.getElementById("logPanel");
+  const d=document.createElement("div");
+  d.className="ll "+type;
+  d.textContent="["+new Date().toLocaleTimeString()+"] "+msg;
+  p.appendChild(d);
+  if(p.children.length>500) p.removeChild(p.firstChild);
+  p.scrollTop=p.scrollHeight;
+}
+
+// ── Twelve Data batch fetch ────────────────────────────────
+// Fetches up to 8 symbols in one call — counts as 1 credit per symbol
+async function fetchBatch(symbols){
+  const url = TDBASE+"/time_series?symbol="+symbols.join(",")+"&interval=1day&outputsize=260&apikey="+TDKEY;
+  const r = await fetch(url);
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  const d = await r.json();
+  // TD returns flat object for single symbol, keyed object for multiple
+  // Normalise: always return keyed by symbol
+  if(symbols.length===1){
+    return d; // caller uses batch.length===1 check
+  }
+  return d;
+}
+
+// ── Indicator math ────────────────────────────────────────
+function calcRSI(c,p=14){
+  if(c.length<p+1) return 50;
+  let ag=0,al=0;
+  for(let i=1;i<=p;i++){const d=c[i]-c[i-1];d>=0?ag+=d:al-=d;}
+  ag/=p;al/=p;
+  for(let i=p+1;i<c.length;i++){
+    const d=c[i]-c[i-1];
+    ag=(ag*(p-1)+Math.max(d,0))/p;
+    al=(al*(p-1)+Math.max(-d,0))/p;
+  }
+  return al===0?100:100-100/(1+ag/al);
+}
+function calcEMA(c,p=21){
+  if(c.length<p) return c[c.length-1];
+  const k=2/(p+1);
+  let e=c.slice(0,p).reduce((a,b)=>a+b,0)/p;
+  for(let i=p;i<c.length;i++) e=c[i]*k+e*(1-k);
+  return e;
+}
+
+function scoreFromCandles(sym, data){
+  if(data.status==="error") throw new Error(data.message||"API error");
+  if(!data.values||!data.values.length) throw new Error("No data");
+  const vals=[...data.values].reverse();
+  const closes=vals.map(v=>parseFloat(v.close));
+  const highs =vals.map(v=>parseFloat(v.high));
+  const lows  =vals.map(v=>parseFloat(v.low));
+  if(closes.length<36) throw new Error("Not enough bars");
+
+  const price   = closes[closes.length-1];
+  const prev    = closes[closes.length-2];
+  const change  = ((price-prev)/prev)*100;
+  const rsi     = calcRSI(closes,14);
+  const ema21   = calcEMA(closes,21);
+  const ema21old= calcEMA(closes.slice(0,-5),21);
+  const emaRising=ema21>ema21old;
+  const hh=Math.max(...highs.slice(-14)), ll=Math.min(...lows.slice(-14));
+  const wr=hh===ll?-50:((hh-price)/(hh-ll))*-100;
+  const high52=Math.max(...highs);
+  const pctHi=(price-high52)/high52*100;
+  const pctEMA=(price-ema21)/ema21*100;
+
+  const c1=rsi<45,c2=wr<-65,c3=price>ema21,c4=emaRising,c5=pctEMA>-10,c6=pctHi<-25;
+  const conds=[c1,c2,c3,c4,c5,c6];
+  const score=conds.filter(Boolean).length;
+  return {sym,price,change,rsi,wr,ema21,emaRising,high52,pctHi,pctEMA,c1,c2,c3,c4,c5,c6,score,conds};
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// ── Countdown timer display ────────────────────────────────
+async function runCountdown(secs){
+  const el=document.getElementById("countdown");
+  el.style.display="block";
+  for(let i=secs;i>0;i--){
+    if(stopReq) break;
+    el.textContent="⏸ Rate limit pause — resuming in "+i+"s...";
+    await sleep(1000);
+  }
+  el.style.display="none";
+}
+
+// ── Main scan ──────────────────────────────────────────────
+async function startScan(){
+  if(isRunning) return;
+  isRunning=true; stopReq=false; results=[]; errCount=0; scanned=0;
+  document.getElementById("runBtn").disabled=true;
+  document.getElementById("stopBtn").disabled=false;
+  document.getElementById("progWrap").style.display="block";
+  document.getElementById("filterBar").style.display="none";
+  document.getElementById("statsRow").style.display="none";
+  document.getElementById("savedBanner").style.display="none";
+  document.getElementById("results").innerHTML="";
+  document.getElementById("logPanel").innerHTML="";
+
+  const listVal=document.getElementById("listSel").value;
+  const tickers=listVal==="sp500"?[...SP500]:listVal==="watchlist"?[...WATCHLIST]
+    :document.getElementById("customTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
+  const minScore=parseInt(document.getElementById("minSel").value);
+
+  // Split into batches of BATCH_SIZE
+  const batches=[];
+  for(let i=0;i<tickers.length;i+=BATCH_SIZE) batches.push(tickers.slice(i,i+BATCH_SIZE));
+
+  log("Scan: "+tickers.length+" stocks · "+batches.length+" batches · min "+minScore+"/6","info");
+  log("Batch size: "+BATCH_SIZE+" · Wait: "+BATCH_WAIT/1000+"s between batches","info");
+  const eta=Math.ceil(batches.length*(BATCH_WAIT/1000)/60);
+  log("Estimated time: ~"+eta+" min for full scan","info");
+
+  for(let bi=0;bi<batches.length;bi++){
+    if(stopReq){log("Stopped.","warn");break;}
+    const batch=batches[bi];
+    const prog=Math.round((bi/batches.length)*100);
+    document.getElementById("progMsg").textContent="Batch "+(bi+1)+"/"+batches.length+" — scanning: "+batch.join(", ");
+    document.getElementById("progPct").textContent=prog+"%";
+    document.getElementById("progFill").style.width=prog+"%";
+
+    let batchData;
+    try{
+      batchData = await fetchBatch(batch);
+    }catch(e){
+      log("Batch fetch error: "+e.message+" — retrying after 62s","warn");
+      await runCountdown(62);
+      bi--; continue;
+    }
+
+    // Check if rate limit hit — TD returns status:"error" in JSON even on 200 OK
+    const firstKey = batch[0];
+    const firstData = batch.length===1 ? batchData : (batchData[firstKey]||{});
+    if(firstData.status==="error" && firstData.message && firstData.message.includes("API credits")){
+      log("Rate limit on batch — waiting 62s then retrying...","warn");
+      await runCountdown(62);
+      bi--; continue;
+    }
+
+    for(const sym of batch){
+      if(stopReq) break;
+      try{
+        const data = batch.length===1 ? batchData : (batchData[sym]||{});
+        // Check per-symbol rate limit too
+        if(data.status==="error" && data.message && data.message.includes("API credits")){
+          log("Rate limit mid-batch — will retry remaining in next batch","warn");
+          break;
+        }
+        const r=scoreFromCandles(sym,data);
+        scanned++;
+        if(r.score>=minScore){
+          results.push(r); renderResults();
+          log("✓ "+sym.padEnd(6)+" "+r.score+"/6 | RSI:"+r.rsi.toFixed(1)+" WR:"+r.wr.toFixed(1)+" | "+r.pctHi.toFixed(1)+"% off hi","ok");
+        } else {
+          log("  "+sym.padEnd(6)+" "+r.score+"/6 | RSI:"+r.rsi.toFixed(1)+" WR:"+r.wr.toFixed(1));
+        }
+      }catch(e){errCount++;log("✗ "+sym+": "+e.message,"err");}
+      updateHdr();
+    }
+
+    // Save after each batch
+    saveResults();
+
+    // Only wait if this was a full batch (used all credits)
+    // Partial batches don't hit the rate limit so no wait needed
+    const wasFull = batch.length >= BATCH_SIZE;
+    if(bi<batches.length-1 && !stopReq && wasFull){
+      log("Batch "+(bi+1)+" done ("+batch.length+" stocks) · waiting 62s...","warn");
+      await runCountdown(62);
+    } else if(bi<batches.length-1 && !stopReq){
+      log("Batch "+(bi+1)+" done ("+batch.length+" stocks, partial — no wait)","info");
+      await sleep(1000); // tiny pause to be safe
+    }
+  }
+
+  document.getElementById("progMsg").textContent="Done — "+scanned+" scanned, "+results.length+" passed";
+  document.getElementById("progPct").textContent="100%";
+  document.getElementById("progFill").style.width="100%";
+  document.getElementById("runBtn").disabled=false;
+  document.getElementById("stopBtn").disabled=true;
+  isRunning=false;
+  if(results.length){
+    document.getElementById("filterBar").style.display="flex";
+    document.getElementById("statsRow").style.display="flex";
+    saveResults();
+  }
+  log("Complete. "+results.length+" passed. Results auto-saved.","info");
+}
+
+function stopScan(){stopReq=true;document.getElementById("stopBtn").disabled=true;log("Stop requested...","warn");}
+
+function updateHdr(){
+  document.getElementById("h-scanned").textContent=scanned;
+  document.getElementById("h-passed").textContent=results.length;
+  document.getElementById("h-err").textContent=errCount;
+  document.getElementById("h-top").textContent=results.length?Math.max(...results.map(r=>r.score))+"/6":"—";
+  document.getElementById("cnt6").textContent=results.filter(r=>r.score===6).length;
+  document.getElementById("cnt5").textContent=results.filter(r=>r.score===5).length;
+  document.getElementById("cnt4").textContent=results.filter(r=>r.score===4).length;
+}
+
+function setFilter(v,btn){
+  activeFilter=v;
+  document.querySelectorAll(".chip").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on");
+  renderResults();
+}
+
+function renderResults(){
+  const min=parseInt(document.getElementById("minSel").value);
+  const sort=document.getElementById("sortSel")?.value||"score";
+  let filtered=results.filter(r=>r.score>=min);
+  if(activeFilter!=="all") filtered=filtered.filter(r=>r.score===activeFilter);
+
+  // Sort options
+  filtered.sort((a,b)=>{
+    if(sort==="pullback") return a.pctHi-b.pctHi;         // deepest pullback first
+    if(sort==="rsi")      return a.rsi-b.rsi;              // lowest RSI first
+    if(sort==="wr")       return a.wr-b.wr;                // lowest WR first
+    return b.score-a.score||a.pctHi-b.pctHi;              // default: score then pullback
+  });
+
+  document.getElementById("resCount").textContent=filtered.length+" shown";
+  const grid=document.getElementById("results");
+  if(!filtered.length){
+    grid.innerHTML='<div class="empty" id="emptyState" style="grid-column:1/-1">No results yet. Press ▶ LIVE SCAN to start.</div>';
+    return;
+  }
+  grid.innerHTML=filtered.map((s,i)=>renderCard(s,i)).join("");
+  updateHdr();
+}
+
+function openChart(sym){
+  window.open("https://www.tradingview.com/chart/?symbol="+sym,"_blank");
+}
+
+function renderCard(s,idx){
+  const g=GRADES[s.score]||{l:"SKIP",bg:"#546E7A",fg:"#fff"};
+  const rC=s.rsi<30?"#00C853":s.rsi<45?"#64DD17":s.rsi>70?"#FF5252":"#78909C";
+  const wC=s.wr<-80?"#00C853":s.wr<-65?"#64DD17":"#78909C";
+  const cc=s.score>=6?"s6":s.score>=5?"s5":"";
+  const dots=s.conds.map((on,i)=>`<div class="dot" title="${LABELS[i]}" style="background:${on?g.bg:"#0d1f35"}"></div>`).join("");
+  const tags=LABELS.map((lbl,i)=>`<span class="tag" style="background:${s.conds[i]?g.bg+"22":"#0d1f35"};color:${s.conds[i]?g.bg:"#546E7A"};border:1px solid ${s.conds[i]?g.bg+"44":"#0b1a2e"}">${s.conds[i]?"✓":"✗"} ${lbl}</span>`).join("");
+  return `<div class="card ${cc}" onclick="openChart('${s.sym}')">
+    <div class="card-top">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:10px;color:#546E7A">#${idx+1}</span>
+          <span class="ticker">${s.sym}</span>
+          <span style="font-size:9px;padding:2px 7px;border-radius:3px;font-weight:700;background:${g.bg};color:${g.fg}">${g.l}</span>
+        </div>
+        <div class="tv-hint">📈 click to open TradingView</div>
+      </div>
+      <div>
+        <div class="price">$${s.price.toFixed(2)}</div>
+        <div class="chg ${s.change>=0?"cpos":"cneg"}">${s.change>=0?"▲":"▼"}${Math.abs(s.change).toFixed(2)}%</div>
+      </div>
+    </div>
+    <div class="dots">${dots}<span class="score-txt" style="color:${g.bg}">${s.score}/6</span></div>
+    <div class="bars">
+      <div><div class="bar-lbl">RSI14</div><div class="bar-row"><div class="bar-track"><div class="bar-fill" style="width:${s.rsi}%;background:${rC}"></div></div><span class="bar-val" style="color:${rC}">${s.rsi.toFixed(1)}</span></div></div>
+      <div><div class="bar-lbl">Williams %R</div><div class="bar-row"><div class="bar-track"><div class="bar-fill" style="width:${Math.abs(s.wr)}%;background:${wC}"></div></div><span class="bar-val" style="color:${wC}">${s.wr.toFixed(1)}</span></div></div>
+    </div>
+    <div class="info-row">
+      <span style="color:${s.c3?"#00C853":"#FF5252"}">${s.c3?"▲ ABOVE":"▼ BELOW"} EMA21 ($${s.ema21.toFixed(2)})</span>
+      <span style="color:${s.c4?"#00C853":"#FF5252"}">${s.c4?"EMA RISING":"EMA FALLING"}</span>
+    </div>
+    <div class="tags">
+      <div class="tag-row">${tags}</div>
+      <div style="margin-top:5px;font-size:8px;color:${s.pctHi<-40?"#00C853":s.pctHi<-25?"#FFD600":"#78909C"}">
+        📉 ${s.pctHi.toFixed(1)}% from 52w high · Hi $${s.high52.toFixed(2)}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Debug single stock ─────────────────────────────────────
+async function debugStock(sym){
+  if(!sym) return;
+  const out=document.getElementById("dout");
+  out.style.color="#00b0ff";
+  out.textContent="Fetching "+sym+"...";
+  try{
+    const bd=await fetchBatch([sym]);
+    const data=bd[sym]||bd;
+    const s=scoreFromCandles(sym,data);
+    const p=(pass,lbl,val)=>(pass?"✅":"❌")+" "+lbl+": "+val;
+    out.style.color=s.score>=4?"#00C853":s.score>=2?"#FFD600":"#90A4AE";
+    out.textContent=[
+      "══ "+sym+" — "+((bd[sym]||bd).values||[]).length+" bars ══",
+      "Price: $"+s.price.toFixed(2)+"  (chg: "+s.change.toFixed(2)+"%)",
+      "",
+      p(s.c1,"C1 RSI14 < 45       ",s.rsi.toFixed(1)),
+      p(s.c2,"C2 WR14 < -65       ",s.wr.toFixed(1)),
+      p(s.c3,"C3 Above EMA21      ","EMA $"+s.ema21.toFixed(2)),
+      p(s.c4,"C4 EMA21 Rising     ",s.emaRising?"yes ↑":"no ↓"),
+      p(s.c5,"C5 Within 10% EMA21 ",s.pctEMA.toFixed(1)+"%"),
+      p(s.c6,"C6 -25% off 52w Hi  ",s.pctHi.toFixed(1)+"%  Hi: $"+s.high52.toFixed(2)),
+      "",
+      "SCORE: "+s.score+"/6  "+[s.c1,s.c2,s.c3,s.c4,s.c5,s.c6].map((c,i)=>"C"+(i+1)+":"+(c?"✅":"❌")).join(" "),
+    ].join("\n");
+  }catch(e){
+    out.style.color="#FF5252";
+    out.textContent=sym+" ERROR: "+e.message;
+  }
+}
+
+// ── Init — load saved results on page open ─────────────────
+loadSaved();
+</script>
+</body>
+</html>
