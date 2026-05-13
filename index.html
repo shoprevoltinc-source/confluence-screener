@@ -13,7 +13,7 @@ body{background:#05080f;color:#e0e8ff;font-family:'Courier New',monospace;paddin
 .logo span{color:#00b0ff;font-weight:400}
 .subtitle{font-size:8px;color:#00b0ff;margin-top:2px;letter-spacing:1px}
 .hstats{display:flex;gap:16px}
-.hs{text-align:center;cursor:default}
+.hs{text-align:center}
 .hs-v{font-size:18px;font-weight:700;color:#00b0ff}
 .hs-l{font-size:9px;color:#546E7A;letter-spacing:1px}
 .stats{display:flex;gap:16px;margin-top:8px;flex-wrap:wrap}
@@ -32,7 +32,6 @@ select,input[type=number],input[type=text]{background:#0a1525;border:1px solid #
 .prog-pct{font-size:9px;color:#546E7A}
 .prog-track{height:3px;background:#0b1a2e;border-radius:2px;overflow:hidden;margin-bottom:3px}
 .prog-fill{height:3px;background:linear-gradient(90deg,#00C853,#00E676);width:0%;transition:width 0.4s}
-.countdown{font-size:10px;color:#FFD600;font-weight:700;display:none;margin-top:2px}
 .filter-bar{padding:8px 14px;display:none;gap:5px;flex-wrap:wrap;align-items:center;background:#060a13;border-bottom:1px solid #0b1a2e}
 .chip{padding:4px 10px;font-family:monospace;font-size:9px;font-weight:700;cursor:pointer;border-radius:4px;border:1px solid #1e3a5f;background:transparent;color:#78909C}
 .chip.on{border-color:#00C85566;background:#00C85322;color:#00C853}
@@ -51,7 +50,7 @@ select,input[type=number],input[type=text]{background:#0a1525;border:1px solid #
 .chg{font-size:10px;margin-top:1px;text-align:right}
 .cpos{color:#00C853}.cneg{color:#FF5252}
 .dots{display:flex;gap:4px;margin-bottom:7px;align-items:center}
-.dot{width:12px;height:12px;border-radius:3px;transition:opacity 0.2s}
+.dot{width:12px;height:12px;border-radius:3px}
 .score-txt{font-size:11px;font-weight:700;margin-left:4px}
 .bars{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:7px}
 .bar-lbl{font-size:9px;color:#78909C;margin-bottom:2px}
@@ -63,15 +62,13 @@ select,input[type=number],input[type=text]{background:#0a1525;border:1px solid #
 .tags{padding-top:7px;border-top:1px solid #0b1a2e}
 .tag-row{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px}
 .tag{font-size:8px;padding:2px 6px;border-radius:3px}
-.tv-btn{display:inline-block;margin-top:5px;padding:4px 10px;background:#1565C0;color:#90CAF9;border:1px solid #1976D244;border-radius:3px;font-size:9px;font-weight:700;text-decoration:none;letter-spacing:1px}
-.tv-btn:hover{background:#1976D2;color:#fff}
 .log-panel{margin:8px 14px;padding:10px;background:#040709;border:1px solid #0b1a2e;border-radius:6px;max-height:140px;overflow-y:auto;font-size:10px}
 .ll{padding:1px 0;color:#546E7A}
 .ll.ok{color:#5cdb95}.ll.err{color:#FF5252}.ll.info{color:#00b0ff}.ll.warn{color:#FFD600}
 .debug-panel{margin:10px 14px;padding:12px;background:#0a1525;border:1px solid #FF980044;border-radius:6px}
 .dbtn{padding:4px 10px;background:#0d1f35;color:#00C853;border:1px solid #00C85333;border-radius:3px;cursor:pointer;font-family:monospace;font-size:10px;margin:2px}
-pre#dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margin-top:8px;max-height:240px;overflow-y:auto}
-.empty{text-align:center;padding:40px 20px;color:#546E7A;font-size:12px}
+pre#dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margin-top:8px;max-height:260px;overflow-y:auto}
+.empty{text-align:center;padding:40px 20px;color:#546E7A;font-size:12px;grid-column:1/-1}
 .saved-banner{background:#00C85322;border:1px solid #00C85344;border-radius:4px;padding:5px 12px;font-size:9px;color:#00C853;margin:6px 14px;display:none}
 </style>
 </head>
@@ -81,7 +78,7 @@ pre#dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
   <div class="hdr-top">
     <div>
       <div class="logo">CONFLUENCE<span>SCREENER</span></div>
-      <div class="subtitle">YAHOO FINANCE · NO RATE LIMITS · S&P 500 · AUTO-SAVE</div>
+      <div class="subtitle">TIINGO · FREE 500/HR · S&P 500 · AUTO-SAVE · TRADINGVIEW</div>
     </div>
     <div class="hstats">
       <div class="hs"><div class="hs-v" id="h-scanned">0</div><div class="hs-l">SCANNED</div></div>
@@ -101,7 +98,7 @@ pre#dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
 <div class="controls">
   <button class="run-btn" id="runBtn" onclick="startScan()">▶ LIVE SCAN</button>
   <button class="stop-btn" id="stopBtn" onclick="stopScan()" disabled>■ STOP</button>
-  <button class="clr-btn" onclick="clearSaved()">🗑 CLEAR SAVED</button>
+  <button class="clr-btn" onclick="clearSaved()">🗑 CLEAR</button>
   <label>LIST</label>
   <select id="listSel">
     <option value="watchlist">Watchlist (20)</option>
@@ -125,7 +122,6 @@ pre#dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
     <span class="prog-pct" id="progPct">0%</span>
   </div>
   <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
-  <div class="countdown" id="countdown"></div>
 </div>
 
 <div class="saved-banner" id="savedBanner"></div>
@@ -149,9 +145,7 @@ pre#dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
 <div class="log-panel" id="logPanel"></div>
 
 <div class="results" id="results">
-  <div class="empty" id="emptyState" style="grid-column:1/-1">
-    Press ▶ LIVE SCAN · Results appear live · Click any card to open TradingView chart
-  </div>
+  <div class="empty">Press ▶ LIVE SCAN · Results appear live · Click any card to open TradingView</div>
 </div>
 
 <div class="debug-panel">
@@ -170,24 +164,25 @@ pre#dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
 </div>
 
 <script>
-// Yahoo Finance — free, no key, no rate limits, works from https://
-// No batch needed — fetch each stock directly, fast
-const BATCH_SIZE = 503;   // process all at once, no rate limit waits
-const BATCH_WAIT = 0;
+const TIINGO_TOKEN = "673d28cd068cd6244388630269820387ef26fa11";
+const TIINGO_BASE  = "https://api.tiingo.com/tiingo/daily";
 
-const SP500 = ["MMM","AOS","ABT","ABBV","ACN","ADBE","AMD","AES","AFL","A","APD","ABNB","AKAM","ALB","ARE","ALGN","ALLE","LNT","ALL","GOOGL","GOOG","MO","AMZN","AMCR","AEE","AAL","AEP","AXP","AIG","AMT","AWK","AMP","AME","AMGN","APH","ADI","ANSS","AON","APA","AAPL","AMAT","APTV","ACGL","ADM","ANET","AJG","AIZ","T","ATO","ADSK","ADP","AZO","AVB","AVY","AXON","BKR","BALL","BAC","BK","BBWI","BAX","BDX","WRB","BRK/B","BBY","BIO","BIIB","BLK","BX","BA","BKNG","BWA","BSX","BMY","AVGO","BR","BLDR","BG","CDNS","CPT","CPB","COF","CAH","KMX","CCL","CARR","CAT","CBOE","CBRE","CDW","CE","COR","CNC","CDAY","CF","CRL","SCHW","CHTR","CVX","CMG","CB","CHD","CI","CINF","CTAS","CSCO","C","CFG","CLX","CME","CMS","KO","CTSH","CL","CMCSA","CAG","COP","ED","STZ","CEG","COO","CPRT","GLW","CPAY","CTVA","CSGP","COST","CTRA","CRWD","CCI","CSX","CMI","CVS","DHR","DRI","DVA","DAY","DE","DAL","DVN","DXCM","FANG","DLR","DFS","DG","DLTR","D","DPZ","DOV","DOW","DHI","DTE","DUK","DD","EMN","ETN","EBAY","ECL","EIX","EW","EA","ELV","EMR","ENPH","ETR","EOG","EPAM","EQT","EFX","EQIX","EQR","ESS","EL","ETSY","EG","EVRG","ES","EXC","EXPE","EXPD","EXR","XOM","FFIV","FDS","FICO","FAST","FRT","FDX","FIS","FITB","FSLR","FE","FI","FMC","F","FTNT","FTV","FOXA","FOX","BEN","FCX","GRMN","IT","GE","GEHC","GEV","GEN","GNRC","GD","GIS","GM","GPC","GILD","GS","HAL","HIG","HAS","HCA","HSIC","HSY","HES","HPE","HLT","HOLX","HD","HON","HRL","HST","HWM","HPQ","HUBB","HUM","HBAN","HII","IBM","IEX","IDXX","ITW","INCY","IR","PODD","INTC","ICE","IFF","IP","IPG","INTU","ISRG","IVZ","INVH","IQV","IRM","JCI","JPM","K","KVUE","KDP","KEY","KEYS","KMB","KIM","KMI","KLAC","KHC","KR","LHX","LH","LRCX","LW","LVS","LDOS","LEN","LLY","LIN","LYV","LKQ","LMT","L","LOW","LULU","LYB","MTB","MRO","MPC","MKTX","MAR","MMC","MLM","MAS","MA","MTCH","MKC","MCD","MCK","MDT","MRK","META","MET","MTD","MGM","MCHP","MU","MSFT","MAA","MRNA","MHK","MOH","TAP","MDLZ","MPWR","MNST","MCO","MS","MOS","MSI","MSCI","NDAQ","NTAP","NFLX","NEM","NEE","NKE","NI","NDSN","NSC","NTRS","NOC","NCLH","NRG","NUE","NVDA","NVR","NXPI","ORLY","OXY","ODFL","OMC","ON","OKE","ORCL","OTIS","PCAR","PKG","PLTR","PANW","PARA","PH","PAYX","PAYC","PYPL","PNR","PEP","PFE","PCG","PM","PSX","PNW","PNC","POOL","PPG","PPL","PFG","PG","PGR","PLD","PRU","PEG","PTC","PSA","PHM","PWR","QCOM","DGX","RL","RJF","RTX","O","REG","REGN","RF","RSG","RMD","RVTY","ROK","ROL","ROP","ROST","RCL","SPGI","CRM","SBAC","SLB","STX","SRE","NOW","SHW","SPG","SWKS","SJM","SNA","SOLV","SO","LUV","SWK","SBUX","STT","STLD","STE","SYK","SYF","SNPS","SYY","TMUS","TROW","TTWO","TPR","TRGP","TGT","TEL","TDY","TFX","TER","TSLA","TXN","TXT","TMO","TJX","TSCO","TT","TDG","TRV","TRMB","TFC","TYL","TSN","USB","UBER","UDR","ULTA","UNP","UAL","UPS","URI","UNH","UHS","VLO","VTR","VLTO","VRSN","VRSK","VZ","VRTX","VTRS","VICI","V","VST","VMC","WAB","WBA","WMT","DIS","WBD","WM","WAT","WEC","WFC","WELL","WST","WDC","WY","WMB","WTW","GWW","WYNN","XEL","XYL","YUM","ZBRA","ZBH","ZTS"];
+const SP500 = ["MMM","AOS","ABT","ABBV","ACN","ADBE","AMD","AES","AFL","A","APD","ABNB","AKAM","ALB","ARE","ALGN","ALLE","LNT","ALL","GOOGL","GOOG","MO","AMZN","AMCR","AEE","AAL","AEP","AXP","AIG","AMT","AWK","AMP","AME","AMGN","APH","ADI","ANSS","AON","APA","AAPL","AMAT","APTV","ACGL","ADM","ANET","AJG","AIZ","T","ATO","ADSK","ADP","AZO","AVB","AVY","AXON","BKR","BALL","BAC","BK","BBWI","BAX","BDX","WRB","BRK-B","BBY","BIO","BIIB","BLK","BX","BA","BKNG","BWA","BSX","BMY","AVGO","BR","BLDR","BG","CDNS","CPT","CPB","COF","CAH","KMX","CCL","CARR","CAT","CBOE","CBRE","CDW","CE","COR","CNC","CDAY","CF","CRL","SCHW","CHTR","CVX","CMG","CB","CHD","CI","CINF","CTAS","CSCO","C","CFG","CLX","CME","CMS","KO","CTSH","CL","CMCSA","CAG","COP","ED","STZ","CEG","COO","CPRT","GLW","CPAY","CTVA","CSGP","COST","CTRA","CRWD","CCI","CSX","CMI","CVS","DHR","DRI","DVA","DAY","DE","DAL","DVN","DXCM","FANG","DLR","DFS","DG","DLTR","D","DPZ","DOV","DOW","DHI","DTE","DUK","DD","EMN","ETN","EBAY","ECL","EIX","EW","EA","ELV","EMR","ENPH","ETR","EOG","EPAM","EQT","EFX","EQIX","EQR","ESS","EL","ETSY","EG","EVRG","ES","EXC","EXPE","EXPD","EXR","XOM","FFIV","FDS","FICO","FAST","FRT","FDX","FIS","FITB","FSLR","FE","FI","FMC","F","FTNT","FTV","FOXA","FOX","BEN","FCX","GRMN","IT","GE","GEHC","GEV","GEN","GNRC","GD","GIS","GM","GPC","GILD","GS","HAL","HIG","HAS","HCA","HSIC","HSY","HES","HPE","HLT","HOLX","HD","HON","HRL","HST","HWM","HPQ","HUBB","HUM","HBAN","HII","IBM","IEX","IDXX","ITW","INCY","IR","PODD","INTC","ICE","IFF","IP","IPG","INTU","ISRG","IVZ","INVH","IQV","IRM","JCI","JPM","K","KVUE","KDP","KEY","KEYS","KMB","KIM","KMI","KLAC","KHC","KR","LHX","LH","LRCX","LW","LVS","LDOS","LEN","LLY","LIN","LYV","LKQ","LMT","L","LOW","LULU","LYB","MTB","MRO","MPC","MKTX","MAR","MMC","MLM","MAS","MA","MTCH","MKC","MCD","MCK","MDT","MRK","META","MET","MTD","MGM","MCHP","MU","MSFT","MAA","MRNA","MHK","MOH","TAP","MDLZ","MPWR","MNST","MCO","MS","MOS","MSI","MSCI","NDAQ","NTAP","NFLX","NEM","NEE","NKE","NI","NDSN","NSC","NTRS","NOC","NCLH","NRG","NUE","NVDA","NVR","NXPI","ORLY","OXY","ODFL","OMC","ON","OKE","ORCL","OTIS","PCAR","PKG","PLTR","PANW","PARA","PH","PAYX","PAYC","PYPL","PNR","PEP","PFE","PCG","PM","PSX","PNW","PNC","POOL","PPG","PPL","PFG","PG","PGR","PLD","PRU","PEG","PTC","PSA","PHM","PWR","QCOM","DGX","RL","RJF","RTX","O","REG","REGN","RF","RSG","RMD","RVTY","ROK","ROL","ROP","ROST","RCL","SPGI","CRM","SBAC","SLB","STX","SRE","NOW","SHW","SPG","SWKS","SJM","SNA","SOLV","SO","LUV","SWK","SBUX","STT","STLD","STE","SYK","SYF","SNPS","SYY","TMUS","TROW","TTWO","TPR","TRGP","TGT","TEL","TDY","TFX","TER","TSLA","TXN","TXT","TMO","TJX","TSCO","TT","TDG","TRV","TRMB","TFC","TYL","TSN","USB","UBER","UDR","ULTA","UNP","UAL","UPS","URI","UNH","UHS","VLO","VTR","VLTO","VRSN","VRSK","VZ","VRTX","VTRS","VICI","V","VST","VMC","WAB","WBA","WMT","DIS","WBD","WM","WAT","WEC","WFC","WELL","WST","WDC","WY","WMB","WTW","GWW","WYNN","XEL","XYL","YUM","ZBRA","ZBH","ZTS"];
 const WATCHLIST = ["SOFI","NKE","AAPL","NVDA","AMD","TSLA","META","GOOGL","MSFT","AMZN","JPM","BAC","PLTR","CRWD","UBER","HOOD","INTC","NOK","CELH","F"];
 const GRADES = {6:{l:"A+ PERFECT",bg:"#00C853",fg:"#000"},5:{l:"A STRONG",bg:"#CCFF00",fg:"#000"},4:{l:"B+ WATCH",bg:"#FFD600",fg:"#000"},3:{l:"B WEAK",bg:"#FF6D00",fg:"#fff"}};
 const LABELS = ["RSI<45","WR<-65","Above EMA21","EMA21 Rising","±10% EMA21","25%+ Off Hi"];
 
 let results=[], stopReq=false, isRunning=false, activeFilter="all", errCount=0, scanned=0;
 
-// ── localStorage save/load ─────────────────────────────────
+// ── Save / Load ────────────────────────────────────────────
 function saveResults(){
   try{
-    localStorage.setItem("cs_results", JSON.stringify(results));
-    localStorage.setItem("cs_saved_at", new Date().toLocaleString());
-    showSavedBanner();
+    localStorage.setItem("cs_results",JSON.stringify(results));
+    localStorage.setItem("cs_saved_at",new Date().toLocaleString());
+    const b=document.getElementById("savedBanner");
+    b.style.display="block";
+    b.textContent="💾 Auto-saved "+results.length+" results at "+new Date().toLocaleTimeString();
+    document.getElementById("savedAt").textContent="saved "+new Date().toLocaleTimeString();
   }catch(e){}
 }
 function loadSaved(){
@@ -199,7 +194,7 @@ function loadSaved(){
       if(results.length){
         scanned=results.length;
         document.getElementById("savedBanner").style.display="block";
-        document.getElementById("savedBanner").textContent="💾 Showing saved scan from "+at+" — "+results.length+" results. Press LIVE SCAN to refresh.";
+        document.getElementById("savedBanner").textContent="💾 Saved scan from "+at+" — "+results.length+" results. Press LIVE SCAN to refresh.";
         document.getElementById("filterBar").style.display="flex";
         document.getElementById("statsRow").style.display="flex";
         renderResults(); updateHdr();
@@ -213,14 +208,8 @@ function clearSaved(){
   document.getElementById("savedBanner").style.display="none";
   document.getElementById("filterBar").style.display="none";
   document.getElementById("statsRow").style.display="none";
-  document.getElementById("results").innerHTML='<div class="empty" id="emptyState" style="grid-column:1/-1">Saved results cleared. Press ▶ LIVE SCAN to scan fresh.</div>';
+  document.getElementById("results").innerHTML='<div class="empty">Cleared. Press ▶ LIVE SCAN to scan fresh.</div>';
   updateHdr();
-}
-function showSavedBanner(){
-  const b=document.getElementById("savedBanner");
-  b.style.display="block";
-  b.textContent="💾 Auto-saved "+results.length+" results at "+new Date().toLocaleTimeString();
-  document.getElementById("savedAt").textContent="saved "+new Date().toLocaleTimeString();
 }
 
 // ── Logging ────────────────────────────────────────────────
@@ -234,22 +223,26 @@ function log(msg,type=""){
   p.scrollTop=p.scrollHeight;
 }
 
-// ── Yahoo Finance fetch — free, no key, no rate limits ────────────────
-async function fetchBatch(symbols){
-  // Yahoo: one call per symbol, returns 1yr daily OHLCV
-  const results = {};
-  for(const sym of symbols){
-    const ySym = sym.replace(".","-");
-    const url = "https://query1.finance.yahoo.com/v8/finance/chart/"+ySym+"?interval=1d&range=1y";
-    const r = await fetch(url);
-    if(!r.ok) throw new Error("Yahoo HTTP "+r.status+" for "+sym);
-    const d = await r.json();
-    results[sym] = d;
-  }
-  return results;
+// ── Tiingo fetch ───────────────────────────────────────────
+async function fetchCandles(sym){
+  const startDate = new Date(Date.now() - 380*24*60*60*1000).toISOString().split("T")[0];
+  const url = TIINGO_BASE+"/"+sym+"/prices?startDate="+startDate+"&token="+TIINGO_TOKEN;
+  const r = await fetch(url, {headers:{"Content-Type":"application/json"}});
+  if(r.status===404) throw new Error("Symbol not found");
+  if(r.status===429) throw new Error("Rate limit — try again in a minute");
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  const data = await r.json();
+  if(!data||!data.length) throw new Error("No data returned");
+  // Tiingo returns oldest-first already
+  return {
+    closes: data.map(d=>d.adjClose||d.close),
+    highs:  data.map(d=>d.high),
+    lows:   data.map(d=>d.low),
+    bars:   data.length
+  };
 }
 
-// ── Indicator math ────────────────────────────────────────
+// ── Indicators ─────────────────────────────────────────────
 function calcRSI(c,p=14){
   if(c.length<p+1) return 50;
   let ag=0,al=0;
@@ -270,53 +263,26 @@ function calcEMA(c,p=21){
   return e;
 }
 
-function scoreFromCandles(sym, data){
-  // Parse Yahoo Finance v8 format
-  const res = data?.chart?.result?.[0];
-  if(!res) throw new Error("No Yahoo result");
-  const q = res.indicators?.quote?.[0];
-  if(!q) throw new Error("No Yahoo OHLCV");
-  const rawC=q.close, rawH=q.high, rawL=q.low;
-  // Filter out null bars
-  const valid=rawC.map((c,i)=>({c,h:rawH[i],l:rawL[i]})).filter(b=>b.c!=null&&b.h!=null&&b.l!=null);
-  if(!valid.length) throw new Error("No valid bars");
-  const closes=valid.map(b=>b.c);
-  const highs =valid.map(b=>b.h);
-  const lows  =valid.map(b=>b.l);
-  if(closes.length<36) throw new Error("Not enough bars");
-
-  const price   = closes[closes.length-1];
-  const prev    = closes[closes.length-2];
-  const change  = ((price-prev)/prev)*100;
-  const rsi     = calcRSI(closes,14);
-  const ema21   = calcEMA(closes,21);
-  const ema21old= calcEMA(closes.slice(0,-5),21);
-  const emaRising=ema21>ema21old;
+function scoreStock(sym, closes, highs, lows){
+  if(closes.length<36) throw new Error("Not enough bars: "+closes.length);
+  const price    = closes[closes.length-1];
+  const prev     = closes[closes.length-2];
+  const change   = ((price-prev)/prev)*100;
+  const rsi      = calcRSI(closes,14);
+  const ema21    = calcEMA(closes,21);
+  const ema21old = calcEMA(closes.slice(0,-5),21);
+  const emaRising= ema21>ema21old;
   const hh=Math.max(...highs.slice(-14)), ll=Math.min(...lows.slice(-14));
   const wr=hh===ll?-50:((hh-price)/(hh-ll))*-100;
   const high52=Math.max(...highs);
   const pctHi=(price-high52)/high52*100;
   const pctEMA=(price-ema21)/ema21*100;
-
   const c1=rsi<45,c2=wr<-65,c3=price>ema21,c4=emaRising,c5=pctEMA>-10,c6=pctHi<-25;
   const conds=[c1,c2,c3,c4,c5,c6];
-  const score=conds.filter(Boolean).length;
-  return {sym,price,change,rsi,wr,ema21,emaRising,high52,pctHi,pctEMA,c1,c2,c3,c4,c5,c6,score,conds};
+  return {sym,price,change,rsi,wr,ema21,emaRising,high52,pctHi,pctEMA,c1,c2,c3,c4,c5,c6,score:conds.filter(Boolean).length,conds};
 }
 
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
-
-// ── Countdown timer display ────────────────────────────────
-async function runCountdown(secs){
-  const el=document.getElementById("countdown");
-  el.style.display="block";
-  for(let i=secs;i>0;i--){
-    if(stopReq) break;
-    el.textContent="⏸ Rate limit pause — resuming in "+i+"s...";
-    await sleep(1000);
-  }
-  el.style.display="none";
-}
 
 // ── Main scan ──────────────────────────────────────────────
 async function startScan(){
@@ -336,48 +302,40 @@ async function startScan(){
     :document.getElementById("customTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
   const minScore=parseInt(document.getElementById("minSel").value);
 
-  // Split into batches of BATCH_SIZE
-  const batches=[];
-  for(let i=0;i<tickers.length;i+=BATCH_SIZE) batches.push(tickers.slice(i,i+BATCH_SIZE));
+  log("Scan: "+tickers.length+" stocks · Tiingo free (500/hr) · min "+minScore+"/6","info");
+  log("Est. time: ~"+Math.ceil(tickers.length*0.15/60)+" min","info");
 
-  log("Scan: "+tickers.length+" stocks · "+batches.length+" batches · min "+minScore+"/6","info");
-  log("Batch size: "+BATCH_SIZE+" · Wait: "+BATCH_WAIT/1000+"s between batches","info");
-  log("Estimated time: ~"+Math.ceil(tickers.length*0.12/60*100)/100+" min (Yahoo, no rate limits)","info");
-
-  for(let bi=0;bi<batches.length;bi++){
+  for(let i=0;i<tickers.length;i++){
     if(stopReq){log("Stopped.","warn");break;}
-    const batch=batches[bi];
-    const prog=Math.round((bi/batches.length)*100);
-    document.getElementById("progMsg").textContent="Batch "+(bi+1)+"/"+batches.length+" — scanning: "+batch.join(", ");
-    document.getElementById("progPct").textContent=prog+"%";
-    document.getElementById("progFill").style.width=prog+"%";
+    const sym=tickers[i];
+    const pct=Math.round((i/tickers.length)*100);
+    document.getElementById("progMsg").textContent="Scanning "+sym+" ("+(i+1)+"/"+tickers.length+")";
+    document.getElementById("progPct").textContent=pct+"%";
+    document.getElementById("progFill").style.width=pct+"%";
 
-    for(const sym of batch){
-      if(stopReq) break;
-      document.getElementById("progMsg").textContent="Scanning "+sym+" ("+(scanned+errCount+1)+"/"+tickers.length+")";
-      try{
-        const ySym = sym.replace(".","-");
-        const url = "https://query1.finance.yahoo.com/v8/finance/chart/"+ySym+"?interval=1d&range=1y";
-        const r = await fetch(url);
-        if(!r.ok) throw new Error("Yahoo HTTP "+r.status);
-        const d = await r.json();
-        const result = scoreFromCandles(sym, d);
-        scanned++;
-        if(result.score>=minScore){
-          results.push(result); renderResults();
-          log("✓ "+sym.padEnd(6)+" "+result.score+"/6 | RSI:"+result.rsi.toFixed(1)+" WR:"+result.wr.toFixed(1)+" | "+result.pctHi.toFixed(1)+"% off hi","ok");
-        } else {
-          log("  "+sym.padEnd(6)+" "+result.score+"/6 | RSI:"+result.rsi.toFixed(1)+" WR:"+result.wr.toFixed(1));
-        }
-      }catch(e){errCount++;log("✗ "+sym+": "+e.message,"err");}
-      updateHdr();
-      await sleep(120); // tiny gap to avoid overwhelming Yahoo
+    try{
+      const {closes,highs,lows}=await fetchCandles(sym);
+      const r=scoreStock(sym,closes,highs,lows);
+      scanned++;
+      if(r.score>=minScore){
+        results.push(r); renderResults();
+        log("✓ "+sym.padEnd(6)+" "+r.score+"/6 | RSI:"+r.rsi.toFixed(1)+" WR:"+r.wr.toFixed(1)+" | "+r.pctHi.toFixed(1)+"% off hi","ok");
+      } else {
+        log("  "+sym.padEnd(6)+" "+r.score+"/6 | RSI:"+r.rsi.toFixed(1)+" WR:"+r.wr.toFixed(1));
+      }
+    }catch(e){
+      errCount++;
+      log("✗ "+sym+": "+e.message,"err");
+      if(e.message.includes("Rate limit")){
+        log("Waiting 61s for rate limit reset...","warn");
+        await sleep(61000);
+        i--; continue;
+      }
     }
-
-    // Save after each batch
-    saveResults();
-
-    // Yahoo has no rate limits — no wait needed between batches
+    updateHdr();
+    // Save every 20 stocks
+    if(scanned%20===0) saveResults();
+    await sleep(100); // 100ms gap = ~10 req/sec, well under 500/hr
   }
 
   document.getElementById("progMsg").textContent="Done — "+scanned+" scanned, "+results.length+" passed";
@@ -391,7 +349,7 @@ async function startScan(){
     document.getElementById("statsRow").style.display="flex";
     saveResults();
   }
-  log("Complete. "+results.length+" passed. Results auto-saved.","info");
+  log("Complete. "+results.length+" passed. Auto-saved.","info");
 }
 
 function stopScan(){stopReq=true;document.getElementById("stopBtn").disabled=true;log("Stop requested...","warn");}
@@ -418,27 +376,17 @@ function renderResults(){
   const sort=document.getElementById("sortSel")?.value||"score";
   let filtered=results.filter(r=>r.score>=min);
   if(activeFilter!=="all") filtered=filtered.filter(r=>r.score===activeFilter);
-
-  // Sort options
   filtered.sort((a,b)=>{
-    if(sort==="pullback") return a.pctHi-b.pctHi;         // deepest pullback first
-    if(sort==="rsi")      return a.rsi-b.rsi;              // lowest RSI first
-    if(sort==="wr")       return a.wr-b.wr;                // lowest WR first
-    return b.score-a.score||a.pctHi-b.pctHi;              // default: score then pullback
+    if(sort==="pullback") return a.pctHi-b.pctHi;
+    if(sort==="rsi")      return a.rsi-b.rsi;
+    if(sort==="wr")       return a.wr-b.wr;
+    return b.score-a.score||a.pctHi-b.pctHi;
   });
-
   document.getElementById("resCount").textContent=filtered.length+" shown";
   const grid=document.getElementById("results");
-  if(!filtered.length){
-    grid.innerHTML='<div class="empty" id="emptyState" style="grid-column:1/-1">No results yet. Press ▶ LIVE SCAN to start.</div>';
-    return;
-  }
+  if(!filtered.length){grid.innerHTML='<div class="empty">No results yet.</div>';return;}
   grid.innerHTML=filtered.map((s,i)=>renderCard(s,i)).join("");
   updateHdr();
-}
-
-function openChart(sym){
-  window.open("https://www.tradingview.com/chart/?symbol="+sym,"_blank");
 }
 
 function renderCard(s,idx){
@@ -448,7 +396,7 @@ function renderCard(s,idx){
   const cc=s.score>=6?"s6":s.score>=5?"s5":"";
   const dots=s.conds.map((on,i)=>`<div class="dot" title="${LABELS[i]}" style="background:${on?g.bg:"#0d1f35"}"></div>`).join("");
   const tags=LABELS.map((lbl,i)=>`<span class="tag" style="background:${s.conds[i]?g.bg+"22":"#0d1f35"};color:${s.conds[i]?g.bg:"#546E7A"};border:1px solid ${s.conds[i]?g.bg+"44":"#0b1a2e"}">${s.conds[i]?"✓":"✗"} ${lbl}</span>`).join("");
-  return `<div class="card ${cc}" onclick="openChart('${s.sym}')">
+  return `<div class="card ${cc}" onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
     <div class="card-top">
       <div>
         <div style="display:flex;align-items:center;gap:6px">
@@ -456,7 +404,7 @@ function renderCard(s,idx){
           <span class="ticker">${s.sym}</span>
           <span style="font-size:9px;padding:2px 7px;border-radius:3px;font-weight:700;background:${g.bg};color:${g.fg}">${g.l}</span>
         </div>
-        <div class="tv-hint">📈 click to open TradingView</div>
+        <div class="tv-hint">📈 click → TradingView</div>
       </div>
       <div>
         <div class="price">$${s.price.toFixed(2)}</div>
@@ -481,24 +429,19 @@ function renderCard(s,idx){
   </div>`;
 }
 
-// ── Debug single stock ─────────────────────────────────────
+// ── Debug ──────────────────────────────────────────────────
 async function debugStock(sym){
   if(!sym) return;
   const out=document.getElementById("dout");
   out.style.color="#00b0ff";
-  out.textContent="Fetching "+sym+" from Yahoo Finance...";
+  out.textContent="Fetching "+sym+" from Tiingo...";
   try{
-    const ySym=sym.replace(".","-");
-    const url="https://query1.finance.yahoo.com/v8/finance/chart/"+ySym+"?interval=1d&range=1y";
-    const r=await fetch(url);
-    if(!r.ok) throw new Error("Yahoo HTTP "+r.status);
-    const d=await r.json();
-    const s=scoreFromCandles(sym,d);
-    const bars=d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(c=>c!=null).length||0;
+    const {closes,highs,lows,bars}=await fetchCandles(sym);
+    const s=scoreStock(sym,closes,highs,lows);
     const p=(pass,lbl,val)=>(pass?"✅":"❌")+" "+lbl+": "+val;
     out.style.color=s.score>=4?"#00C853":s.score>=2?"#FFD600":"#90A4AE";
     out.textContent=[
-      "══ "+sym+" — "+bars+" bars (Yahoo) ══",
+      "══ "+sym+" — "+bars+" bars (Tiingo) ══",
       "Price: $"+s.price.toFixed(2)+"  (chg: "+s.change.toFixed(2)+"%)",
       "",
       p(s.c1,"C1 RSI14 < 45       ",s.rsi.toFixed(1)),
@@ -516,7 +459,6 @@ async function debugStock(sym){
   }
 }
 
-// ── Init — load saved results on page open ─────────────────
 loadSaved();
 </script>
 </body>
