@@ -243,21 +243,30 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
   <button class="run-btn cat" id="catRunBtn" onclick="startCatalystScan()">⚡ SCAN CATALYSTS</button>
   <button class="stop-btn" id="catStopBtn" onclick="stopScan()" disabled>■ STOP</button>
   <button class="clr-btn" onclick="clearSaved('catalyst')">🗑 CLEAR</button>
-  <label>UNIVERSE</label>
-  <select id="catListSel">
-    <option value="smallcap">Small Cap Watchlist</option>
-    <option value="custom">Custom</option>
+  <label>SECTOR</label>
+  <select id="catSector">
+    <option value="all">All Sectors</option>
+    <option value="Quantum/AI">⚛ Quantum / AI</option>
+    <option value="Defense/Gov">🛡 Defense / Gov</option>
+    <option value="Biotech">🧬 Biotech</option>
+    <option value="Semiconductors">💾 Semiconductors</option>
+    <option value="Clean Energy">⚡ Clean Energy</option>
+    <option value="Fintech">💳 Fintech</option>
   </select>
-  <label>MAX PRICE</label>
-  <input type="number" id="catMaxPrice" value="25" min="1" max="100" style="width:55px">
-  <label>MIN VOL SPIKE</label>
+  <label>MAX $</label>
+  <input type="number" id="catMaxPrice" value="50" min="1" max="500" style="width:55px">
+  <label>VOL SPIKE</label>
   <select id="catVolSpike">
-    <option value="2">2x avg</option>
-    <option value="3" selected>3x avg</option>
+    <option value="2" selected>2x avg</option>
+    <option value="3">3x avg</option>
     <option value="5">5x avg</option>
   </select>
-  <label>TICKERS</label>
-  <input type="text" id="catCustomTk" placeholder="MRAM,SOUN,IONQ" style="width:150px">
+  <label>LIST</label>
+  <select id="catListSel">
+    <option value="universe">Sector Universe</option>
+    <option value="custom">Custom Tickers</option>
+  </select>
+  <input type="text" id="catCustomTk" placeholder="QUBT,MGNX,NVTS" style="width:140px">
 </div>
 
 <div class="prog-wrap" id="c-prog">
@@ -275,22 +284,25 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
   <button class="chip" onclick="setCFilter(4,this)">🔥🔥 4/5</button>
   <button class="chip" onclick="setCFilter(3,this)">🔥 3/5</button>
   <select class="sort-select" id="c-sortSel" onchange="renderCatalyst()">
-    <option value="score">Sort: Hottest</option>
+    <option value="heat">Sort: Heat Score</option>
+    <option value="earnings">Sort: Earnings Soonest</option>
+    <option value="coiling">Sort: Tightest Coil</option>
     <option value="volspike">Sort: Vol Spike</option>
-    <option value="flatdays">Sort: Flattest (days)</option>
   </select>
   <span style="font-size:9px;color:#37474F;margin-left:auto" id="c-resCount"></span>
 </div>
 
 <div style="padding:8px 14px;background:#0a1218;border-bottom:1px solid #0b1a2e">
-  <div style="font-size:9px;color:#FF9100;font-weight:700;margin-bottom:4px">⚡ CATALYST CONDITIONS (5/5 = MRAM-type setup)</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <span style="font-size:8px;padding:2px 8px;border:1px solid #FF6D0044;border-radius:3px;color:#78909C">C1: Price $3–$25</span>
-    <span style="font-size:8px;padding:2px 8px;border:1px solid #FF6D0044;border-radius:3px;color:#78909C">C2: Vol spike 3x+</span>
-    <span style="font-size:8px;padding:2px 8px;border:1px solid #FF6D0044;border-radius:3px;color:#78909C">C3: Flat 15+ days</span>
-    <span style="font-size:8px;padding:2px 8px;border:1px solid #FF6D0044;border-radius:3px;color:#78909C">C4: Price breaking out</span>
-    <span style="font-size:8px;padding:2px 8px;border:1px solid #FF6D0044;border-radius:3px;color:#78909C">C5: Low float proxy</span>
+  <div style="font-size:9px;color:#FF9100;font-weight:700;margin-bottom:6px">⚡ CATALYST CONDITIONS — Based on QUBT · MGNX · NVTS · AMPX pattern</div>
+  <div style="display:flex;gap:5px;flex-wrap:wrap">
+    <span style="font-size:8px;padding:2px 8px;border:1px solid #FF6D0044;border-radius:3px;color:#78909C">C1: Price in range</span>
+    <span style="font-size:8px;padding:2px 8px;border:1px solid #FF6D0044;border-radius:3px;color:#78909C">C2: 🔄 Coiling tight 8+ days</span>
+    <span style="font-size:8px;padding:2px 8px;border:1px solid #FF6D0044;border-radius:3px;color:#78909C">C3: 🔇 Vol dry-up OR spike</span>
+    <span style="font-size:8px;padding:2px 8px;border:1px solid #FF6D0044;border-radius:3px;color:#78909C">C4: 📅 Earnings &lt;14d OR breakout</span>
+    <span style="font-size:8px;padding:2px 8px;border:1px solid #FF6D0044;border-radius:3px;color:#78909C">C5: 📉 Near 52w low</span>
+    <span style="font-size:8px;padding:2px 8px;border:1px solid #FF6D0044;border-radius:3px;color:#78909C">C6: RSI &lt;55 (not overbought)</span>
   </div>
+  <div style="margin-top:5px;font-size:8px;color:#546E7A">🔥🔥🔥 FIRE = coiling + vol dry-up + earnings this week = highest conviction setup</div>
 </div>
 
 <div class="log-panel" id="c-log"></div>
@@ -324,19 +336,148 @@ const TD_KEYS = [
   "9802166cf9694f42a64738bd776c22b9",
   "5a13fcf43f1347c6b2b4459a0076ba51"
 ];
-const ROTATE_EVERY = 7;
-let keyIdx=0, keyCallCount=0;
 
-function getKey(){
-  keyCallCount++;
-  if(keyCallCount>ROTATE_EVERY){keyCallCount=1;keyIdx=(keyIdx+1)%TD_KEYS.length;updateKeyStatus();}
-  return TD_KEYS[keyIdx];
+// Finnhub — live quote + earnings calendar
+const FH_KEY = "d819lthr01qler4hgk4gd819lthr01qler4hgk50";
+
+// Cache earnings dates to avoid repeated API calls
+const earningsCache = {};
+
+async function fetchEarningsDate(sym){
+  if(earningsCache[sym] !== undefined) return earningsCache[sym];
+  try{
+    const today = new Date().toISOString().split("T")[0];
+    const future = new Date(Date.now() + 30*86400000).toISOString().split("T")[0];
+    const url = "https://finnhub.io/api/v1/calendar/earnings?from="+today+"&to="+future+"&symbol="+sym+"&token="+FH_KEY;
+    const r = await fetch(url);
+    if(!r.ok){ earningsCache[sym]=null; return null; }
+    const d = await r.json();
+    const earnings = d.earningsCalendar||[];
+    if(earnings.length>0){
+      const next = earnings[0];
+      const daysUntil = Math.ceil((new Date(next.date)-new Date())/(86400000));
+      earningsCache[sym] = {date:next.date, daysUntil, eps:next.epsEstimate};
+      return earningsCache[sym];
+    }
+    earningsCache[sym] = null;
+    return null;
+  }catch(e){ earningsCache[sym]=null; return null; }
 }
-function updateKeyStatus(){
+
+async function fetchLiveQuote(sym){
+  try{
+    const url = "https://finnhub.io/api/v1/quote?symbol="+sym+"&token="+FH_KEY;
+    const r = await fetch(url);
+    if(!r.ok) return null;
+    const d = await r.json();
+    if(!d||!d.c) return null;
+    return {
+      price:  d.c,   // current/last price
+      open:   d.o,   // day open
+      high:   d.h,   // day high
+      low:    d.l,   // day low
+      prev:   d.pc,  // previous close
+      change: d.d,   // change from prev close
+      changePct: d.dp // % change from prev close
+    };
+  }catch(e){ return null; }
+}
+
+// Detect if market is in pre-market, open, after-hours, or closed
+function getMarketSession(){
+  const now = new Date();
+  // Convert to ET
+  const et = new Date(now.toLocaleString("en-US", {timeZone:"America/New_York"}));
+  const h = et.getHours(), m = et.getMinutes();
+  const day = et.getDay(); // 0=Sun, 6=Sat
+  if(day===0||day===6) return "weekend";
+  const mins = h*60+m;
+  if(mins >= 240 && mins < 570)  return "premarket";  // 4:00am - 9:30am ET
+  if(mins >= 570 && mins < 960)  return "open";        // 9:30am - 4:00pm ET
+  if(mins >= 960 && mins < 1200) return "afterhours";  // 4:00pm - 8:00pm ET
+  return "closed";
+}
+// ── Parallel scan engine ─────────────────────────────────────────────────
+// Each key gets its own independent worker — all run simultaneously
+// Key i fetches stocks at indices: i, i+4, i+8, i+12... (interleaved)
+// This gives true parallelism without exceeding per-key rate limits
+
+let keyIdx=0; // still used for single-stock debug
+
+function updateKeyStatus(activeKeys=[]){
   TD_KEYS.forEach((_,i)=>{
     const el=document.getElementById("ks"+i);
-    if(el) el.className="ks"+(i===keyIdx?" active":"");
+    if(el) el.className="ks"+(activeKeys.includes(i)?"active":"");
   });
+}
+
+// Fetch candles using a specific key (no rotation — each worker owns its key)
+async function fetchCandlesWithKey(sym, keyIndex, retries=3){
+  for(let attempt=0; attempt<retries; attempt++){
+    const key = TD_KEYS[keyIndex];
+    const url = "https://api.twelvedata.com/time_series?symbol="+sym+"&interval=1day&outputsize=260&apikey="+key;
+    const r = await fetch(url);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const d = await r.json();
+    if(d.status==="error"){
+      if(d.message&&d.message.includes("API credits")){
+        // This key hit its limit — wait for rate window reset
+        await sleep(62000);
+        continue;
+      }
+      if(d.message&&(d.message.includes("Grow or Venture")||d.message.includes("not found")||d.message.includes("missing or invalid")))
+        throw new Error("SKIP:"+d.message);
+      throw new Error(d.message||"API error");
+    }
+    if(!d.values||!d.values.length) throw new Error("No data");
+    const vals=[...d.values].reverse();
+    return {
+      closes:  vals.map(v=>parseFloat(v.close)),
+      highs:   vals.map(v=>parseFloat(v.high)),
+      lows:    vals.map(v=>parseFloat(v.low)),
+      volumes: vals.map(v=>parseFloat(v.volume)||0),
+      bars:    vals.length
+    };
+  }
+  throw new Error("Key "+keyIndex+" rate limited");
+}
+
+// Single worker: processes every Nth stock using key N
+// delay between each fetch = 8500ms to stay under 8/min per key
+async function runWorker(keyIndex, tickers, minScore, isCatalyst, maxPrice, minVolSpike, onResult, onProgress){
+  const DELAY = 8500; // 8.5s between calls = 7 calls/min per key (safe under 8 limit)
+  for(let i=0; i<tickers.length; i++){
+    if(stopReq) break;
+    const sym = tickers[i];
+    onProgress(sym, keyIndex);
+    try{
+      const candles = await fetchCandlesWithKey(sym, keyIndex);
+      let result;
+      if(isCatalyst){
+        const earnings = await fetchEarningsDate(sym);
+        result = scoreCatalyst(sym, candles.closes, candles.highs, candles.lows, candles.volumes, maxPrice, minVolSpike, earnings);
+        if(result.score>=3) onResult(result, true);
+        else onResult(result, false);
+      } else {
+        result = scoreRecovery(sym, candles.closes, candles.highs, candles.lows);
+        // Overlay live quote for pre-market price
+        const lq = await fetchLiveQuote(sym);
+        if(lq&&lq.price>0){ result.price=lq.price; result.change=lq.changePct||result.change; result.liveQuote=lq; result.session=getMarketSession(); }
+        if(result.score>=minScore) onResult(result, true);
+        else onResult(result, false);
+      }
+    }catch(e){
+      if(!e.message.startsWith("SKIP:")) onResult({sym, error:e.message}, false);
+    }
+    if(i < tickers.length-1) await sleep(DELAY);
+  }
+}
+
+// Split array into N roughly equal chunks (interleaved for even distribution)
+function splitInterleaved(arr, n){
+  const chunks = Array.from({length:n}, ()=>[]);
+  arr.forEach((item,i) => chunks[i%n].push(item));
+  return chunks;
 }
 
 // ── Ticker Lists ────────────────────────────────────────────
@@ -401,27 +542,21 @@ function renderWatchlistUI(){
 }
 
 // Small cap catalyst universe — stocks $3-$25, known for explosive moves on news
-const SMALLCAP = [
-  // Defense & Gov contracts (MRAM-type explosive moves)
-  "MRAM","KTOS","AVAV","RCAT","ACHR","JOBY","ASTS","LUNR","RDW","SPIR",
-  "BBAI","DRS","CACI","SAIC","LDOS","BWXT","HWM","TDG","AXON","CDRE",
-  // AI & Quantum computing
-  "SOUN","IONQ","RGTI","QUBT","ARQQ","CRKN","VRNT","LPSN","MTTR","AAOI",
-  "COHU","FORM","SMTC","ONTO","ACMR","IIVI","VIAV","CEVA","PLAB","DIOD",
-  // Biotech / Pharma catalysts
-  "RXRX","DNLI","BEAM","EDIT","CRSP","NTLA","VERV","NUVL","ALLO","HIMS",
-  "OCGN","NVAX","VXRT","INO","PSNL","BLUE","ARVN","PRTA","IMVT","KYMR",
-  "MGNX","PTGX","RCKT","SAGE","YMAB","DAWN","TGTX","IOVA","APLS","FOLD",
-  // Clean energy (real companies with contracts)
-  "BLNK","CHPT","EVGO","STEM","ARRY","NOVA","SHLS","FLNC","BLDP","FCEL",
-  "PLUG","RUN","CSIQ","DQ","JKS","BE","CWEN","GPRE","VNET","AMRC",
-  // Fintech & Consumer growth
-  "SOFI","HOOD","AFRM","UPST","DAVE","MQ","LMND","ROOT","DKNG","PENN",
-  "RBLX","SKLZ","MAPS","IREN","MSTR","CIFR","RIOT","MARA","HUT","CLSK",
-  // Small/mid tech with momentum history
-  "APPS","CRSR","GTLB","BILL","ZI","DOCS","FOUR","RELY","TASK","ALKT",
-  "JAMF","WEAV","CFLT","SPSC","ASAN","BRZE","SEMR","DOMO","SPRK","INFA"
-];
+// ── Catalyst Universe — organized by sector ──────────────────────────────
+// These are real companies with catalysts, earnings beats, and explosive histories
+// Based on QUBT/MGNX/NVTS/AMPX pattern analysis
+
+const SECTORS = {
+  "Quantum/AI":    ["QUBT","IONQ","RGTI","SOUN","BBAI","ARQQ","QBTS","CRKN","LPSN","MTTR","AAOI","COHU","FORM","SMTC","VIAV","CEVA","PLAB","DIOD","VRNT","DM"],
+  "Defense/Gov":   ["MRAM","KTOS","AVAV","RCAT","ASTS","LUNR","RDW","SPIR","BBAI","CDRE","DRS","CACI","SAIC","BWXT","AXON","HWM","TDG","ACHR","JOBY","LILM"],
+  "Biotech":       ["MGNX","RXRX","DNLI","BEAM","EDIT","CRSP","NTLA","VERV","NUVL","ALLO","HIMS","OCGN","NVAX","VXRT","INO","PSNL","BLUE","ARVN","PRTA","IMVT","KYMR","PTGX","RCKT","SAGE","TGTX","IOVA","APLS","FOLD","DAWN","YMAB"],
+  "Semiconductors":["NVTS","AMPX","SMTC","AAOI","COHU","FORM","ONTO","ACMR","IIVI","PLAB","DIOD","CEVA","VIAV","POWI","MAXN","AEVA","LAZR","MVIS","OUST"],
+  "Clean Energy":  ["BLNK","CHPT","EVGO","STEM","ARRY","NOVA","SHLS","FLNC","BLDP","FCEL","PLUG","RUN","CSIQ","DQ","JKS","BE","CWEN","GPRE","AMRC","VNET"],
+  "Fintech":       ["SOFI","HOOD","AFRM","UPST","DAVE","MQ","LMND","ROOT","DKNG","PENN","RBLX","MSTR","IREN","CIFR","RIOT","MARA","HUT","CLSK","FOUR","RELY"]
+};
+
+// Combined flat list for scanning
+const SMALLCAP = [...new Set(Object.values(SECTORS).flat())];
 
 // ── State ───────────────────────────────────────────────────
 let rResults=[], cResults=[], stopReq=false, isRunning=false;
@@ -437,7 +572,9 @@ function switchTab(tab){
   document.getElementById("tab-"+tab).classList.add("active");
   document.getElementById("panel-"+tab).classList.add("active");
   if(tab==="recovery"){
-    document.getElementById("mainSubtitle").textContent="4× TWELVE DATA KEYS · 32 CREDITS/MIN · AUTO-SAVE";
+    const sess=getMarketSession();
+    const sessLabel={"premarket":"🌅 PRE-MARKET","open":"🟢 MARKET OPEN","afterhours":"🌙 AFTER HOURS","closed":"⚪ MARKET CLOSED","weekend":"⚪ WEEKEND"}[sess]||"";
+    document.getElementById("mainSubtitle").textContent="4× TWELVE DATA · LIVE PRICES · "+sessLabel;
     updateHdr(rResults);
     if(rResults.length){ renderRecovery(); document.getElementById("r-filterBar").style.display="flex"; document.getElementById("statsRow").style.display="flex"; }
   } else {
@@ -553,6 +690,9 @@ async function fetchCandles(sym, retries=3){
   throw new Error("All keys rate limited");
 }
 
+// ── fetchCandles: single-stock wrapper for debug (uses key 0) ──────────────
+async function fetchCandles(sym){ return fetchCandlesWithKey(sym, 0); }
+
 // ── Indicators ─────────────────────────────────────────────
 function calcRSI(c,p=14){
   if(c.length<p+1) return 50;
@@ -618,54 +758,72 @@ async function startRecoveryScan(){
   document.getElementById("r-savedBanner").style.display="none";
   document.getElementById("r-results").innerHTML="";
   document.getElementById("r-log").innerHTML="";
-  keyIdx=0; keyCallCount=0; updateKeyStatus();
+  updateKeyStatus([0,1,2,3]);
 
-  const listVal=document.getElementById("listSel").value;
-  const tickers=listVal==="sp500"?[...SP500]:listVal==="watchlist"?[...WATCHLIST]
+  const listVal  = document.getElementById("listSel").value;
+  const tickers  = listVal==="sp500"?[...SP500]:listVal==="watchlist"?[...WATCHLIST]
     :document.getElementById("customTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
-  const minScore=parseInt(document.getElementById("minSel").value);
+  const minScore = parseInt(document.getElementById("minSel").value);
+  const nKeys    = TD_KEYS.length;
+  const chunks   = splitInterleaved(tickers, nKeys);
+  const total    = tickers.length;
+  let   done     = 0;
 
-  log("Recovery scan: "+tickers.length+" stocks · 4 keys · min "+minScore+"/6","info");
+  const eta = Math.ceil(total / nKeys * 8.5 / 60);
+  log("⚡ PARALLEL scan: "+total+" stocks across "+nKeys+" keys simultaneously","info");
+  log("Est. ~"+eta+" min ("+nKeys+"x faster than sequential)","info");
 
-  for(let i=0;i<tickers.length;i++){
-    if(stopReq){log("Stopped.","warn");break;}
-    const sym=tickers[i];
-    const pct=Math.round(i/tickers.length*100);
-    document.getElementById("r-progMsg").textContent="Scanning "+sym+" ("+(i+1)+"/"+tickers.length+") · Key "+(keyIdx+1);
-    document.getElementById("r-progPct").textContent=pct+"%";
-    document.getElementById("r-progFill").style.width=pct+"%";
+  // Progress tracker
+  const progInterval = setInterval(()=>{
+    const pct = Math.round(done/total*100);
+    document.getElementById("r-progPct").textContent = pct+"%";
+    document.getElementById("r-progFill").style.width = pct+"%";
+  }, 500);
 
-    try{
-      const {closes,highs,lows}=await fetchCandles(sym);
-      const r=scoreRecovery(sym,closes,highs,lows);
+  // Result handler — called by each worker as results come in
+  function onResult(r, passed){
+    done++;
+    document.getElementById("r-progMsg").textContent =
+      "Scanning... "+done+"/"+total+" · "+rResults.length+" passed";
+    if(r.error){
+      errCount++;
+      log("✗ "+r.sym+": "+r.error,"err");
+    } else if(passed){
       scanned++;
-      if(r.score>=minScore){
-        rResults.push(r); renderRecovery();
-        log("✓ "+sym.padEnd(6)+" "+r.score+"/6 | RSI:"+r.rsi.toFixed(1)+" WR:"+r.wr.toFixed(1)+" | "+r.pctHi.toFixed(1)+"% off hi","ok");
-      } else {
-        log("  "+sym.padEnd(6)+" "+r.score+"/6 | RSI:"+r.rsi.toFixed(1)+" WR:"+r.wr.toFixed(1));
-      }
-    }catch(e){
-      if(e.message.startsWith("SKIP:")||e.message.includes("Grow or Venture")){
-        log("⚠ "+sym+" — not on free plan, skipped","warn");
-      } else if(e.message.includes("All keys rate limited")){
-        log("All keys limited — waiting 62s...","warn");
-        await countdown(62,"r"); i--; continue;
-      } else { errCount++; log("✗ "+sym+": "+e.message,"err"); }
+      rResults.push(r); renderRecovery();
+      const priceStr="$"+r.price.toFixed(2)+(r.session==="premarket"?" 🌅PM":r.session==="afterhours"?" 🌙AH":"");
+      log("✓ "+r.sym.padEnd(6)+" "+r.score+"/6 | RSI:"+r.rsi.toFixed(1)+" WR:"+r.wr.toFixed(1)+" | "+r.pctHi.toFixed(1)+"% off hi | "+priceStr,"ok");
+      if(rResults.length%10===0) saveResults();
+    } else {
+      scanned++;
+      log("  "+r.sym.padEnd(6)+" "+r.score+"/6 | RSI:"+r.rsi.toFixed(1)+" WR:"+r.wr.toFixed(1));
     }
     updateHdr(rResults);
-    if(scanned%20===0&&scanned>0) saveResults();
-    await sleep(200);
   }
 
-  document.getElementById("r-progMsg").textContent="Done — "+scanned+" scanned, "+rResults.length+" passed";
-  document.getElementById("r-progPct").textContent="100%";
-  document.getElementById("r-progFill").style.width="100%";
+  function onProgress(sym, keyIdx){
+    document.getElementById("r-progMsg").textContent =
+      "K"+(keyIdx+1)+": "+sym+" · "+done+"/"+total+" done · "+rResults.length+" passed";
+  }
+
+  // Launch all workers simultaneously
+  await Promise.all(
+    chunks.map((chunk, ki) => runWorker(ki, chunk, minScore, false, 0, 0, onResult, onProgress))
+  );
+
+  clearInterval(progInterval);
+  document.getElementById("r-progMsg").textContent = "Done — "+scanned+" scanned, "+rResults.length+" passed";
+  document.getElementById("r-progPct").textContent = "100%";
+  document.getElementById("r-progFill").style.width = "100%";
   document.getElementById("runBtn").disabled=false;
   document.getElementById("stopBtn").disabled=true;
   isRunning=false;
-  if(rResults.length){document.getElementById("r-filterBar").style.display="flex";document.getElementById("statsRow").style.display="flex";saveResults();}
-  log("Complete. "+rResults.length+" passed.","info");
+  if(rResults.length){
+    document.getElementById("r-filterBar").style.display="flex";
+    document.getElementById("statsRow").style.display="flex";
+    saveResults();
+  }
+  log("✅ Complete. "+rResults.length+" passed. Scanned in parallel with "+nKeys+" keys.","info");
 }
 
 function setRFilter(v,btn){
@@ -696,7 +854,10 @@ function renderRecovery(){
     return `<div class="card ${cc}" onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
       <div class="card-top">
         <div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:#546E7A">#${i+1}</span><span class="ticker">${s.sym}</span><span style="font-size:9px;padding:2px 7px;border-radius:3px;font-weight:700;background:${g.bg};color:${g.fg}">${g.l}</span></div><div class="tv-hint">📈 click → TradingView</div></div>
-        <div><div class="price">$${s.price.toFixed(2)}</div><div class="chg ${s.change>=0?"cpos":"cneg"}">${s.change>=0?"▲":"▼"}${Math.abs(s.change).toFixed(2)}%</div></div>
+        <div>
+          <div class="price">$${s.price.toFixed(2)}${s.session==="premarket"?'<span style="font-size:7px;color:#FFD600;margin-left:4px;border:1px solid #FFD60066;padding:1px 4px;border-radius:2px">🌅 PRE-MKT</span>':s.session==="afterhours"?'<span style="font-size:7px;color:#9C27B0;margin-left:4px;border:1px solid #9C27B066;padding:1px 4px;border-radius:2px">🌙 AH</span>':'<span style="font-size:7px;color:#00C853;margin-left:4px;border:1px solid #00C85366;padding:1px 4px;border-radius:2px">🔴 LIVE</span>'}</div>
+          <div class="chg ${s.change>=0?"cpos":"cneg"}">${s.change>=0?"▲":"▼"}${Math.abs(s.change).toFixed(2)}%</div>
+          ${s.liveQuote?'<div style="font-size:8px;color:#546E7A">prev $'+s.liveQuote.prev.toFixed(2)+'</div>':''}</div>
       </div>
       <div class="dots">${dots}<span class="score-txt" style="color:${g.bg}">${s.score}/6</span></div>
       <div class="bars">
@@ -717,9 +878,19 @@ async function debugRecovery(sym){
   try{
     const {closes,highs,lows,bars}=await fetchCandles(sym);
     const s=scoreRecovery(sym,closes,highs,lows);
+    // Get live quote
+    const lq=await fetchLiveQuote(sym);
+    const sess=getMarketSession();
+    const livePrice=lq&&lq.price>0?lq.price:s.price;
+    const livePct=lq?lq.changePct:s.change;
+    const sessStr={"premarket":"🌅 PRE-MARKET","open":"🟢 MARKET OPEN","afterhours":"🌙 AFTER HOURS","closed":"⚪ CLOSED","weekend":"⚪ WEEKEND"}[sess]||"";
     const p=(pass,lbl,val)=>(pass?"✅":"❌")+" "+lbl+": "+val;
     out.style.color=s.score>=4?"#00C853":s.score>=2?"#FFD600":"#90A4AE";
-    out.textContent=["══ "+sym+" — "+bars+" bars ══","Price: $"+s.price.toFixed(2)+"  (chg: "+s.change.toFixed(2)+"%)", "",
+    out.textContent=["══ "+sym+" — "+bars+" bars · "+sessStr+" ══",
+      "TD close:  $"+s.price.toFixed(2)+" (yesterday close)",
+      "LIVE now:  $"+livePrice.toFixed(2)+"  ("+( livePct>=0?"+":"")+livePct.toFixed(2)+"%)"+(lq&&sess==="premarket"?" ← PRE-MARKET PRICE":""),
+      lq?"Prev close: $"+lq.prev.toFixed(2)+" · Open: $"+(lq.open||0).toFixed(2)+" · Hi: $"+(lq.high||0).toFixed(2)+" · Lo: $"+(lq.low||0).toFixed(2):"",
+      "",
       p(s.c1,"C1 RSI14 < 45       ",s.rsi.toFixed(1)),
       p(s.c2,"C2 WR14 < -65       ",s.wr.toFixed(1)),
       p(s.c3,"C3 Above EMA21      ","EMA $"+s.ema21.toFixed(2)),
@@ -734,33 +905,85 @@ async function debugRecovery(sym){
 // ══════════════════════════════════════════════════════════
 // CATALYST SCREENER
 // ══════════════════════════════════════════════════════════
-function scoreCatalyst(sym,closes,highs,lows,volumes,maxPrice,minVolSpike){
-  if(closes.length<30) throw new Error("Not enough bars");
-  const price=closes[closes.length-1];
-  const prev=closes[closes.length-2];
-  const change=((price-prev)/prev)*100;
-  const todayVol=volumes[volumes.length-1];
-  const avgV=avgVol(volumes,20);
-  const volSpike=avgV>0?todayVol/avgV:0;
-  const fd=flatDays(closes.slice(0,-1),0.06); // flat days BEFORE today
-  const high20=Math.max(...highs.slice(-21,-1)); // 20-day high before today
-  const breakout=price>high20*1.02; // breaking above 20-day high by 2%+
-  // Low float proxy: small price + high volume spike = likely low float
-  const lowFloatProxy = volSpike>3 && price<20;
-  // RSI was oversold recently (within last 5 days)
-  const rsiNow=calcRSI(closes,14);
-  const rsi5ago=calcRSI(closes.slice(0,-5),14);
+function scoreCatalyst(sym, closes, highs, lows, volumes, maxPrice, minVolSpike, earnings){
+  if(closes.length < 30) throw new Error("Not enough bars");
 
-  const c1=price>=3&&price<=maxPrice;          // in price range
-  const c2=volSpike>=minVolSpike;               // volume spike
-  const c3=fd>=10;                              // was flat 10+ days
-  const c4=breakout||change>5;                  // breaking out today
-  const c5=lowFloatProxy||volSpike>5;           // low float signal
+  const price   = closes[closes.length-1];
+  const prev    = closes[closes.length-2];
+  const change  = ((price-prev)/prev)*100;
 
-  const conds=[c1,c2,c3,c4,c5];
-  const score=conds.filter(Boolean).length;
+  // ── Volume analysis ──────────────────────────────────────
+  const todayVol  = volumes[volumes.length-1];
+  const avgVol20  = volumes.slice(-21,-1).reduce((a,b)=>a+b,0)/20;
+  const volSpike  = avgVol20>0 ? todayVol/avgVol20 : 0;
 
-  return {sym,price,change,volSpike,flatDays:fd,breakout,rsi:rsiNow,high20,c1,c2,c3,c4,c5,score,conds,avgVol:avgV,todayVol};
+  // Volume dry-up: last 5 days avg vs 20 day avg — looking for shrinking volume
+  const vol5      = volumes.slice(-6,-1).reduce((a,b)=>a+b,0)/5;
+  const volDryUp  = vol5 < avgVol20 * 0.6; // volume 40%+ below average = drying up
+
+  // ── Price coiling — tight range detection ────────────────
+  // How tight is the price range over last 15 days?
+  const last15H = Math.max(...highs.slice(-15));
+  const last15L = Math.min(...lows.slice(-15));
+  const rangeWidth = last15H > 0 ? (last15H-last15L)/last15L*100 : 999;
+  const isTight = rangeWidth < 15; // price contained in <15% range for 15 days
+
+  // Flat days: consecutive days within 6% of current price
+  let flatDaysCount = 0;
+  for(let i=closes.length-2; i>=0; i--){
+    if(Math.abs(closes[i]-price)/price < 0.06) flatDaysCount++;
+    else break;
+  }
+
+  // ── Breakout detection ───────────────────────────────────
+  const high20     = Math.max(...highs.slice(-21,-1));
+  const breakout   = price > high20 * 1.02; // breaking above 20-day high
+
+  // ── Near 52w low (deep value + coiling) ─────────────────
+  const low52      = Math.min(...lows);
+  const pctFromLow = ((price-low52)/low52)*100;
+  const nearLow    = pctFromLow < 50; // within 50% of 52w low
+
+  // ── Near 52w high (momentum breakout type) ───────────────
+  const high52     = Math.max(...highs);
+  const pctFromHigh= ((price-high52)/high52)*100;
+
+  // ── Earnings catalyst proximity ──────────────────────────
+  const hasEarnings     = earnings && earnings.daysUntil >= 0 && earnings.daysUntil <= 14;
+  const earningsDays    = earnings ? earnings.daysUntil : 999;
+
+  // ── Low float proxy ──────────────────────────────────────
+  const lowFloatProxy   = volSpike > 3 && price < 25;
+
+  // ── RSI ──────────────────────────────────────────────────
+  const rsi = calcRSI(closes, 14);
+
+  // ─────────────────────────────────────────────────────────
+  // 6 CATALYST CONDITIONS (updated from QUBT/MGNX/NVTS/AMPX analysis)
+  // ─────────────────────────────────────────────────────────
+  const c1 = price >= 2 && price <= maxPrice;           // C1: Price in range
+  const c2 = isTight && flatDaysCount >= 8;             // C2: Coiling tight 8+ days
+  const c3 = volDryUp || volSpike >= minVolSpike;       // C3: Vol dry-up OR spike
+  const c4 = hasEarnings || breakout || change > 8;     // C4: Catalyst present
+  const c5 = nearLow || pctFromHigh < -20;              // C5: Deep pullback setup
+  const c6 = rsi < 55;                                  // C6: Not overbought
+
+  const conds = [c1,c2,c3,c4,c5,c6];
+  const score = conds.filter(Boolean).length;
+
+  // Heat score: bonus points for stacked signals
+  let heat = score;
+  if(hasEarnings && earningsDays<=7) heat++;   // earnings this week
+  if(volDryUp && isTight) heat++;              // classic AMPX/NVTS setup
+  if(breakout && volSpike>=2) heat++;          // QUBT breakout type
+
+  return {
+    sym, price, change, volSpike, volDryUp, flatDays:flatDaysCount,
+    isTight, rangeWidth, breakout, rsi, high20, high52, low52,
+    pctFromHigh, pctFromLow, nearLow, lowFloatProxy,
+    earnings, hasEarnings, earningsDays, avgVol:avgVol20, todayVol,
+    c1, c2, c3, c4, c5, c6, score, heat, conds
+  };
 }
 
 async function startCatalystScan(){
@@ -773,54 +996,73 @@ async function startCatalystScan(){
   document.getElementById("c-savedBanner").style.display="none";
   document.getElementById("c-results").innerHTML="";
   document.getElementById("c-log").innerHTML="";
-  keyIdx=0; keyCallCount=0; updateKeyStatus();
+  updateKeyStatus([0,1,2,3]);
 
-  const listVal=document.getElementById("catListSel").value;
-  const tickers=listVal==="smallcap"?[...SMALLCAP]
-    :document.getElementById("catCustomTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
-  const maxPrice=parseFloat(document.getElementById("catMaxPrice").value)||25;
-  const minVolSpike=parseFloat(document.getElementById("catVolSpike").value)||3;
+  const listVal     = document.getElementById("catListSel").value;
+  const sectorSel   = document.getElementById("catSector")?.value||"all";
+  const maxPrice    = parseFloat(document.getElementById("catMaxPrice").value)||50;
+  const minVolSpike = parseFloat(document.getElementById("catVolSpike").value)||2;
 
-  log("Catalyst scan: "+tickers.length+" stocks · max $"+maxPrice+" · vol spike "+minVolSpike+"x+","info","c");
-
-  for(let i=0;i<tickers.length;i++){
-    if(stopReq){log("Stopped.","warn","c");break;}
-    const sym=tickers[i];
-    const pct=Math.round(i/tickers.length*100);
-    document.getElementById("c-progMsg").textContent="Scanning "+sym+" ("+(i+1)+"/"+tickers.length+")";
-    document.getElementById("c-progPct").textContent=pct+"%";
-    document.getElementById("c-progFill").style.width=pct+"%";
-
-    try{
-      const {closes,highs,lows,volumes}=await fetchCandles(sym);
-      const r=scoreCatalyst(sym,closes,highs,lows,volumes,maxPrice,minVolSpike);
-      scanned++;
-      if(r.score>=3){
-        cResults.push(r); renderCatalyst();
-        const heat=r.score>=5?"🔥🔥🔥":r.score>=4?"🔥🔥":"🔥";
-        log(heat+" "+sym.padEnd(6)+" "+r.score+"/5 | Vol:"+r.volSpike.toFixed(1)+"x | Flat:"+r.flatDays+"d | $"+r.price.toFixed(2)+(r.breakout?" BREAKOUT":""),"ok","c");
-      } else {
-        log("  "+sym.padEnd(6)+" "+r.score+"/5 | Vol:"+r.volSpike.toFixed(1)+"x | $"+r.price.toFixed(2),"","c");
-      }
-    }catch(e){
-      if(e.message.startsWith("SKIP:")||e.message.includes("Grow or Venture")||e.message.includes("missing or invalid")||e.message.includes("not found")){
-        log("⚠ "+sym+" skipped (invalid/delisted)","warn","c");
-      } else if(e.message.includes("All keys rate limited")){
-        log("All keys limited — waiting 62s...","warn","c");
-        await countdown(62,"c"); i--; continue;
-      } else { errCount++; log("✗ "+sym+": "+e.message,"err","c"); }
-    }
-    updateHdr(cResults);
-    await sleep(200);
+  let tickers;
+  if(listVal==="custom"){
+    tickers = document.getElementById("catCustomTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
+  } else if(sectorSel!=="all" && SECTORS[sectorSel]){
+    tickers = [...SECTORS[sectorSel]];
+  } else {
+    tickers = [...SMALLCAP];
   }
 
-  document.getElementById("c-progMsg").textContent="Done — "+scanned+" scanned, "+cResults.length+" catalyst setups found";
-  document.getElementById("c-progPct").textContent="100%";
+  const nKeys  = TD_KEYS.length;
+  const chunks = splitInterleaved(tickers, nKeys);
+  const total  = tickers.length;
+  let   done   = 0;
+
+  log("⚡ PARALLEL catalyst scan: "+total+" stocks · "+nKeys+" keys · sector: "+sectorSel,"info","c");
+  log("Est. ~"+Math.ceil(total/nKeys*8.5/60)+" min","info","c");
+
+  const progInterval = setInterval(()=>{
+    const pct = Math.round(done/total*100);
+    document.getElementById("c-progPct").textContent = pct+"%";
+    document.getElementById("c-progFill").style.width = pct+"%";
+  }, 500);
+
+  function onCatResult(r, passed){
+    done++;
+    document.getElementById("c-progMsg").textContent =
+      "Scanning... "+done+"/"+total+" · "+cResults.length+" setups found";
+    if(r.error){ errCount++; }
+    else if(passed){
+      scanned++;
+      cResults.push(r); renderCatalyst();
+      const heat = r.heat>=8?"🔥🔥🔥 FIRE":r.heat>=6?"🔥🔥 HOT":r.score>=4?"🔥 WARM":"📡 WATCH";
+      log(heat+" "+r.sym.padEnd(6)+" "+r.score+"/6 heat:"+r.heat
+        +(r.hasEarnings?" | 📅 "+r.earningsDays+"d":"")
+        +(r.volDryUp?" | 🔇 DRY":"")
+        +(r.isTight?" | 🔄 COIL":"")
+        +(r.breakout?" | 🚀 BRK":"")
+        +" $"+r.price.toFixed(2),"ok","c");
+    } else { scanned++; }
+    updateHdr(cResults);
+  }
+
+  function onCatProgress(sym, ki){
+    document.getElementById("c-progMsg").textContent =
+      "K"+(ki+1)+": "+sym+" · "+done+"/"+total+" · "+cResults.length+" found";
+  }
+
+  await Promise.all(
+    chunks.map((chunk, ki) => runWorker(ki, chunk, 3, true, maxPrice, minVolSpike, onCatResult, onCatProgress))
+  );
+
+  clearInterval(progInterval);
+  document.getElementById("c-progMsg").textContent = "Done — "+scanned+" scanned, "+cResults.length+" setups found";
+  document.getElementById("c-progPct").textContent = "100%";
+  document.getElementById("c-progFill").style.width = "100%";
   document.getElementById("catRunBtn").disabled=false;
   document.getElementById("catStopBtn").disabled=true;
   isRunning=false;
-  if(cResults.length){document.getElementById("c-filterBar").style.display="flex";saveResults();}
-  log("Complete. "+cResults.length+" catalyst setups.","info","c");
+  if(cResults.length){ document.getElementById("c-filterBar").style.display="flex"; saveResults(); }
+  log("✅ Complete. "+cResults.length+" catalyst setups found.","info","c");
 }
 
 function setCFilter(v,btn){
@@ -834,7 +1076,12 @@ function renderCatalyst(){
   const sort=document.getElementById("c-sortSel")?.value||"score";
   let f=[...cResults];
   if(cFilter!=="all") f=f.filter(r=>r.score===cFilter);
-  f.sort((a,b)=>sort==="volspike"?b.volSpike-a.volSpike:sort==="flatdays"?b.flatDays-a.flatDays:b.score-a.score||b.volSpike-a.volSpike);
+  f.sort((a,b)=>{
+    if(sort==="earnings") return (a.earningsDays||999)-(b.earningsDays||999);
+    if(sort==="coiling")  return a.rangeWidth-b.rangeWidth;
+    if(sort==="volspike") return b.volSpike-a.volSpike;
+    return b.heat-a.heat||b.score-a.score; // default: heat score
+  });
   document.getElementById("c-resCount").textContent=f.length+" shown";
   const grid=document.getElementById("c-results");
   if(!f.length){grid.innerHTML='<div class="empty">No catalyst setups found yet.</div>';return;}
@@ -848,7 +1095,17 @@ function renderCatalyst(){
     const tags=CAT_LABELS.map((lbl,j)=>`<span class="tag" style="background:${s.conds[j]?heatBg+"22":"#0d1f35"};color:${s.conds[j]?heatBg:"#546E7A"};border:1px solid ${s.conds[j]?heatBg+"44":"#0b1a2e"}">${s.conds[j]?"✓":"✗"} ${lbl}</span>`).join("");
     return `<div class="card ${cc}" onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
       <div class="card-top">
-        <div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:10px;color:#546E7A">#${i+1}</span><span class="ticker">${s.sym}</span><span style="font-size:9px;padding:2px 7px;border-radius:3px;font-weight:700;background:${heatBg};color:#000">${heat}</span></div><div class="tv-hint">📈 click → TradingView</div></div>
+        <div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-size:10px;color:#546E7A">#${i+1}</span>
+            <span class="ticker">${s.sym}</span>
+            <span style="font-size:9px;padding:2px 7px;border-radius:3px;font-weight:700;background:${heatBg};color:#000">${heat}</span>
+            ${s.hasEarnings?`<span style="font-size:8px;padding:1px 6px;border-radius:3px;background:#1565C022;color:#90CAF9;border:1px solid #1565C044">📅 EARN ${s.earningsDays}d</span>`:""}
+            ${s.volDryUp?`<span style="font-size:8px;padding:1px 6px;border-radius:3px;background:#9C27B022;color:#CE93D8;border:1px solid #9C27B044">🔇 DRY</span>`:""}
+            ${s.isTight?`<span style="font-size:8px;padding:1px 6px;border-radius:3px;background:#00695C22;color:#80CBC4;border:1px solid #00695C44">🔄 COIL</span>`:""}
+          </div>
+          <div class="tv-hint">📈 click → TradingView</div>
+        </div>
         <div><div class="price">$${s.price.toFixed(2)}</div><div class="chg ${s.change>=0?"cpos":"cneg"}">${s.change>=0?"▲":"▼"}${Math.abs(s.change).toFixed(2)}%</div></div>
       </div>
       <div class="dots">${dots}<span class="score-txt" style="color:${heatBg}">${s.score}/5</span></div>
@@ -862,7 +1119,12 @@ function renderCatalyst(){
         <span style="color:#546E7A">20d Hi: $${s.high20.toFixed(2)}</span>
       </div>
       <div class="tags"><div class="tag-row">${tags}</div>
-        <div style="margin-top:5px;font-size:8px;color:#546E7A">Vol today: ${(s.todayVol/1e6).toFixed(1)}M · Avg: ${(s.avgVol/1e6).toFixed(1)}M</div>
+        <div style="margin-top:5px;font-size:8px;color:#546E7A;display:flex;gap:10px;flex-wrap:wrap">
+          <span>📊 Vol: ${s.volSpike.toFixed(1)}x avg</span>
+          <span>📐 Range: ${s.rangeWidth.toFixed(1)}% / ${s.flatDays}d flat</span>
+          <span style="color:${s.pctFromHigh<-30?"#00C853":"#546E7A"}">📉 ${s.pctFromHigh.toFixed(0)}% off hi</span>
+          <span>RSI: ${s.rsi.toFixed(0)}</span>
+        </div>
       </div>
     </div>`;
   }).join("");
@@ -874,21 +1136,30 @@ async function debugCatalyst(sym){
   const out=document.getElementById("c-dout");
   out.style.color="#FF9100"; out.textContent="Fetching "+sym+"...";
   try{
-    const maxPrice=parseFloat(document.getElementById("catMaxPrice").value)||25;
-    const minVolSpike=parseFloat(document.getElementById("catVolSpike").value)||3;
+    const maxPrice=parseFloat(document.getElementById("catMaxPrice").value)||50;
+    const minVolSpike=parseFloat(document.getElementById("catVolSpike").value)||2;
     const {closes,highs,lows,volumes,bars}=await fetchCandles(sym);
-    const s=scoreCatalyst(sym,closes,highs,lows,volumes,maxPrice,minVolSpike);
+    const earnings=await fetchEarningsDate(sym);
+    const s=scoreCatalyst(sym,closes,highs,lows,volumes,maxPrice,minVolSpike,earnings);
     const p=(pass,lbl,val)=>(pass?"✅":"❌")+" "+lbl+": "+val;
     out.style.color=s.score>=4?"#FF4500":s.score>=3?"#FF9100":"#90A4AE";
-    out.textContent=["══ "+sym+" CATALYST DEBUG — "+bars+" bars ══",
-      "Price: $"+s.price.toFixed(2)+"  (day chg: "+s.change.toFixed(2)+"%)", "",
-      p(s.c1,"C1 Price $3-$25       ","$"+s.price.toFixed(2)),
-      p(s.c2,"C2 Vol spike "+minVolSpike+"x+    ",s.volSpike.toFixed(2)+"x (today: "+(s.todayVol/1e6).toFixed(1)+"M, avg: "+(s.avgVol/1e6).toFixed(1)+"M)"),
-      p(s.c3,"C3 Flat 10+ days     ",s.flatDays+" days flat"),
-      p(s.c4,"C4 Breaking out      ",(s.breakout?"YES (above $"+s.high20.toFixed(2)+" 20d hi)":s.change.toFixed(1)+"% today, 20d hi $"+s.high20.toFixed(2))),
-      p(s.c5,"C5 Low float signal  ","vol spike "+s.volSpike.toFixed(1)+"x, price $"+s.price.toFixed(2)),"",
-      "SCORE: "+s.score+"/5  "+[s.c1,s.c2,s.c3,s.c4,s.c5].map((c,i)=>"C"+(i+1)+":"+(c?"✅":"❌")).join(" "),
-      s.score>=4?"\n⚡ HIGH PROBABILITY CATALYST SETUP — CHECK CHART + NEWS":""
+    const earStr=s.hasEarnings?"✅ in "+s.earningsDays+"d ("+s.earnings.date+")":"none in 14d";
+    out.textContent=[
+      "══ "+sym+" CATALYST DEBUG — "+bars+" bars ══",
+      "Price:   $"+s.price.toFixed(2)+"  (day: "+s.change.toFixed(2)+"%)",
+      "Session: "+getMarketSession().toUpperCase(), "",
+      p(s.c1,"C1 Price in range    ","$"+s.price.toFixed(2)),
+      p(s.c2,"C2 Coiling tight     ","range "+s.rangeWidth.toFixed(1)+"% · "+s.flatDays+"d flat"),
+      p(s.c3,"C3 Vol dry-up/spike  ",s.volSpike.toFixed(1)+"x"+(s.volDryUp?" 🔇 DRY-UP":"")),
+      p(s.c4,"C4 Catalyst present  ",s.hasEarnings?"📅 EARNINGS "+s.earningsDays+"d":s.breakout?"🚀 BREAKOUT":"change "+s.change.toFixed(1)+"%"),
+      p(s.c5,"C5 Near 52w low      ","+"+s.pctFromLow.toFixed(0)+"% above low $"+s.low52.toFixed(2)),
+      p(s.c6,"C6 RSI <55           ","RSI "+s.rsi.toFixed(1)), "",
+      "EARNINGS:  "+earStr,
+      "52w High:  $"+s.high52.toFixed(2)+" ("+s.pctFromHigh.toFixed(0)+"% off)",
+      "Avg Vol:   "+(s.avgVol/1e6).toFixed(1)+"M · Today: "+(s.todayVol/1e6).toFixed(1)+"M", "",
+      "SCORE: "+s.score+"/6  HEAT: "+s.heat+"/9",
+      [s.c1,s.c2,s.c3,s.c4,s.c5,s.c6].map((c,i)=>"C"+(i+1)+":"+(c?"✅":"❌")).join("  "),
+      s.heat>=7?"\n🔥🔥🔥 FIRE — Highest conviction":s.heat>=5?"\n🔥🔥 HOT — Watch closely":s.score>=4?"\n🔥 BUILDING SETUP":""
     ].join("\n");
   }catch(e){out.style.color="#FF5252";out.textContent=sym+" ERROR: "+e.message;}
   collapseDebugAfterTest("c");
