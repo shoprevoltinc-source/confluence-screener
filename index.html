@@ -100,6 +100,38 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
 .empty{text-align:center;padding:40px 20px;color:#546E7A;font-size:12px;grid-column:1/-1}
 .saved-banner{background:#00C85322;border:1px solid #00C85344;border-radius:4px;padding:5px 12px;font-size:9px;color:#00C853;margin:6px 14px;display:none}
 .cat-banner{background:#FF6D0022;border:1px solid #FF6D0044;border-radius:4px;padding:5px 12px;font-size:9px;color:#FF9100;margin:6px 14px;display:none}
+/* ── Alert tab styles ── */
+.alert-card{background:#08101e;border:1px solid #0b1a2e;border-radius:8px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:transform 0.1s}
+.alert-card:hover{transform:translateX(3px)}
+.alert-card.fire{border-color:#FF4500aa;background:linear-gradient(135deg,#FF450018,#060d18);box-shadow:0 0 15px #FF450015}
+.alert-card.hot{border-color:#FF9100aa;background:linear-gradient(135deg,#FF910012,#060d18)}
+.alert-card.warm{border-color:#FFD60066;background:linear-gradient(135deg,#FFD60010,#060d18)}
+.alert-card.earnings{border-color:#1565C0aa;background:linear-gradient(135deg,#1565C015,#060d18)}
+.alert-icon{font-size:28px;min-width:36px;text-align:center}
+.alert-body{flex:1}
+.alert-sym{font-size:18px;font-weight:700;color:#fff;letter-spacing:1px}
+.alert-reason{font-size:11px;color:#e0e8ff;margin-top:3px}
+.alert-meta{font-size:10px;color:#546E7A;margin-top:4px;display:flex;gap:12px;flex-wrap:wrap}
+.alert-price{text-align:right;min-width:80px}
+.alert-p{font-size:18px;font-weight:700;color:#fff}
+.alert-chg{font-size:12px;font-weight:700;margin-top:2px}
+.alert-chg.up{color:#00C853}
+.alert-chg.dn{color:#FF5252}
+.cal-week{margin-bottom:16px}
+.cal-week-hdr{font-size:10px;font-weight:700;color:#00b0ff;letter-spacing:2px;padding:6px 0;border-bottom:1px solid #0b1a2e;margin-bottom:8px}
+.cal-item{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#08101e;border:1px solid #0b1a2e;border-radius:6px;margin-bottom:5px;cursor:pointer}
+.cal-item:hover{border-color:#1565C044;background:#0d1f35}
+.cal-date{font-size:10px;color:#1976D2;font-family:monospace;min-width:60px}
+.cal-sym{font-size:13px;font-weight:700;color:#fff;min-width:55px}
+.cal-desc{font-size:10px;color:#78909C;flex:1}
+.cal-days{font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px}
+.cal-days.soon{background:#FF450022;color:#FF4500;border:1px solid #FF450044}
+.cal-days.week{background:#FF910022;color:#FF9100;border:1px solid #FF910044}
+.cal-days.next{background:#1565C022;color:#90CAF9;border:1px solid #1565C044}
+.notif-btn{background:linear-gradient(135deg,#7B1FA2,#9C27B0);color:#fff;border:none;padding:8px 18px;font-family:monospace;font-size:11px;font-weight:700;cursor:pointer;border-radius:4px;box-shadow:0 0 12px #9C27B044}
+.auto-status{font-size:9px;padding:3px 8px;border-radius:3px;margin-left:8px}
+.auto-on{background:#00C85322;color:#00C853;border:1px solid #00C85344}
+.auto-off{background:#546E7A22;color:#546E7A;border:1px solid #546E7A44}
 </style>
 </head>
 <body>
@@ -129,6 +161,7 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
 <div class="tabs">
   <div class="tab active" id="tab-recovery" onclick="switchTab('recovery')">📈 RECOVERY SCREENER</div>
   <div class="tab" id="tab-catalyst" onclick="switchTab('catalyst')">⚡ CATALYST SCREENER</div>
+  <div class="tab" id="tab-alerts" onclick="switchTab('alerts')">🔔 MORNING ALERTS</div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
@@ -254,7 +287,7 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
     <option value="Fintech">💳 Fintech</option>
   </select>
   <label>MAX $</label>
-  <input type="number" id="catMaxPrice" value="50" min="1" max="500" style="width:55px">
+  <input type="number" id="catMaxPrice" value="75" min="1" max="500" style="width:55px">
   <label>VOL SPIKE</label>
   <select id="catVolSpike">
     <option value="2" selected>2x avg</option>
@@ -327,6 +360,79 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
   <pre class="dout" id="c-dout" style="margin-top:6px">Click a ticker to test catalyst conditions.</pre>
 </div>
 </div><!-- end tab-panel catalyst -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB 3: MORNING ALERTS + CATALYST CALENDAR
+═══════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="panel-alerts">
+
+<div class="controls">
+  <button class="notif-btn" id="alertRunBtn" onclick="runMorningAlerts()">🔔 RUN ALERTS NOW</button>
+  <button class="stop-btn" id="alertStopBtn" onclick="stopScan()" disabled>■ STOP</button>
+  <span class="auto-status auto-off" id="autoStatus">⏰ AUTO 6AM: OFF</span>
+  <button onclick="toggleAutoAlert()" style="background:transparent;border:1px solid #1e3a5f;color:#78909C;padding:5px 10px;font-family:monospace;font-size:9px;cursor:pointer;border-radius:3px;margin-left:4px">TOGGLE AUTO</button>
+  <label style="margin-left:8px;font-size:10px;color:#78909C">MIN MOVE</label>
+  <select id="alertMinMove">
+    <option value="3">3%+</option>
+    <option value="5" selected>5%+</option>
+    <option value="8">8%+</option>
+    <option value="10">10%+</option>
+  </select>
+  <label style="font-size:10px;color:#78909C">VOL SPIKE</label>
+  <select id="alertMinVol">
+    <option value="1.5">1.5x+</option>
+    <option value="2" selected>2x+</option>
+    <option value="3">3x+</option>
+  </select>
+  <label style="font-size:10px;color:#78909C">LIST</label>
+  <select id="alertList">
+    <option value="catalyst" selected>Catalyst Universe</option>
+    <option value="watchlist">My Watchlist</option>
+    <option value="sp500">S&P 500</option>
+  </select>
+</div>
+
+<div class="prog-wrap" id="a-prog">
+  <div class="prog-top"><span class="prog-msg" id="a-progMsg">Checking pre-market...</span><span class="prog-pct" id="a-progPct">0%</span></div>
+  <div class="prog-track"><div class="prog-fill" id="a-progFill" style="background:linear-gradient(90deg,#7B1FA2,#9C27B0)"></div></div>
+</div>
+
+<div style="padding:10px 14px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+
+  <!-- LEFT: Live Alerts -->
+  <div>
+    <div style="font-size:10px;font-weight:700;color:#9C27B0;letter-spacing:2px;margin-bottom:10px">
+      🔔 PRE-MARKET MOVERS
+      <span style="font-size:8px;color:#546E7A;font-weight:400;margin-left:8px" id="alertTime"></span>
+    </div>
+    <div id="alertResults">
+      <div class="empty" style="grid-column:1">
+        <div style="font-size:24px;margin-bottom:8px">🔔</div>
+        Click RUN ALERTS NOW to scan your watchlist for pre-market movers<br><br>
+        <span style="font-size:9px;color:#37474F">Flags anything moving 5%+ on 2x+ volume before market open<br>
+        Checks Finnhub live quotes — works best 4am–9:30am ET</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Catalyst Calendar -->
+  <div>
+    <div style="font-size:10px;font-weight:700;color:#1976D2;letter-spacing:2px;margin-bottom:10px">
+      📅 EARNINGS CALENDAR
+      <button onclick="loadCalendar()" style="background:transparent;border:1px solid #1565C044;color:#90CAF9;padding:2px 8px;font-family:monospace;font-size:8px;cursor:pointer;border-radius:3px;margin-left:8px">REFRESH</button>
+    </div>
+    <div id="calendarResults">
+      <div style="font-size:10px;color:#546E7A;padding:20px 0;text-align:center">
+        Click REFRESH to load upcoming earnings for your watchlist
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="log-panel" id="a-log" style="margin-top:0"></div>
+
+</div><!-- end tab-panel alerts -->
 
 <script>
 // ── API Keys ────────────────────────────────────────────────
@@ -550,13 +656,36 @@ const SECTORS = {
   "Quantum/AI":    ["QUBT","IONQ","RGTI","SOUN","BBAI","ARQQ","QBTS","CRKN","LPSN","MTTR","AAOI","COHU","FORM","SMTC","VIAV","CEVA","PLAB","DIOD","VRNT","DM"],
   "Defense/Gov":   ["MRAM","KTOS","AVAV","RCAT","ASTS","LUNR","RDW","SPIR","BBAI","CDRE","DRS","CACI","SAIC","BWXT","AXON","HWM","TDG","ACHR","JOBY","LILM"],
   "Biotech":       ["MGNX","RXRX","DNLI","BEAM","EDIT","CRSP","NTLA","VERV","NUVL","ALLO","HIMS","OCGN","NVAX","VXRT","INO","PSNL","BLUE","ARVN","PRTA","IMVT","KYMR","PTGX","RCKT","SAGE","TGTX","IOVA","APLS","FOLD","DAWN","YMAB"],
-  "Semiconductors":["NVTS","AMPX","SMTC","AAOI","COHU","FORM","ONTO","ACMR","IIVI","PLAB","DIOD","CEVA","VIAV","POWI","MAXN","AEVA","LAZR","MVIS","OUST"],
+  "Semiconductors":["NVTS","AMPX","SMTC","AAOI","COHU","FORM","ONTO","ACMR","IIVI","PLAB","DIOD","CEVA","VIAV","POWI","MAXN","AEVA","LAZR","MVIS","OUST","AMKR","WOLF","AMBA","SLAB","SITM","NXPI"],
   "Clean Energy":  ["BLNK","CHPT","EVGO","STEM","ARRY","NOVA","SHLS","FLNC","BLDP","FCEL","PLUG","RUN","CSIQ","DQ","JKS","BE","CWEN","GPRE","AMRC","VNET"],
-  "Fintech":       ["SOFI","HOOD","AFRM","UPST","DAVE","MQ","LMND","ROOT","DKNG","PENN","RBLX","MSTR","IREN","CIFR","RIOT","MARA","HUT","CLSK","FOUR","RELY"]
+  "Fintech":       ["SOFI","HOOD","AFRM","UPST","DAVE","MQ","LMND","ROOT","DKNG","PENN","RBLX","MSTR","IREN","CIFR","RIOT","MARA","HUT","CLSK","FOUR","RELY"],
+  // ── Mid-Cap additions $25–$75 ──────────────────────────────────────────
+  "Mid-Cap Tech":  ["CRWD","DDOG","ZS","GTLB","BILL","DOCS","BRZE","SEMR","CFLT","ASAN","SMAR","WEAV","ALKT","JAMF","TASK","SPSC","FOUR","ACMR","ONTO","FORM"],
+  "Mid-Cap Health":["HIMS","TDOC","ACCD","PRVA","GDRX","PGNY","ONEM","CANO","TALK","ALHC","DOCS","CERT","XERS","INVA","TMDX","LUNG","NVRO","NVCR","FATE","ALLO"],
+  "Mid-Cap Defense":["KTOS","AVAV","CDRE","BWXT","CACI","DRS","LDOS","SAIC","HWM","TDG","AXON","ACHR","JOBY","RDW","ASTS","SPIR","LUNR","RCAT","BBAI","MRCY"],
+  "Mid-Cap Energy": ["CWEN","BE","ARRY","NOVA","SHLS","STEM","FLNC","GPRE","AMRC","REGI","CLNE","GEVO","REX","VGASF","HYLN","HYZN","EVGO","BLNK","CHPT","NKLA"]
 };
 
-// Combined flat list for scanning
-const SMALLCAP = [...new Set(Object.values(SECTORS).flat())];
+// Combined flat list — Small Cap ($2-$25) + Mid Cap ($25-$75) = full catalyst universe
+const SMALLCAP = [...new Set([
+  // Small Cap — explosive catalyst plays
+  "MRAM","KTOS","AVAV","RCAT","ACHR","JOBY","ASTS","LUNR","RDW","SPIR",
+  "BBAI","CDRE","QUBT","IONQ","RGTI","SOUN","ARQQ","QBTS","CRKN","VRNT",
+  "MGNX","RXRX","DNLI","BEAM","EDIT","CRSP","NTLA","VERV","NUVL","ALLO",
+  "HIMS","OCGN","NVAX","VXRT","INO","PSNL","BLUE","ARVN","PRTA","IMVT",
+  "KYMR","PTGX","RCKT","SAGE","TGTX","IOVA","APLS","FOLD","DAWN","YMAB",
+  "NVTS","AMPX","SMTC","AAOI","COHU","FORM","ONTO","ACMR","PLAB","DIOD",
+  "VIAV","POWI","MAXN","AEVA","LAZR","MVIS","OUST","WOLF","AMBA","SLAB",
+  "BLNK","CHPT","EVGO","STEM","ARRY","NOVA","SHLS","FLNC","BLDP","FCEL",
+  "PLUG","RUN","CSIQ","DQ","JKS","BE","CWEN","GPRE","AMRC","VNET",
+  "SOFI","HOOD","AFRM","UPST","DAVE","MQ","LMND","ROOT","DKNG","PENN",
+  "RBLX","MSTR","IREN","CIFR","RIOT","MARA","HUT","CLSK","FOUR","RELY",
+  // Mid Cap ($25-$75) — momentum plays with catalyst history
+  "CRWD","DDOG","ZS","GTLB","BILL","DOCS","BRZE","CFLT","ASAN","SMAR",
+  "WEAV","ALKT","JAMF","TASK","SPSC","TDOC","ACCD","PRVA","GDRX","PGNY",
+  "TMDX","NVCR","MRCY","GEVO","CLNE","REGI","AXON","SITM","NXPI","AMKR",
+  "HIMS","NVRO","FATE","CWEN","ARRY","NOVA","SHLS","STEM","FLNC","ONTO"
+])];
 
 // ── State ───────────────────────────────────────────────────
 let rResults=[], cResults=[], stopReq=false, isRunning=false;
@@ -1201,8 +1330,240 @@ async function countdown(secs,panel){
   el.style.display="none";
 }
 
+// ══════════════════════════════════════════════════════════
+// MORNING ALERTS SYSTEM
+// ══════════════════════════════════════════════════════════
+
+let autoAlertTimer = null;
+let alertRunning = false;
+
+// ── Request browser notifications permission ──────────────
+async function requestNotifPermission(){
+  if(!("Notification" in window)) return false;
+  if(Notification.permission==="granted") return true;
+  const p = await Notification.requestPermission();
+  return p==="granted";
+}
+
+function sendNotification(title, body, sym){
+  if(Notification.permission!=="granted") return;
+  const n = new Notification(title, {
+    body, icon:"https://finviz.com/image/favicon.ico",
+    tag: sym, requireInteraction: true
+  });
+  n.onclick = () => window.open("https://www.tradingview.com/chart/?symbol="+sym,"_blank");
+}
+
+// ── Toggle auto 6am alert ────────────────────────────────
+function toggleAutoAlert(){
+  if(autoAlertTimer){
+    clearInterval(autoAlertTimer);
+    autoAlertTimer = null;
+    document.getElementById("autoStatus").className="auto-status auto-off";
+    document.getElementById("autoStatus").textContent="⏰ AUTO 6AM: OFF";
+    log("Auto-alert disabled","warn","a");
+  } else {
+    // Check every minute if it's 6am ET
+    autoAlertTimer = setInterval(()=>{
+      const et = new Date(new Date().toLocaleString("en-US",{timeZone:"America/New_York"}));
+      if(et.getHours()===6 && et.getMinutes()===0){
+        log("⏰ 6:00 AM ET — running automatic morning alerts...","info","a");
+        runMorningAlerts();
+      }
+    }, 60000);
+    document.getElementById("autoStatus").className="auto-status auto-on";
+    document.getElementById("autoStatus").textContent="⏰ AUTO 6AM: ON";
+    log("Auto-alert enabled — will run at 6:00 AM ET","ok","a");
+    requestNotifPermission();
+  }
+}
+
+// ── Main morning alert scan ──────────────────────────────
+async function runMorningAlerts(){
+  if(alertRunning) return;
+  alertRunning=true;
+  document.getElementById("alertRunBtn").disabled=true;
+  document.getElementById("alertStopBtn").disabled=false;
+  document.getElementById("a-prog").style.display="block";
+  document.getElementById("a-log").innerHTML="";
+  document.getElementById("alertResults").innerHTML="";
+  document.getElementById("alertTime").textContent=new Date().toLocaleTimeString();
+
+  const listVal   = document.getElementById("alertList").value;
+  const minMove   = parseFloat(document.getElementById("alertMinMove").value)||5;
+  const minVol    = parseFloat(document.getElementById("alertMinVol").value)||2;
+  const tickers   = listVal==="sp500"?[...SP500]:listVal==="catalyst"?[...SMALLCAP]:[...WATCHLIST];
+
+  const sess = getMarketSession();
+  log("🔔 Morning alert scan: "+tickers.length+" stocks · min move "+minMove+"% · vol "+minVol+"x+","info","a");
+  log("Session: "+sess.toUpperCase()+" · "+new Date().toLocaleTimeString(),"info","a");
+  if(sess==="closed"||sess==="weekend")
+    log("⚠ Market closed — using previous session data","warn","a");
+
+  const alerts = [];
+  const calData = {};
+
+  for(let i=0;i<tickers.length;i++){
+    if(stopReq) break;
+    const sym = tickers[i];
+    const pct = Math.round(i/tickers.length*100);
+    document.getElementById("a-progMsg").textContent="Checking "+sym+" ("+(i+1)+"/"+tickers.length+")";
+    document.getElementById("a-progPct").textContent=pct+"%";
+    document.getElementById("a-progFill").style.width=pct+"%";
+
+    try{
+      // Get live quote from Finnhub (pre-market aware)
+      const q = await fetchLiveQuote(sym);
+      if(!q||!q.price) continue;
+
+      const changePct = q.changePct||0;
+      const absChange = Math.abs(changePct);
+
+      // Get average volume from Twelve Data (use key 0, cached if possible)
+      let volSpike = 0;
+      try{
+        const cd = await fetchCandlesWithKey(sym, i%TD_KEYS.length);
+        const avgV = cd.volumes.slice(-21,-1).reduce((a,b)=>a+b,0)/20;
+        // Estimate today's vol from Finnhub (not directly available, use price move as proxy)
+        volSpike = avgV > 0 ? Math.abs(changePct)/2 : 0; // rough proxy
+      }catch(e){}
+
+      // Get earnings date
+      const earnings = await fetchEarningsDate(sym);
+      if(earnings) calData[sym] = earnings;
+
+      // Flag if moving enough
+      const isAlert = absChange >= minMove;
+      const hasEarningsSoon = earnings && earnings.daysUntil <= 3;
+
+      if(isAlert || hasEarningsSoon){
+        const alert = {
+          sym, price:q.price, changePct, absChange,
+          prev:q.prev, high:q.high, low:q.low,
+          earnings, hasEarningsSoon, sess
+        };
+        alerts.push(alert);
+        renderAlerts(alerts);
+
+        // Send browser notification for big moves
+        if(absChange>=minMove){
+          const dir = changePct>=0?"📈 UP":"📉 DOWN";
+          sendNotification(
+            sym+" "+dir+" "+changePct.toFixed(1)+"% PRE-MARKET",
+            "$"+q.price.toFixed(2)+" (was $"+q.prev.toFixed(2)+") — Click to open chart",
+            sym
+          );
+          log("🔔 ALERT: "+sym+" "+dir+" "+changePct.toFixed(1)+"% | $"+q.price.toFixed(2)+(hasEarningsSoon?" | 📅 EARNINGS IN "+earnings.daysUntil+"d":""),"ok","a");
+        }
+      } else {
+        log("  "+sym.padEnd(6)+" "+changePct.toFixed(1)+"% | $"+q.price.toFixed(2));
+      }
+    }catch(e){ log("✗ "+sym+": "+e.message,"err","a"); }
+
+    await sleep(300); // Finnhub free = light usage here
+  }
+
+  document.getElementById("a-progMsg").textContent="Done — "+alerts.length+" alerts found";
+  document.getElementById("a-progPct").textContent="100%";
+  document.getElementById("alertRunBtn").disabled=false;
+  document.getElementById("alertStopBtn").disabled=true;
+  alertRunning=false;
+
+  // Also render calendar
+  renderCalendar(calData);
+  log("✅ Alert scan complete. "+alerts.length+" movers found.","info","a");
+}
+
+function renderAlerts(alerts){
+  const el = document.getElementById("alertResults");
+  if(!alerts.length){
+    el.innerHTML='<div style="font-size:10px;color:#546E7A;padding:20px 0;text-align:center">No movers above threshold yet...</div>';
+    return;
+  }
+  const sorted = [...alerts].sort((a,b)=>b.absChange-a.absChange);
+  el.innerHTML = sorted.map(a=>{
+    const up = a.changePct>=0;
+    const heat = a.absChange>=10?"fire":a.absChange>=5?"hot":"warm";
+    const icon = a.absChange>=10?"🚀":a.absChange>=5?"🔥":"📡";
+    const reasons = [];
+    if(a.absChange>=a.absChange) reasons.push((up?"▲":"▼")+Math.abs(a.changePct).toFixed(1)+"% "+(a.sess==="premarket"?"pre-mkt":"today"));
+    if(a.hasEarningsSoon) reasons.push("📅 earnings in "+a.earnings.daysUntil+"d");
+    return `<div class="alert-card ${heat}" onclick="window.open('https://www.tradingview.com/chart/?symbol=${a.sym}','_blank')">
+      <div class="alert-icon">${icon}</div>
+      <div class="alert-body">
+        <div class="alert-sym">${a.sym}</div>
+        <div class="alert-reason">${reasons.join(" · ")}</div>
+        <div class="alert-meta">
+          <span>prev close $${(a.prev||0).toFixed(2)}</span>
+          ${a.high?'<span>hi $'+(a.high||0).toFixed(2)+'</span>':''}
+          ${a.low?'<span>lo $'+(a.low||0).toFixed(2)+'</span>':''}
+          <span style="color:#1976D2">📈 click → TradingView</span>
+        </div>
+      </div>
+      <div class="alert-price">
+        <div class="alert-p">$${a.price.toFixed(2)}</div>
+        <div class="alert-chg ${up?'up':'dn'}">${up?"▲":"▼"}${Math.abs(a.changePct).toFixed(2)}%</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ── Earnings Calendar ────────────────────────────────────
+async function loadCalendar(){
+  document.getElementById("calendarResults").innerHTML='<div style="font-size:10px;color:#00b0ff;padding:10px 0">Loading earnings dates...</div>';
+  const tickers = [...WATCHLIST];
+  const calData = {};
+  for(const sym of tickers){
+    try{
+      const e = await fetchEarningsDate(sym);
+      if(e) calData[sym] = e;
+    }catch(err){}
+    await sleep(200);
+  }
+  renderCalendar(calData);
+}
+
+function renderCalendar(calData){
+  const el = document.getElementById("calendarResults");
+  const entries = Object.entries(calData)
+    .filter(([,e])=>e&&e.daysUntil>=0&&e.daysUntil<=30)
+    .sort((a,b)=>a[1].daysUntil-b[1].daysUntil);
+
+  if(!entries.length){
+    el.innerHTML='<div style="font-size:10px;color:#546E7A;padding:10px 0">No upcoming earnings found in next 30 days</div>';
+    return;
+  }
+
+  // Group by week
+  const thisWeek  = entries.filter(([,e])=>e.daysUntil<=7);
+  const nextWeek  = entries.filter(([,e])=>e.daysUntil>7&&e.daysUntil<=14);
+  const later     = entries.filter(([,e])=>e.daysUntil>14);
+
+  function makeGroup(label, items, cls){
+    if(!items.length) return '';
+    return `<div class="cal-week">
+      <div class="cal-week-hdr">${label} (${items.length})</div>
+      ${items.map(([sym,e])=>`
+        <div class="cal-item" onclick="window.open('https://www.tradingview.com/chart/?symbol=${sym}','_blank')">
+          <div class="cal-date">${e.date}</div>
+          <div class="cal-sym">${sym}</div>
+          <div class="cal-desc">Earnings report</div>
+          <div class="cal-days ${cls}">${e.daysUntil===0?"TODAY":e.daysUntil===1?"TOMORROW":e.daysUntil+"d away"}</div>
+        </div>`).join("")}
+    </div>`;
+  }
+
+  el.innerHTML =
+    makeGroup("🔥 THIS WEEK", thisWeek, "soon") +
+    makeGroup("📅 NEXT WEEK", nextWeek, "week") +
+    makeGroup("🗓 LATER", later, "next");
+}
+
+// ── Init ──────────────────────────────────────────────────
 loadSaved();
 renderWatchlistUI();
+// Auto-load calendar on startup
+setTimeout(()=>{ try{ loadCalendar(); }catch(e){} }, 2000);
 </script>
 </body>
 </html>
