@@ -901,15 +901,20 @@ async function loadSaved(){
         const fbR = await window.fbLoad("recovery");
         const fbC = await window.fbLoad("catalyst");
 
-        if(fbR && fbR.data && fbR.data.length > rResults.length){
-          // Firebase has more results — use those
-          rResults = fbR.data;
-          localStorage.setItem("cs_recovery", JSON.stringify(rResults));
-          document.getElementById("r-savedBanner").textContent =
-            "☁️ Synced from Firebase ("+fbR.device+") · "+new Date(fbR.savedAt).toLocaleString()+" — "+rResults.length+" results";
-          document.getElementById("r-filterBar").style.display="flex";
-          document.getElementById("statsRow").style.display="flex";
-          renderRecovery(); updateHdr(rResults);
+        if(fbR && fbR.data && fbR.data.length > 0){
+          const localAt  = localStorage.getItem("cs_saved_at");
+          const fbAt     = new Date(fbR.savedAt).getTime();
+          const localTime= localAt ? new Date(localAt).getTime() : 0;
+          if(fbAt >= localTime || fbR.data.length !== rResults.length){
+            rResults = fbR.data;
+            localStorage.setItem("cs_recovery", JSON.stringify(rResults));
+            document.getElementById("r-savedBanner").textContent =
+              "☁️ Firebase ("+fbR.device+") · "+new Date(fbR.savedAt).toLocaleString()+" — "+rResults.length+" results";
+            document.getElementById("r-savedBanner").style.display="block";
+            document.getElementById("r-filterBar").style.display="flex";
+            document.getElementById("statsRow").style.display="flex";
+            renderRecovery(); updateHdr(rResults);
+          }
         }
         if(fbC && fbC.data && fbC.data.length > cResults.length){
           cResults = fbC.data;
@@ -922,19 +927,26 @@ async function loadSaved(){
 
         // Set up real-time listener — if laptop pushes while phone is open, update instantly
         window.fbListen("recovery", (fbR)=>{
-          if(fbR.data.length > 0 && fbR.data.length !== rResults.length){
+          if(fbR.data && fbR.data.length > 0){
             rResults = fbR.data;
+            localStorage.setItem("cs_recovery", JSON.stringify(rResults));
             renderRecovery(); updateHdr(rResults);
+            document.getElementById("r-savedBanner").style.display="block";
             document.getElementById("r-savedBanner").textContent =
               "🔴 LIVE from "+fbR.device+" · "+new Date(fbR.savedAt).toLocaleTimeString();
+            document.getElementById("r-filterBar").style.display="flex";
+            document.getElementById("statsRow").style.display="flex";
           }
         });
         window.fbListen("catalyst", (fbC)=>{
-          if(fbC.data.length > 0 && fbC.data.length !== cResults.length){
+          if(fbC.data && fbC.data.length > 0){
             cResults = fbC.data;
+            localStorage.setItem("cs_catalyst", JSON.stringify(cResults));
             renderCatalyst();
+            document.getElementById("c-savedBanner").style.display="block";
             document.getElementById("c-savedBanner").textContent =
               "🔴 LIVE from "+fbC.device+" · "+new Date(fbC.savedAt).toLocaleTimeString();
+            document.getElementById("c-filterBar").style.display="flex";
           }
         });
 
