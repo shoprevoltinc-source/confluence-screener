@@ -262,6 +262,11 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
   <button class="run-btn" id="runBtn" onclick="startRecoveryScan()">▶ LIVE SCAN</button>
   <button class="stop-btn" id="stopBtn" onclick="stopScan()" disabled>■ STOP</button>
   <button class="clr-btn" onclick="clearSaved('recovery')">🗑 CLEAR</button>
+  <label>MODE</label>
+  <select id="scanMode">
+    <option value="replace">Replace results</option>
+    <option value="merge">Merge with existing</option>
+  </select>
   <label>LIST</label>
   <select id="listSel">
     <option value="watchlist">Watchlist (20)</option>
@@ -304,6 +309,7 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
   <button class="chip" onclick="setRFilter(5,this)">5/6</button>
   <button class="chip" onclick="setRFilter(4,this)">4/6</button>
   <button class="chip" onclick="setRFilter(3,this)">3/6</button>
+  <button class="chip" onclick="setRFilter('jax',this)">🟢 JAX</button>
   <select class="sort-select" id="r-sortSel" onchange="renderRecovery()">
     <option value="jax">Sort: 🟢 JAX Signal First</option>
     <option value="score">Sort: Best Score</option>
@@ -311,6 +317,9 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
     <option value="rsi">Sort: Lowest RSI</option>
     <option value="wr">Sort: Lowest WR</option>
   </select>
+  <input type="text" id="r-tickerSearch" placeholder="🔍 filter ticker..." 
+    style="width:120px;font-size:9px;padding:3px 7px;margin-left:4px"
+    oninput="renderRecovery()">
   <span style="font-size:9px;color:#37474F;margin-left:auto" id="r-resCount"></span>
 </div>
 
@@ -1261,7 +1270,10 @@ function scoreRecovery(sym,closes,highs,lows){
 
 async function startRecoveryScan(){
   if(isRunning) return;
-  isRunning=true; stopReq=false; rResults=[]; scanned=0; errCount=0;
+  const scanMode = document.getElementById("scanMode")?.value||"replace";
+  const keepExisting = scanMode==="merge" && rResults.length>0;
+  isRunning=true; stopReq=false; scanned=0; errCount=0;
+  if(!keepExisting) rResults=[];
   document.getElementById("runBtn").disabled=true;
   document.getElementById("stopBtn").disabled=false;
   document.getElementById("r-prog").style.display="block";
@@ -1302,7 +1314,11 @@ async function startRecoveryScan(){
       log("✗ "+r.sym+": "+r.error,"err");
     } else if(passed){
       scanned++;
-      rResults.push(r); renderRecovery();
+      // Prevent duplicates when merging
+      const existingIdx = rResults.findIndex(x=>x.sym===r.sym);
+      if(existingIdx>=0) rResults[existingIdx]=r; // update existing
+      else rResults.push(r);
+      renderRecovery();
       const priceStr="$"+r.price.toFixed(2)+(r.session==="premarket"?" 🌅PM":r.session==="afterhours"?" 🌙AH":"");
       const jaxStr = r.greenArrow?" | 🟢 JAX SIGNAL":"";
       log("✓ "+r.sym.padEnd(6)+" "+r.score+"/6 | RSI:"+r.rsi.toFixed(1)+" WR:"+r.wr.toFixed(1)+" | "+r.pctHi.toFixed(1)+"% off hi | "+priceStr+jaxStr, r.greenArrow?"ok":"ok");
