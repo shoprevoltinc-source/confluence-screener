@@ -1501,14 +1501,14 @@ async function debugRecovery(sym){
       "SCORE: "+s.score+"/6  "+[s.c1,s.c2,s.c3,s.c4,s.c5,s.c6].map((c,i)=>"C"+(i+1)+":"+(c?"✅":"❌")).join(" "),
       "",
       "── JAX PRO "+(s.greenArrow?"🟢 GREEN ARROW ACTIVE":"⚪ Waiting for signal")+" ──",
-      ...(s.jax?[
-        (s.emaStack?"✅":"❌")+" EMA Stack (20>40>60>price)",
-        (s.macdBull?"✅":"❌")+" MACD histogram > 0",
-        (s.jax.rsiBull?"✅":"❌")+" RSI > 50  ("+s.rsi.toFixed(1)+")",
-        (s.jax.wrBull?"✅":"❌")+" WR > -50  ("+s.wr.toFixed(1)+")",
-        (s.stBull?"✅":"❌")+" SuperTrend bullish",
+      ...(s.jaxHasData?[
+        (s.jaxEmaStack?"✅":"❌")+" EMA Stack (20>40>60>price)",
+        (s.jaxMacdBull?"✅":"❌")+" MACD histogram > 0",
+        (s.jaxRsiBull?"✅":"❌")+" RSI > 50  ("+s.rsi.toFixed(1)+")",
+        (s.jaxWrBull?"✅":"❌")+" WR > -50  ("+s.wr.toFixed(1)+")",
+        (s.jaxStBull?"✅":"❌")+" SuperTrend bullish",
         "Bull Score: "+s.bullScore+"/5",
-        "ATR Trail:  $"+s.trailVal.toFixed(2)+" · "+(s.jax.atrTS.utBuy?"🟢 UTBuy fired!":s.jax.st.flipped?"🟢 ST Flipped!":"Waiting for flip"),
+        "ATR Trail:  $"+s.jaxTrail.toFixed(2)+" · "+(s.jaxUtBuy?"🟢 UTBuy fired!":s.jaxStFlip?"🟢 ST Flipped!":"Waiting for flip"),
       ]:["Need 70+ bars for JAX PRO (have "+bars+")"]),
     ].join("\n");
   }catch(e){out.style.color="#FF5252";out.textContent=sym+" ERROR: "+e.message;}
@@ -1606,11 +1606,20 @@ function scoreCatalyst(sym, closes, highs, lows, volumes, maxPrice, minVolSpike,
   const jax = closes.length >= 70 ? calcJAXPRO(closes, highs, lows) : null;
   const greenArrow = jax ? jax.greenArrow : false;
   const bullScore  = jax ? jax.bullScore  : 0;
+  // Flatten all JAX fields so they survive JSON/Firebase serialization
+  const jaxRsiBull  = jax ? jax.rsiBull        : false;
+  const jaxWrBull   = jax ? jax.wrBull         : false;
+  const jaxEmaStack = jax ? jax.emaStack        : false;
+  const jaxMacdBull = jax ? jax.macdBull        : false;
+  const jaxStBull   = jax ? jax.stBull          : false;
+  const jaxUtBuy    = jax ? jax.atrTS.utBuy     : false;
+  const jaxStFlip   = jax ? jax.st.flipped      : false;
+  const jaxTrail    = jax ? jax.trailVal        : 0;
+  const jaxHasData  = jax !== null;
 
   // Upgrade heat score if JAX fires
-  if(greenArrow) heat += 3; // 🟢 JAX green arrow = strongest signal
+  if(greenArrow) heat += 3;
 
-  // Upgrade status if JAX fires
   const finalStatus = greenArrow && isIgniting ? "🚀🟢 IGNITION + JAX"
     : greenArrow ? "🟢 JAX SIGNAL"
     : status;
@@ -1626,12 +1635,10 @@ function scoreCatalyst(sym, closes, highs, lows, volumes, maxPrice, minVolSpike,
     high20, high52, low52, pctFromHigh, pctFromLow, nearLow,
     // Catalyst data
     earnings, hasEarnings, earningsDays,
-    // JAX PRO
-    jax, greenArrow, bullScore,
-    trailVal: jax ? jax.trailVal : 0,
-    stBull:   jax ? jax.stBull   : false,
-    macdBull: jax ? jax.macdBull : false,
-    emaStack: jax ? jax.emaStack : false,
+    // JAX PRO — all flat fields (survive JSON serialization perfectly)
+    greenArrow, bullScore, jaxHasData,
+    jaxRsiBull, jaxWrBull, jaxEmaStack, jaxMacdBull,
+    jaxStBull, jaxUtBuy, jaxStFlip, jaxTrail,
     // Indicators
     rsi, avgVol:avgVol20, todayVol
   };
@@ -1790,20 +1797,20 @@ function renderCatalyst(){
           <span style="color:${s.pctFromHigh<-30?"#00C853":"#546E7A"}">📉 ${s.pctFromHigh.toFixed(0)}% off hi</span>
           ${s.atrRatio>0?`<span style="color:#CE93D8">ATR ${(s.atrRatio*100).toFixed(0)}% of avg</span>`:""}
         </div>
-        ${s.jax?`<div style="margin-top:6px;padding:5px 8px;background:#05080f;border-radius:4px;border:1px solid ${s.greenArrow?"#00C85366":"#0b1a2e"}">
+        ${s.jaxHasData?`<div style="margin-top:6px;padding:5px 8px;background:#05080f;border-radius:4px;border:1px solid ${s.greenArrow?"#00C85366":"#0b1a2e"}">
           <div style="font-size:8px;font-weight:700;color:${s.greenArrow?"#00C853":"#546E7A"};margin-bottom:3px">
             ${s.greenArrow?"🟢 JAX PRO GREEN ARROW — ENTER NOW":"⚪ JAX PRO — Waiting"}
             <span style="float:right">bull: ${s.bullScore}/5</span>
           </div>
           <div style="display:flex;gap:5px;flex-wrap:wrap">
-            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.emaStack?"#00C85322":"#0d1f35"};color:${s.emaStack?"#00C853":"#37474F"}">EMA stack</span>
-            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.macdBull?"#00C85322":"#0d1f35"};color:${s.macdBull?"#00C853":"#37474F"}">MACD+</span>
-            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.jax.rsiBull?"#00C85322":"#0d1f35"};color:${s.jax.rsiBull?"#00C853":"#37474F"}">RSI>50</span>
-            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.jax.wrBull?"#00C85322":"#0d1f35"};color:${s.jax.wrBull?"#00C853":"#37474F"}">WR>-50</span>
-            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.stBull?"#00C85322":"#0d1f35"};color:${s.stBull?"#00C853":"#37474F"}">SuperTrend</span>
-            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.jax.atrTS.utBuy?"#00C85322":"#0d1f35"};color:${s.jax.atrTS.utBuy?"#00C853":"#37474F"}">UTBuy</span>
+            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.jaxEmaStack?"#00C85322":"#0d1f35"};color:${s.jaxEmaStack?"#00C853":"#37474F"}">EMA stack</span>
+            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.jaxMacdBull?"#00C85322":"#0d1f35"};color:${s.jaxMacdBull?"#00C853":"#37474F"}">MACD+</span>
+            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.jaxRsiBull?"#00C85322":"#0d1f35"};color:${s.jaxRsiBull?"#00C853":"#37474F"}">RSI>50</span>
+            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.jaxWrBull?"#00C85322":"#0d1f35"};color:${s.jaxWrBull?"#00C853":"#37474F"}">WR>-50</span>
+            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.jaxStBull?"#00C85322":"#0d1f35"};color:${s.jaxStBull?"#00C853":"#37474F"}">SuperTrend</span>
+            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.jaxUtBuy?"#00C85322":"#0d1f35"};color:${s.jaxUtBuy?"#00C853":"#37474F"}">UTBuy</span>
           </div>
-          <div style="font-size:7px;color:#546E7A;margin-top:2px">Trail: $${s.trailVal.toFixed(2)}</div>
+          <div style="font-size:7px;color:#546E7A;margin-top:2px">Trail: $${s.jaxTrail.toFixed(2)}</div>
         </div>`:""}
       </div>
     </div>`;
