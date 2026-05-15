@@ -6,12 +6,16 @@
 <title>Confluence Screener</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-<!-- Firebase SDK -->
-<script type="module">
-
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
+<!-- Firebase SDK — compat version works in Chrome + Edge + Safari + Mobile -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+function initFirebase(){
+  if(typeof firebase === "undefined"){
+    setTimeout(initFirebase, 100); // wait for compat scripts to load
+    return;
+  }
+(function(){
   const firebaseConfig = {
     apiKey: "AIzaSyCSIreDUpNhSBbZECWoOulV18R5yVlHOAE",
     authDomain: "confluence-screener.firebaseapp.com",
@@ -22,54 +26,63 @@
     appId: "1:8400711645:web:f2a1fee50a20e487c31034"
   };
 
-  const app = initializeApp(firebaseConfig);
-  const db  = getDatabase(app);
+  const app = firebase.initializeApp(firebaseConfig);
+  const db  = firebase.database();
 
-  // ── Push results to Firebase ──────────────────────────────
   window.fbSave = async function(key, data){
     try{
-      await set(ref(db, "screener/"+key), {
+      await db.ref("screener/"+key).set({
         data: JSON.stringify(data),
         savedAt: new Date().toISOString(),
         device: navigator.userAgent.includes("Mobile") ? "mobile" : "desktop"
       });
-      console.log("Firebase saved:", key);
       return true;
-    }catch(e){ console.warn("Firebase save failed:", e); return false; }
+    }catch(e){ console.warn("fbSave failed:", e); return false; }
   };
 
-  // ── Load results from Firebase ────────────────────────────
   window.fbLoad = async function(key){
     try{
-      const snap = await get(ref(db, "screener/"+key));
+      const snap = await db.ref("screener/"+key).once("value");
       if(snap.exists()){
         const val = snap.val();
         return { data: JSON.parse(val.data), savedAt: val.savedAt, device: val.device };
       }
       return null;
-    }catch(e){ console.warn("Firebase load failed:", e); return null; }
+    }catch(e){ console.warn("fbLoad failed:", e); return null; }
   };
 
-  // ── Listen for real-time updates (other device pushed results) ──
   window.fbListen = function(key, callback){
-    onValue(ref(db, "screener/"+key), (snap)=>{
+    db.ref("screener/"+key).on("value", (snap)=>{
       if(snap.exists()){
-        const val = snap.val();
-        callback({ data: JSON.parse(val.data), savedAt: val.savedAt, device: val.device });
+        try{
+          const val = snap.val();
+          callback({ data: JSON.parse(val.data), savedAt: val.savedAt, device: val.device });
+        }catch(e){}
       }
     });
   };
 
-  // Signal that Firebase is ready
   window.firebaseReady = true;
   document.dispatchEvent(new Event("firebaseReady"));
-  console.log("Firebase connected ✅");
-  // Update status indicator
+  console.log("Firebase ✅ connected (compat)");
+
   setTimeout(()=>{
     const el = document.getElementById("fbStatus");
-    if(el){ el.textContent="🟢 Firebase"; el.style.background="#00C85322"; el.style.color="#00C853"; el.style.borderColor="#00C85344"; }
+    if(el){
+      el.textContent = "🟢 FIREBASE";
+      el.style.background = "rgba(0,200,83,0.1)";
+      el.style.color = "#00C853";
+      el.style.borderColor = "rgba(0,200,83,0.3)";
+    }
   }, 500);
-
+})();
+}
+// Run after page loads to ensure compat scripts are ready
+if(document.readyState === "loading"){
+  document.addEventListener("DOMContentLoaded", initFirebase);
+} else {
+  initFirebase();
+}
 </script>
 
 <style>
@@ -2725,15 +2738,15 @@ function renderAlerts(alerts){
         <div class="alert-sym">${a.sym}</div>
         <div class="alert-reason">${reasons.join(" · ")}</div>
         <div class="alert-meta">
-          <span>prev close $${(a.prev||0).toFixed(2)}</span>
+          <span>prev $${(a.prev||0).toFixed(2)}</span>
           ${a.high?'<span>hi $'+(a.high||0).toFixed(2)+'</span>':''}
           ${a.low?'<span>lo $'+(a.low||0).toFixed(2)+'</span>':''}
-          <span style="color:#1976D2">📈 click → TradingView</span>
+          <span style="color:var(--blue)">📈 TradingView</span>
         </div>
       </div>
       <div class="alert-price">
         <div class="alert-p">$${a.price.toFixed(2)}</div>
-        <div class="alert-chg ${up?'up':'dn'}">${up?"▲":"▼"}${Math.abs(a.changePct).toFixed(2)}%</div>
+        <div class="alert-pct" style="color:${up?'#00C853':'#FF1744'};font-weight:700">${up?"▲":"▼"}${Math.abs(a.changePct).toFixed(2)}%</div>
       </div>
     </div>`;
   }).join("");
