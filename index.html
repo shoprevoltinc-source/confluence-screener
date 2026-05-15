@@ -1373,10 +1373,19 @@ function setRFilter(v,btn){
 
 function renderRecovery(){
   const min=parseInt(document.getElementById("minSel").value);
-  const sort=document.getElementById("r-sortSel")?.value||"score";
+  const sort=document.getElementById("r-sortSel")?.value||"jax";
+  const tickerSearch=(document.getElementById("r-tickerSearch")?.value||"").toUpperCase().trim();
   let f=rResults.filter(r=>r.score>=min);
-  if(rFilter!=="all") f=f.filter(r=>r.score===rFilter);
-  f.sort((a,b)=>sort==="pullback"?a.pctHi-b.pctHi:sort==="rsi"?a.rsi-b.rsi:sort==="wr"?a.wr-b.wr:b.score-a.score||a.pctHi-b.pctHi);
+  if(rFilter==="jax") f=f.filter(r=>r.greenArrow);
+  else if(rFilter!=="all") f=f.filter(r=>r.score===rFilter);
+  if(tickerSearch) f=f.filter(r=>r.sym.includes(tickerSearch));
+  f.sort((a,b)=>{
+    if(sort==="jax")      return (b.greenArrow?1:0)-(a.greenArrow?1:0)||b.bullScore-a.bullScore||b.score-a.score;
+    if(sort==="pullback") return a.pctHi-b.pctHi;
+    if(sort==="rsi")      return a.rsi-b.rsi;
+    if(sort==="wr")       return a.wr-b.wr;
+    return b.score-a.score||a.pctHi-b.pctHi;
+  });
   document.getElementById("r-resCount").textContent=f.length+" shown";
   const GRADES={6:{l:"A+ PERFECT",bg:"#00C853",fg:"#000"},5:{l:"A STRONG",bg:"#CCFF00",fg:"#000"},4:{l:"B+ WATCH",bg:"#FFD600",fg:"#000"},3:{l:"B WEAK",bg:"#FF6D00",fg:"#fff"}};
   const LABELS=["RSI<45","WR<-65","Above EMA21","EMA21 Rising","±10% EMA21","25%+ Off Hi"];
