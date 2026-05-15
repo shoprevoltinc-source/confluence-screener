@@ -4,6 +4,70 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Confluence Screener</title>
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCSIreDUpNhSBbZECWoOulV18R5yVlHOAE",
+    authDomain: "confluence-screener.firebaseapp.com",
+    databaseURL: "https://confluence-screener-default-rtdb.firebaseio.com",
+    projectId: "confluence-screener",
+    storageBucket: "confluence-screener.firebasestorage.app",
+    messagingSenderId: "8400711645",
+    appId: "1:8400711645:web:f2a1fee50a20e487c31034"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  // ── Push results to Firebase ──────────────────────────────
+  window.fbSave = async function(key, data){
+    try{
+      await set(ref(db, "screener/"+key), {
+        data: JSON.stringify(data),
+        savedAt: new Date().toISOString(),
+        device: navigator.userAgent.includes("Mobile") ? "mobile" : "desktop"
+      });
+      console.log("Firebase saved:", key);
+      return true;
+    }catch(e){ console.warn("Firebase save failed:", e); return false; }
+  };
+
+  // ── Load results from Firebase ────────────────────────────
+  window.fbLoad = async function(key){
+    try{
+      const snap = await get(ref(db, "screener/"+key));
+      if(snap.exists()){
+        const val = snap.val();
+        return { data: JSON.parse(val.data), savedAt: val.savedAt, device: val.device };
+      }
+      return null;
+    }catch(e){ console.warn("Firebase load failed:", e); return null; }
+  };
+
+  // ── Listen for real-time updates (other device pushed results) ──
+  window.fbListen = function(key, callback){
+    onValue(ref(db, "screener/"+key), (snap)=>{
+      if(snap.exists()){
+        const val = snap.val();
+        callback({ data: JSON.parse(val.data), savedAt: val.savedAt, device: val.device });
+      }
+    });
+  };
+
+  // Signal that Firebase is ready
+  window.firebaseReady = true;
+  document.dispatchEvent(new Event("firebaseReady"));
+  console.log("Firebase connected ✅");
+  // Update status indicator
+  setTimeout(()=>{
+    const el = document.getElementById("fbStatus");
+    if(el){ el.textContent="🟢 Firebase"; el.style.background="#00C85322"; el.style.color="#00C853"; el.style.borderColor="#00C85344"; }
+  }, 500);
+</script>
+
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#05080f;color:#e0e8ff;font-family:'Courier New',monospace;padding-bottom:60px}
@@ -140,7 +204,10 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
   <div class="hdr-top">
     <div>
       <div class="logo">CONFLUENCE<span>SCREENER</span></div>
-      <div class="subtitle" id="mainSubtitle">4× TWELVE DATA KEYS · 32 CREDITS/MIN · AUTO-SAVE</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="subtitle" id="mainSubtitle">5× TWELVE DATA KEYS · 40 CREDITS/MIN · AUTO-SAVE</div>
+        <span id="fbStatus" style="font-size:8px;padding:1px 6px;border-radius:3px;background:#37474F22;color:#546E7A;border:1px solid #37474F44">⚫ Firebase</span>
+      </div>
     </div>
     <div class="hstats">
       <div class="hs"><div class="hs-v" id="h-scanned">0</div><div class="hs-l">SCANNED</div></div>
@@ -217,7 +284,8 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
   <span class="ks" id="ks1">KEY 2</span>
   <span class="ks" id="ks2">KEY 3</span>
   <span class="ks" id="ks3">KEY 4</span>
-  <span style="margin-left:8px;color:#546E7A">4 keys · 32 credits/min · rotating every 7 stocks</span>
+  <span class="ks" id="ks4">KEY 5</span>
+  <span style="margin-left:8px;color:#546E7A">5 keys · 40 credits/min · rotating every 7 stocks</span>
 </div>
 
 <div class="prog-wrap" id="r-prog">
@@ -322,9 +390,10 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
   <button class="chip" onclick="setCFilter(3,this)">🔥 3/5</button>
   <select class="sort-select" id="c-sortSel" onchange="renderCatalyst()">
     <option value="heat">Sort: Heat Score</option>
+    <option value="rvol">Sort: 15m RVOL (Live)</option>
     <option value="earnings">Sort: Earnings Soonest</option>
-    <option value="coiling">Sort: Tightest Coil</option>
-    <option value="volspike">Sort: Vol Spike</option>
+    <option value="atr">Sort: ATR Coil (Tightest)</option>
+    <option value="volspike">Sort: Daily Vol Spike</option>
   </select>
   <span style="font-size:9px;color:#37474F;margin-left:auto" id="c-resCount"></span>
 </div>
@@ -444,7 +513,8 @@ const TD_KEYS = [
   "fceed7ef4b7847d38e1ecd0bddcad5eb",
   "c05d8242562f496e8709d5c9e0ce4109",
   "9802166cf9694f42a64738bd776c22b9",
-  "5a13fcf43f1347c6b2b4459a0076ba51"
+  "5a13fcf43f1347c6b2b4459a0076ba51",
+  "257f261bbb394e8bad0c871eb5d9218d"
 ];
 
 // Finnhub — live quote + earnings calendar
@@ -565,7 +635,18 @@ async function runWorker(keyIndex, tickers, minScore, isCatalyst, maxPrice, minV
       let result;
       if(isCatalyst){
         const earnings = await fetchEarningsDate(sym);
-        result = scoreCatalyst(sym, candles.closes, candles.highs, candles.lows, candles.volumes, maxPrice, minVolSpike, earnings);
+
+        // Fetch 15-min candles for RVOL (Finnhub free)
+        let atrData = null, rvol15m = 0;
+        try{
+          // ATR from daily candles
+          atrData = calcATR(candles.highs, candles.lows, candles.closes);
+          // 15m RVOL from Finnhub intraday
+          const intra = await fetch15mCandles(sym);
+          if(intra) rvol15m = calcRVOL15m(intra.times, intra.volumes);
+        }catch(e){}
+
+        result = scoreCatalyst(sym, candles.closes, candles.highs, candles.lows, candles.volumes, maxPrice, minVolSpike, earnings, atrData, rvol15m);
         if(result.score>=3) onResult(result, true);
         else onResult(result, false);
       } else {
@@ -731,24 +812,35 @@ function log(msg,type="",panel="r"){
 // ── Save/Load ──────────────────────────────────────────────
 function saveResults(){
   try{
+    // Save to localStorage (this device)
     localStorage.setItem("cs_recovery",JSON.stringify(rResults));
     localStorage.setItem("cs_catalyst",JSON.stringify(cResults));
     localStorage.setItem("cs_saved_at",new Date().toLocaleString());
+
+    // Save to Firebase (all devices)
+    if(window.firebaseReady){
+      window.fbSave("recovery", rResults);
+      window.fbSave("catalyst", cResults);
+      document.getElementById("r-savedBanner").textContent="💾 Saved locally + synced to Firebase · "+new Date().toLocaleTimeString();
+    } else {
+      document.getElementById("r-savedBanner").textContent="💾 Saved locally · "+new Date().toLocaleTimeString();
+    }
     document.getElementById("r-savedBanner").style.display="block";
-    document.getElementById("r-savedBanner").textContent="💾 Auto-saved "+rResults.length+" results · "+new Date().toLocaleTimeString();
-    document.getElementById("savedAt").textContent="saved "+new Date().toLocaleTimeString();
+    document.getElementById("savedAt").textContent="synced "+new Date().toLocaleTimeString();
   }catch(e){}
 }
-function loadSaved(){
+async function loadSaved(){
   try{
-    const rr=localStorage.getItem("cs_recovery");
-    const cr=localStorage.getItem("cs_catalyst");
-    const at=localStorage.getItem("cs_saved_at");
+    const rr  = localStorage.getItem("cs_recovery");
+    const cr  = localStorage.getItem("cs_catalyst");
+    const at  = localStorage.getItem("cs_saved_at");
+
+    // Load from localStorage first (instant)
     if(rr){
       rResults=JSON.parse(rr);
       if(rResults.length){
         document.getElementById("r-savedBanner").style.display="block";
-        document.getElementById("r-savedBanner").textContent="💾 Saved from "+at+" — "+rResults.length+" recovery results";
+        document.getElementById("r-savedBanner").textContent="💾 Local: "+at+" — "+rResults.length+" results";
         document.getElementById("r-filterBar").style.display="flex";
         document.getElementById("statsRow").style.display="flex";
         renderRecovery(); updateHdr(rResults);
@@ -758,11 +850,56 @@ function loadSaved(){
       cResults=JSON.parse(cr);
       if(cResults.length){
         document.getElementById("c-savedBanner").style.display="block";
-        document.getElementById("c-savedBanner").textContent="⚡ Saved from "+at+" — "+cResults.length+" catalyst setups";
+        document.getElementById("c-savedBanner").textContent="⚡ Local: "+at+" — "+cResults.length+" catalyst setups";
         document.getElementById("c-filterBar").style.display="flex";
         renderCatalyst();
       }
     }
+
+    // Then check Firebase for newer results from another device
+    document.addEventListener("firebaseReady", async ()=>{
+      try{
+        const fbR = await window.fbLoad("recovery");
+        const fbC = await window.fbLoad("catalyst");
+
+        if(fbR && fbR.data && fbR.data.length > rResults.length){
+          // Firebase has more results — use those
+          rResults = fbR.data;
+          localStorage.setItem("cs_recovery", JSON.stringify(rResults));
+          document.getElementById("r-savedBanner").textContent =
+            "☁️ Synced from Firebase ("+fbR.device+") · "+new Date(fbR.savedAt).toLocaleString()+" — "+rResults.length+" results";
+          document.getElementById("r-filterBar").style.display="flex";
+          document.getElementById("statsRow").style.display="flex";
+          renderRecovery(); updateHdr(rResults);
+        }
+        if(fbC && fbC.data && fbC.data.length > cResults.length){
+          cResults = fbC.data;
+          localStorage.setItem("cs_catalyst", JSON.stringify(cResults));
+          document.getElementById("c-savedBanner").textContent =
+            "☁️ Synced from Firebase ("+fbC.device+") · "+new Date(fbC.savedAt).toLocaleString()+" — "+cResults.length+" setups";
+          document.getElementById("c-filterBar").style.display="flex";
+          renderCatalyst();
+        }
+
+        // Set up real-time listener — if laptop pushes while phone is open, update instantly
+        window.fbListen("recovery", (fbR)=>{
+          if(fbR.data.length > 0 && fbR.data.length !== rResults.length){
+            rResults = fbR.data;
+            renderRecovery(); updateHdr(rResults);
+            document.getElementById("r-savedBanner").textContent =
+              "🔴 LIVE from "+fbR.device+" · "+new Date(fbR.savedAt).toLocaleTimeString();
+          }
+        });
+        window.fbListen("catalyst", (fbC)=>{
+          if(fbC.data.length > 0 && fbC.data.length !== cResults.length){
+            cResults = fbC.data;
+            renderCatalyst();
+            document.getElementById("c-savedBanner").textContent =
+              "🔴 LIVE from "+fbC.device+" · "+new Date(fbC.savedAt).toLocaleTimeString();
+          }
+        });
+      }catch(e){ console.warn("Firebase load error:", e); }
+    });
   }catch(e){}
 }
 function clearSaved(which){
@@ -825,6 +962,73 @@ async function fetchCandles(sym, retries=3){
 
 // ── fetchCandles: single-stock wrapper for debug (uses key 0) ──────────────
 async function fetchCandles(sym){ return fetchCandlesWithKey(sym, 0); }
+
+// ── Fetch 15-minute intraday candles from Finnhub ────────────────────────────
+async function fetch15mCandles(sym){
+  try{
+    const now   = Math.floor(Date.now()/1000);
+    const from  = now - 11*24*60*60; // 11 days back (gets 10 trading days)
+    const url   = "https://finnhub.io/api/v1/stock/candle?symbol="+sym
+                  +"&resolution=15&from="+from+"&to="+now+"&token="+FH_KEY;
+    const r = await fetch(url);
+    if(!r.ok) return null;
+    const d = await r.json();
+    if(!d||d.s!=="ok"||!d.c||d.c.length<2) return null;
+    return {
+      closes:  d.c,
+      highs:   d.h,
+      lows:    d.l,
+      volumes: d.v,
+      times:   d.t  // UNIX timestamps — needed for time-slot matching
+    };
+  }catch(e){ return null; }
+}
+
+// ── Calculate RVOL at the SAME 15-min time slot (your Python logic) ──────────
+function calcRVOL15m(times, volumes){
+  if(!times||!volumes||times.length<2) return 0;
+  // Get current bar time slot (hour + minute)
+  const nowTs    = times[times.length-1];
+  const nowDate  = new Date(nowTs*1000);
+  const nowHour  = nowDate.getHours();
+  const nowMin   = nowDate.getMinutes();
+  const curVol   = volumes[volumes.length-1];
+
+  // Find all bars from the SAME time slot over past 10 days
+  const sameSlot = [];
+  for(let i=0; i<times.length-1; i++){
+    const d = new Date(times[i]*1000);
+    if(d.getHours()===nowHour && d.getMinutes()===nowMin){
+      sameSlot.push(volumes[i]);
+    }
+  }
+  if(sameSlot.length===0) return 0;
+  const avgAtSlot = sameSlot.reduce((a,b)=>a+b,0)/sameSlot.length;
+  return avgAtSlot>0 ? curVol/avgAtSlot : 0;
+}
+
+// ── ATR calculation (True Range average) ────────────────────────────────────
+function calcATR(highs, lows, closes, period=14){
+  if(highs.length < period+1) return 0;
+  const trs = [];
+  for(let i=1; i<highs.length; i++){
+    const tr = Math.max(
+      highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i-1]),
+      Math.abs(lows[i]  - closes[i-1])
+    );
+    trs.push(tr);
+  }
+  // Current ATR = average of last 14 TRs
+  const currentATR = trs.slice(-period).reduce((a,b)=>a+b,0)/period;
+  // 20-day ATR average = average of ATRs over last 20 bars
+  const atrSeries = [];
+  for(let i=period; i<=trs.length; i++){
+    atrSeries.push(trs.slice(i-period,i).reduce((a,b)=>a+b,0)/period);
+  }
+  const avgATR20 = atrSeries.slice(-20).reduce((a,b)=>a+b,0)/Math.min(atrSeries.length,20);
+  return { currentATR, avgATR20, isCoiling: currentATR < avgATR20 };
+}
 
 // ── Indicators ─────────────────────────────────────────────
 function calcRSI(c,p=14){
@@ -903,7 +1107,7 @@ async function startRecoveryScan(){
   let   done     = 0;
 
   const eta = Math.ceil(total / nKeys * 8.5 / 60);
-  log("⚡ PARALLEL scan: "+total+" stocks across "+nKeys+" keys simultaneously","info");
+  log("⚡ PARALLEL scan: "+total+" stocks across "+nKeys+" keys · 40 credits/min","info");
   log("Est. ~"+eta+" min ("+nKeys+"x faster than sequential)","info");
 
   // Progress tracker
@@ -1038,84 +1242,104 @@ async function debugRecovery(sym){
 // ══════════════════════════════════════════════════════════
 // CATALYST SCREENER
 // ══════════════════════════════════════════════════════════
-function scoreCatalyst(sym, closes, highs, lows, volumes, maxPrice, minVolSpike, earnings){
+function scoreCatalyst(sym, closes, highs, lows, volumes, maxPrice, minVolSpike, earnings, atrData, rvol15m){
   if(closes.length < 30) throw new Error("Not enough bars");
 
   const price   = closes[closes.length-1];
   const prev    = closes[closes.length-2];
   const change  = ((price-prev)/prev)*100;
 
-  // ── Volume analysis ──────────────────────────────────────
-  const todayVol  = volumes[volumes.length-1];
-  const avgVol20  = volumes.slice(-21,-1).reduce((a,b)=>a+b,0)/20;
-  const volSpike  = avgVol20>0 ? todayVol/avgVol20 : 0;
+  // ── ATR Coil (from your Python logic) ────────────────────
+  // ATR shrinking = volatility compressing = spring loading
+  const atrCoiling  = atrData ? atrData.isCoiling : false;
+  const currentATR  = atrData ? atrData.currentATR : 0;
+  const avgATR20    = atrData ? atrData.avgATR20 : 0;
+  const atrRatio    = avgATR20 > 0 ? currentATR/avgATR20 : 1;
 
-  // Volume dry-up: last 5 days avg vs 20 day avg — looking for shrinking volume
-  const vol5      = volumes.slice(-6,-1).reduce((a,b)=>a+b,0)/5;
-  const volDryUp  = vol5 < avgVol20 * 0.6; // volume 40%+ below average = drying up
+  // ── 15-min RVOL (same time slot — your Python logic) ─────
+  // Volume exploding at this exact time vs normal = ignition
+  const rvolNow     = rvol15m || 0;
+  const isIgniting  = rvolNow >= 2.5;  // 2.5x+ = IGNITION
+  const isWakingUp  = rvolNow >= 1.5 && rvolNow < 2.5;
 
-  // ── Price coiling — tight range detection ────────────────
-  // How tight is the price range over last 15 days?
-  const last15H = Math.max(...highs.slice(-15));
-  const last15L = Math.min(...lows.slice(-15));
-  const rangeWidth = last15H > 0 ? (last15H-last15L)/last15L*100 : 999;
-  const isTight = rangeWidth < 15; // price contained in <15% range for 15 days
+  // ── Daily volume (fallback when market closed) ────────────
+  const todayVol    = volumes[volumes.length-1];
+  const avgVol20    = volumes.slice(-21,-1).reduce((a,b)=>a+b,0)/20;
+  const dailySpike  = avgVol20 > 0 ? todayVol/avgVol20 : 0;
+  const volDryUp    = (volumes.slice(-6,-1).reduce((a,b)=>a+b,0)/5) < avgVol20*0.6;
 
-  // Flat days: consecutive days within 6% of current price
+  // ── Price coiling (backup measure) ───────────────────────
+  const last15H     = Math.max(...highs.slice(-15));
+  const last15L     = Math.min(...lows.slice(-15));
+  const rangeWidth  = last15H > 0 ? (last15H-last15L)/last15L*100 : 999;
+  const isTight     = rangeWidth < 15;
+
+  // ── Flat days ─────────────────────────────────────────────
   let flatDaysCount = 0;
   for(let i=closes.length-2; i>=0; i--){
     if(Math.abs(closes[i]-price)/price < 0.06) flatDaysCount++;
     else break;
   }
 
-  // ── Breakout detection ───────────────────────────────────
-  const high20     = Math.max(...highs.slice(-21,-1));
-  const breakout   = price > high20 * 1.02; // breaking above 20-day high
+  // ── Breakout ──────────────────────────────────────────────
+  const high20      = Math.max(...highs.slice(-21,-1));
+  const breakout    = price > high20 * 1.02;
 
-  // ── Near 52w low (deep value + coiling) ─────────────────
-  const low52      = Math.min(...lows);
-  const pctFromLow = ((price-low52)/low52)*100;
-  const nearLow    = pctFromLow < 50; // within 50% of 52w low
+  // ── 52w levels ────────────────────────────────────────────
+  const low52       = Math.min(...lows);
+  const high52      = Math.max(...highs);
+  const pctFromLow  = ((price-low52)/low52)*100;
+  const pctFromHigh = ((price-high52)/high52)*100;
+  const nearLow     = pctFromLow < 50;
 
-  // ── Near 52w high (momentum breakout type) ───────────────
-  const high52     = Math.max(...highs);
-  const pctFromHigh= ((price-high52)/high52)*100;
+  // ── Earnings ──────────────────────────────────────────────
+  const hasEarnings    = earnings && earnings.daysUntil >= 0 && earnings.daysUntil <= 14;
+  const earningsDays   = earnings ? earnings.daysUntil : 999;
 
-  // ── Earnings catalyst proximity ──────────────────────────
-  const hasEarnings     = earnings && earnings.daysUntil >= 0 && earnings.daysUntil <= 14;
-  const earningsDays    = earnings ? earnings.daysUntil : 999;
-
-  // ── Low float proxy ──────────────────────────────────────
-  const lowFloatProxy   = volSpike > 3 && price < 25;
-
-  // ── RSI ──────────────────────────────────────────────────
+  // ── RSI ───────────────────────────────────────────────────
   const rsi = calcRSI(closes, 14);
 
-  // ─────────────────────────────────────────────────────────
-  // 6 CATALYST CONDITIONS (updated from QUBT/MGNX/NVTS/AMPX analysis)
-  // ─────────────────────────────────────────────────────────
-  const c1 = price >= 2 && price <= maxPrice;           // C1: Price in range
-  const c2 = isTight && flatDaysCount >= 8;             // C2: Coiling tight 8+ days
-  const c3 = volDryUp || volSpike >= minVolSpike;       // C3: Vol dry-up OR spike
-  const c4 = hasEarnings || breakout || change > 8;     // C4: Catalyst present
-  const c5 = nearLow || pctFromHigh < -20;              // C5: Deep pullback setup
-  const c6 = rsi < 55;                                  // C6: Not overbought
+  // ══════════════════════════════════════════════════════════
+  // 6 CONDITIONS — ATR + 15m RVOL upgraded system
+  // ══════════════════════════════════════════════════════════
+  const c1 = price >= 2 && price <= maxPrice;                    // Price in range
+  const c2 = atrCoiling || (isTight && flatDaysCount >= 8);      // ATR coiling OR price tight
+  const c3 = isIgniting || dailySpike >= minVolSpike || volDryUp; // 15m ignition OR daily spike OR dry-up
+  const c4 = hasEarnings || breakout || change > 8;              // Catalyst present
+  const c5 = nearLow || pctFromHigh < -20;                       // Deep pullback
+  const c6 = rsi < 55;                                           // Not overbought
 
   const conds = [c1,c2,c3,c4,c5,c6];
   const score = conds.filter(Boolean).length;
 
-  // Heat score: bonus points for stacked signals
+  // ── Heat score — stacked signals = higher conviction ──────
   let heat = score;
-  if(hasEarnings && earningsDays<=7) heat++;   // earnings this week
-  if(volDryUp && isTight) heat++;              // classic AMPX/NVTS setup
-  if(breakout && volSpike>=2) heat++;          // QUBT breakout type
+  if(isIgniting && atrCoiling)       heat += 3; // 🚀 IGNITION — ATR coil + RVOL spike
+  else if(isIgniting)                heat += 2; // 👀 WAKING UP — volume only
+  else if(atrCoiling && volDryUp)    heat += 2; // ⏳ COILING — classic NVTS/AMPX setup
+  if(hasEarnings && earningsDays<=7) heat += 1; // earnings this week
+  if(breakout && rvolNow>=1.5)       heat += 1; // breakout with volume
+
+  // ── Status label ──────────────────────────────────────────
+  const status = isIgniting && atrCoiling ? "🚀 IGNITION"
+               : isIgniting               ? "👀 WAKING UP"
+               : atrCoiling && volDryUp   ? "⏳ COILING"
+               : atrCoiling               ? "⏳ WATCHING"
+               : "📡 MONITOR";
 
   return {
-    sym, price, change, volSpike, volDryUp, flatDays:flatDaysCount,
-    isTight, rangeWidth, breakout, rsi, high20, high52, low52,
-    pctFromHigh, pctFromLow, nearLow, lowFloatProxy,
-    earnings, hasEarnings, earningsDays, avgVol:avgVol20, todayVol,
-    c1, c2, c3, c4, c5, c6, score, heat, conds
+    sym, price, change, status, heat, score, conds,
+    // ATR data
+    atrCoiling, currentATR, avgATR20, atrRatio,
+    // Volume data
+    rvolNow, isIgniting, isWakingUp, dailySpike, volDryUp,
+    // Price data
+    isTight, rangeWidth, flatDays:flatDaysCount, breakout,
+    high20, high52, low52, pctFromHigh, pctFromLow, nearLow,
+    // Catalyst data
+    earnings, hasEarnings, earningsDays,
+    // Indicators
+    rsi, avgVol:avgVol20, todayVol
   };
 }
 
@@ -1210,10 +1434,11 @@ function renderCatalyst(){
   let f=[...cResults];
   if(cFilter!=="all") f=f.filter(r=>r.score===cFilter);
   f.sort((a,b)=>{
+    if(sort==="rvol")     return b.rvolNow-a.rvolNow;
     if(sort==="earnings") return (a.earningsDays||999)-(b.earningsDays||999);
-    if(sort==="coiling")  return a.rangeWidth-b.rangeWidth;
-    if(sort==="volspike") return b.volSpike-a.volSpike;
-    return b.heat-a.heat||b.score-a.score; // default: heat score
+    if(sort==="atr")      return a.atrRatio-b.atrRatio;  // lowest ratio = tightest coil
+    if(sort==="volspike") return b.dailySpike-a.dailySpike;
+    return b.heat-a.heat||b.score-a.score;
   });
   document.getElementById("c-resCount").textContent=f.length+" shown";
   const grid=document.getElementById("c-results");
@@ -1234,8 +1459,9 @@ function renderCatalyst(){
             <span class="ticker">${s.sym}</span>
             <span style="font-size:9px;padding:2px 7px;border-radius:3px;font-weight:700;background:${heatBg};color:#000">${heat}</span>
             ${s.hasEarnings?`<span style="font-size:8px;padding:1px 6px;border-radius:3px;background:#1565C022;color:#90CAF9;border:1px solid #1565C044">📅 EARN ${s.earningsDays}d</span>`:""}
-            ${s.volDryUp?`<span style="font-size:8px;padding:1px 6px;border-radius:3px;background:#9C27B022;color:#CE93D8;border:1px solid #9C27B044">🔇 DRY</span>`:""}
-            ${s.isTight?`<span style="font-size:8px;padding:1px 6px;border-radius:3px;background:#00695C22;color:#80CBC4;border:1px solid #00695C44">🔄 COIL</span>`:""}
+            ${s.isIgniting?`<span style="font-size:8px;padding:1px 6px;border-radius:3px;background:#FF450033;color:#FF6B35;border:1px solid #FF450066">🚀 RVOL ${s.rvolNow.toFixed(1)}x</span>`:""}
+            ${s.atrCoiling?`<span style="font-size:8px;padding:1px 6px;border-radius:3px;background:#9C27B022;color:#CE93D8;border:1px solid #9C27B044">📉 ATR COIL</span>`:""}
+            ${(s.volDryUp&&!s.isIgniting)?`<span style="font-size:8px;padding:1px 6px;border-radius:3px;background:#00695C22;color:#80CBC4;border:1px solid #00695C044">🔇 DRY</span>`:""}
           </div>
           <div class="tv-hint">📈 click → TradingView</div>
         </div>
@@ -1243,20 +1469,32 @@ function renderCatalyst(){
       </div>
       <div class="dots">${dots}<span class="score-txt" style="color:${heatBg}">${s.score}/5</span></div>
       <div class="bars">
-        <div><div class="bar-lbl">VOL SPIKE</div><div class="bar-row"><div class="bar-track"><div class="bar-fill" style="width:${Math.min(s.volSpike/10*100,100)}%;background:${volC}"></div></div><span class="bar-val" style="color:${volC}">${s.volSpike.toFixed(1)}x</span></div></div>
-        <div><div class="bar-lbl">FLAT DAYS</div><div class="bar-row"><div class="bar-track"><div class="bar-fill" style="width:${Math.min(s.flatDays/30*100,100)}%;background:#00b0ff"></div></div><span class="bar-val" style="color:#00b0ff">${s.flatDays}d</span></div></div>
+        <div>
+          <div class="bar-lbl">15m RVOL ${s.rvolNow>0?"(LIVE)":"(mkt closed)"}</div>
+          <div class="bar-row">
+            <div class="bar-track"><div class="bar-fill" style="width:${Math.min(s.rvolNow/5*100,100)}%;background:${s.isIgniting?"#FF4500":s.isWakingUp?"#FF9100":"#546E7A"}"></div></div>
+            <span class="bar-val" style="color:${s.isIgniting?"#FF4500":s.isWakingUp?"#FF9100":"#546E7A"}">${s.rvolNow>0?s.rvolNow.toFixed(1)+"x":"—"}</span>
+          </div>
+        </div>
+        <div>
+          <div class="bar-lbl">ATR COIL ${s.atrCoiling?"✅":"—"}</div>
+          <div class="bar-row">
+            <div class="bar-track"><div class="bar-fill" style="width:${Math.min((1-s.atrRatio)*200,100)}%;background:${s.atrCoiling?"#9C27B0":"#546E7A"}"></div></div>
+            <span class="bar-val" style="color:${s.atrCoiling?"#CE93D8":"#546E7A"}">${s.atrRatio>0?(s.atrRatio*100).toFixed(0)+"%":"—"}</span>
+          </div>
+        </div>
       </div>
       <div class="info-row">
-        <span style="color:${s.breakout?"#FF4500":"#546E7A"}">${s.breakout?"🚀 BREAKOUT":"↔ No breakout"}</span>
+        <span style="color:${s.isIgniting?"#FF4500":s.atrCoiling?"#CE93D8":"#546E7A"};font-weight:700">${s.status}</span>
         <span style="color:#78909C">RSI: ${s.rsi.toFixed(1)}</span>
-        <span style="color:#546E7A">20d Hi: $${s.high20.toFixed(2)}</span>
+        ${s.breakout?'<span style="color:#FF4500">🚀 BREAKOUT</span>':''}
       </div>
       <div class="tags"><div class="tag-row">${tags}</div>
         <div style="margin-top:5px;font-size:8px;color:#546E7A;display:flex;gap:10px;flex-wrap:wrap">
-          <span>📊 Vol: ${s.volSpike.toFixed(1)}x avg</span>
-          <span>📐 Range: ${s.rangeWidth.toFixed(1)}% / ${s.flatDays}d flat</span>
+          <span>📊 Daily vol: ${s.dailySpike.toFixed(1)}x</span>
+          <span>📐 ${s.rangeWidth.toFixed(1)}% range · ${s.flatDays}d flat</span>
           <span style="color:${s.pctFromHigh<-30?"#00C853":"#546E7A"}">📉 ${s.pctFromHigh.toFixed(0)}% off hi</span>
-          <span>RSI: ${s.rsi.toFixed(0)}</span>
+          ${s.atrRatio>0?`<span style="color:#CE93D8">ATR ${(s.atrRatio*100).toFixed(0)}% of avg</span>`:""}
         </div>
       </div>
     </div>`;
@@ -1453,8 +1691,8 @@ async function runMorningAlerts(){
         if(absChange>=minMove){
           const dir = changePct>=0?"📈 UP":"📉 DOWN";
           sendNotification(
-            sym+" "+dir+" "+changePct.toFixed(1)+"% PRE-MARKET",
-            "$"+q.price.toFixed(2)+" (was $"+q.prev.toFixed(2)+") — Click to open chart",
+            "🔔 "+sym+" "+dir+" "+changePct.toFixed(1)+"% — CHECK NOW",
+            "$"+q.price.toFixed(2)+" · prev $"+q.prev.toFixed(2)+" · Click to open TradingView",
             sym
           );
           log("🔔 ALERT: "+sym+" "+dir+" "+changePct.toFixed(1)+"% | $"+q.price.toFixed(2)+(hasEarningsSoon?" | 📅 EARNINGS IN "+earnings.daysUntil+"d":""),"ok","a");
