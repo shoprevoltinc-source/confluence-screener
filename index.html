@@ -453,9 +453,15 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
 <div class="controls">
   <button class="notif-btn" id="alertRunBtn" onclick="runMorningAlerts()">🔔 RUN ALERTS NOW</button>
   <button class="stop-btn" id="alertStopBtn" onclick="stopScan()" disabled>■ STOP</button>
-  <span class="auto-status auto-off" id="autoStatus">⏰ AUTO 6AM: OFF</span>
+  <span class="auto-status auto-off" id="autoStatus">⏰ AUTO: OFF</span>
   <button onclick="toggleAutoAlert()" style="background:transparent;border:1px solid #1e3a5f;color:#78909C;padding:5px 10px;font-family:monospace;font-size:9px;cursor:pointer;border-radius:3px;margin-left:4px">TOGGLE AUTO</button>
-  <label style="margin-left:8px;font-size:10px;color:#78909C">MIN MOVE</label>
+  <label style="margin-left:8px;font-size:10px;color:#78909C">SESSION</label>
+  <select id="alertSession" style="font-size:9px">
+    <option value="premarket">6:00 AM Pre-Market</option>
+    <option value="open">9:45 AM Market Open</option>
+    <option value="manual">Manual (now)</option>
+  </select>
+  <label style="font-size:10px;color:#78909C">MIN MOVE</label>
   <select id="alertMinMove">
     <option value="3">3%+</option>
     <option value="5" selected>5%+</option>
@@ -483,20 +489,31 @@ pre.dout{font-size:10px;color:#90A4AE;white-space:pre-wrap;line-height:1.7;margi
 
 <div style="padding:10px 14px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
 
-  <!-- LEFT: Live Alerts -->
+  <!-- LEFT: Session Results -->
   <div>
-    <div style="font-size:10px;font-weight:700;color:#9C27B0;letter-spacing:2px;margin-bottom:10px">
-      🔔 PRE-MARKET MOVERS
-      <span style="font-size:8px;color:#546E7A;font-weight:400;margin-left:8px" id="alertTime"></span>
+    <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center">
+      <div style="font-size:10px;font-weight:700;color:#9C27B0;letter-spacing:2px">🔔 ALERT RESULTS</div>
+      <span style="font-size:8px;color:#546E7A" id="alertTime"></span>
+      <button onclick="showComparison()" style="margin-left:auto;background:transparent;border:1px solid #1565C044;color:#90CAF9;padding:2px 8px;font-family:monospace;font-size:8px;cursor:pointer;border-radius:3px">📊 COMPARE SESSIONS</button>
+    </div>
+    <!-- Session tabs -->
+    <div style="display:flex;gap:4px;margin-bottom:8px">
+      <button class="chip on" id="ses-tab-pm" onclick="showSession('premarket',this)" style="font-size:8px">🌅 6AM PRE-MARKET</button>
+      <button class="chip" id="ses-tab-open" onclick="showSession('open',this)" style="font-size:8px">🟢 9:45AM OPEN</button>
     </div>
     <div id="alertResults">
-      <div class="empty" style="grid-column:1">
+      <div style="font-size:10px;color:#546E7A;padding:20px 0;text-align:center">
         <div style="font-size:24px;margin-bottom:8px">🔔</div>
-        Click RUN ALERTS NOW to scan your watchlist for pre-market movers<br><br>
-        <span style="font-size:9px;color:#37474F">Flags anything moving 5%+ on 2x+ volume before market open<br>
-        Checks Finnhub live quotes — works best 4am–9:30am ET</span>
+        Select session and click RUN ALERTS NOW<br><br>
+        <span style="font-size:9px;color:#37474F">
+          Run at 6AM → saves pre-market movers<br>
+          Run at 9:45AM → saves market open movers<br>
+          Compare at end of day to see which setups followed through
+        </span>
       </div>
     </div>
+    <!-- Comparison view (hidden by default) -->
+    <div id="comparisonView" style="display:none"></div>
   </div>
 
   <!-- RIGHT: Catalyst Calendar -->
@@ -845,6 +862,17 @@ async function loadSaved(){
     const rr  = localStorage.getItem("cs_recovery");
     const cr  = localStorage.getItem("cs_catalyst");
     const at  = localStorage.getItem("cs_saved_at");
+    // Load alert sessions from localStorage instantly
+    for(const sk of ["premarket","open"]){
+      try{
+        const raw = localStorage.getItem("cs_alerts_"+sk);
+        if(raw){
+          const parsed = JSON.parse(raw);
+          sessionAlerts[sk].alerts = parsed.alerts||[];
+          sessionAlerts[sk].time   = new Date(parsed.time).toLocaleTimeString();
+        }
+      }catch(e){}
+    }
 
     // Load from localStorage first (instant)
     if(rr){
@@ -909,6 +937,37 @@ async function loadSaved(){
               "🔴 LIVE from "+fbC.device+" · "+new Date(fbC.savedAt).toLocaleTimeString();
           }
         });
+
+        // ── Load alert sessions from Firebase ──────────────────────
+        for(const sk of ["premarket","open"]){
+          try{
+            const fbA = await window.fbLoad("alerts_"+sk);
+            if(fbA && fbA.data && fbA.data.alerts){
+              sessionAlerts[sk].alerts = fbA.data.alerts;
+              sessionAlerts[sk].time   = new Date(fbA.data.time).toLocaleTimeString();
+              log("☁️ Loaded "+sk+" alerts from Firebase ("+fbA.data.alerts.length+" stocks)","info","a");
+            }
+          }catch(e){}
+        }
+
+        // Real-time alert listener — phone sees laptop's alerts instantly
+        window.fbListen("alerts_premarket", (fb)=>{
+          if(fb.data && fb.data.alerts){
+            sessionAlerts.premarket.alerts = fb.data.alerts;
+            sessionAlerts.premarket.time   = new Date(fb.data.time).toLocaleTimeString();
+            if(activeSession==="premarket") renderAlerts(fb.data.alerts);
+            log("🔴 LIVE pre-market alerts synced from another device","info","a");
+          }
+        });
+        window.fbListen("alerts_open", (fb)=>{
+          if(fb.data && fb.data.alerts){
+            sessionAlerts.open.alerts = fb.data.alerts;
+            sessionAlerts.open.time   = new Date(fb.data.time).toLocaleTimeString();
+            if(activeSession==="open") renderAlerts(fb.data.alerts);
+            log("🔴 LIVE market-open alerts synced from another device","info","a");
+          }
+        });
+
       }catch(e){ console.warn("Firebase load error:", e); }
     });
   }catch(e){}
@@ -1249,23 +1308,8 @@ function scoreRecovery(sym,closes,highs,lows){
   const pctHi=(price-high52)/high52*100, pctEMA=(price-ema21)/ema21*100;
   const c1=rsi<45,c2=wr<-65,c3=price>ema21,c4=emaRising,c5=pctEMA>-10,c6=pctHi<-25;
   const conds=[c1,c2,c3,c4,c5,c6];
-  const score=conds.filter(Boolean).length;
-
-  // ── JAX PRO Signal (C7) ───────────────────────────────────
-  const jax = closes.length >= 70 ? calcJAXPRO(closes, highs, lows) : null;
-  const greenArrow = jax ? jax.greenArrow : false;
-  const bullScore  = jax ? jax.bullScore  : 0;
-
-  return {
-    sym,price,change,rsi,wr,ema21,emaRising,high52,pctHi,pctEMA,
-    c1,c2,c3,c4,c5,c6,score,conds,
-    // JAX PRO data
-    jax, greenArrow, bullScore,
-    trailVal: jax ? jax.trailVal : 0,
-    stBull:   jax ? jax.stBull   : false,
-    macdBull: jax ? jax.macdBull : false,
-    emaStack: jax ? jax.emaStack : false,
-  };
+  return {sym,price,change,rsi,wr,ema21,emaRising,high52,pctHi,pctEMA,
+    c1,c2,c3,c4,c5,c6,score:conds.filter(Boolean).length,conds};
 }
 
 async function startRecoveryScan(){
@@ -1558,8 +1602,21 @@ function scoreCatalyst(sym, closes, highs, lows, volumes, maxPrice, minVolSpike,
                : atrCoiling               ? "⏳ WATCHING"
                : "📡 MONITOR";
 
+  // ── JAX PRO — C7 (green arrow = ignition confirmed) ────
+  const jax = closes.length >= 70 ? calcJAXPRO(closes, highs, lows) : null;
+  const greenArrow = jax ? jax.greenArrow : false;
+  const bullScore  = jax ? jax.bullScore  : 0;
+
+  // Upgrade heat score if JAX fires
+  if(greenArrow) heat += 3; // 🟢 JAX green arrow = strongest signal
+
+  // Upgrade status if JAX fires
+  const finalStatus = greenArrow && isIgniting ? "🚀🟢 IGNITION + JAX"
+    : greenArrow ? "🟢 JAX SIGNAL"
+    : status;
+
   return {
-    sym, price, change, status, heat, score, conds,
+    sym, price, change, status:finalStatus, heat, score, conds,
     // ATR data
     atrCoiling, currentATR, avgATR20, atrRatio,
     // Volume data
@@ -1569,6 +1626,12 @@ function scoreCatalyst(sym, closes, highs, lows, volumes, maxPrice, minVolSpike,
     high20, high52, low52, pctFromHigh, pctFromLow, nearLow,
     // Catalyst data
     earnings, hasEarnings, earningsDays,
+    // JAX PRO
+    jax, greenArrow, bullScore,
+    trailVal: jax ? jax.trailVal : 0,
+    stBull:   jax ? jax.stBull   : false,
+    macdBull: jax ? jax.macdBull : false,
+    emaStack: jax ? jax.emaStack : false,
     // Indicators
     rsi, avgVol:avgVol20, todayVol
   };
@@ -1727,6 +1790,21 @@ function renderCatalyst(){
           <span style="color:${s.pctFromHigh<-30?"#00C853":"#546E7A"}">📉 ${s.pctFromHigh.toFixed(0)}% off hi</span>
           ${s.atrRatio>0?`<span style="color:#CE93D8">ATR ${(s.atrRatio*100).toFixed(0)}% of avg</span>`:""}
         </div>
+        ${s.jax?`<div style="margin-top:6px;padding:5px 8px;background:#05080f;border-radius:4px;border:1px solid ${s.greenArrow?"#00C85366":"#0b1a2e"}">
+          <div style="font-size:8px;font-weight:700;color:${s.greenArrow?"#00C853":"#546E7A"};margin-bottom:3px">
+            ${s.greenArrow?"🟢 JAX PRO GREEN ARROW — ENTER NOW":"⚪ JAX PRO — Waiting"}
+            <span style="float:right">bull: ${s.bullScore}/5</span>
+          </div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.emaStack?"#00C85322":"#0d1f35"};color:${s.emaStack?"#00C853":"#37474F"}">EMA stack</span>
+            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.macdBull?"#00C85322":"#0d1f35"};color:${s.macdBull?"#00C853":"#37474F"}">MACD+</span>
+            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.jax.rsiBull?"#00C85322":"#0d1f35"};color:${s.jax.rsiBull?"#00C853":"#37474F"}">RSI>50</span>
+            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.jax.wrBull?"#00C85322":"#0d1f35"};color:${s.jax.wrBull?"#00C853":"#37474F"}">WR>-50</span>
+            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.stBull?"#00C85322":"#0d1f35"};color:${s.stBull?"#00C853":"#37474F"}">SuperTrend</span>
+            <span style="font-size:7px;padding:1px 5px;border-radius:2px;background:${s.jax.atrTS.utBuy?"#00C85322":"#0d1f35"};color:${s.jax.atrTS.utBuy?"#00C853":"#37474F"}">UTBuy</span>
+          </div>
+          <div style="font-size:7px;color:#546E7A;margin-top:2px">Trail: $${s.trailVal.toFixed(2)}</div>
+        </div>`:""}
       </div>
     </div>`;
   }).join("");
@@ -1827,26 +1905,98 @@ function sendNotification(title, body, sym){
   n.onclick = () => window.open("https://www.tradingview.com/chart/?symbol="+sym,"_blank");
 }
 
-// ── Toggle auto 6am alert ────────────────────────────────
+// Session storage for comparison
+let sessionAlerts = {
+  premarket: { alerts:[], time:null, label:"6AM Pre-Market" },
+  open:      { alerts:[], time:null, label:"9:45AM Market Open" }
+};
+let activeSession = "premarket";
+
+function showSession(sess, btn){
+  activeSession = sess;
+  document.querySelectorAll("#ses-tab-pm, #ses-tab-open").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on");
+  renderAlerts(sessionAlerts[sess].alerts);
+  const t = sessionAlerts[sess].time;
+  document.getElementById("alertTime").textContent = t ? "Last run: "+t : "Not run yet";
+}
+
+function showComparison(){
+  const pmAlerts  = sessionAlerts.premarket.alerts;
+  const opAlerts  = sessionAlerts.open.alerts;
+  const cv = document.getElementById("comparisonView");
+  const ar = document.getElementById("alertResults");
+
+  if(!pmAlerts.length && !opAlerts.length){
+    log("Run both sessions first to compare","warn","a"); return;
+  }
+
+  cv.style.display = cv.style.display==="none" ? "block" : "none";
+  ar.style.display = ar.style.display==="none" ? "block" : "none";
+
+  if(cv.style.display==="none") return;
+
+  // Build comparison table
+  const allSyms = [...new Set([...pmAlerts.map(a=>a.sym), ...opAlerts.map(a=>a.sym)])];
+  const pmMap   = Object.fromEntries(pmAlerts.map(a=>[a.sym,a]));
+  const opMap   = Object.fromEntries(opAlerts.map(a=>[a.sym,a]));
+
+  cv.innerHTML = `
+    <div style="font-size:10px;font-weight:700;color:#1976D2;margin-bottom:8px">📊 SESSION COMPARISON</div>
+    <div style="font-size:8px;color:#546E7A;margin-bottom:8px">
+      Green = appeared in both sessions (strongest setups) · 
+      Blue = pre-market only · Orange = open only
+    </div>
+    ${allSyms.sort((a,b)=>{
+      const inBoth = (pmMap[a]&&opMap[a]?1:0) - (pmMap[b]&&opMap[b]?1:0);
+      return -inBoth;
+    }).map(sym=>{
+      const pm = pmMap[sym], op = opMap[sym];
+      const inBoth = pm && op;
+      const bg = inBoth?"#00C85315":pm?"#1565C015":"#FF910015";
+      const bc = inBoth?"#00C85344":pm?"#1565C044":"#FF910044";
+      const label = inBoth?"✅ BOTH SESSIONS":pm?"🌅 PRE-MKT ONLY":"🟢 OPEN ONLY";
+      const labelC = inBoth?"#00C853":pm?"#90CAF9":"#FF9100";
+      return `<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:${bg};border:1px solid ${bc};border-radius:5px;margin-bottom:4px;cursor:pointer"
+              onclick="window.open('https://www.tradingview.com/chart/?symbol=${sym}','_blank')">
+        <span style="font-size:13px;font-weight:700;color:#fff;min-width:50px">${sym}</span>
+        <span style="font-size:8px;color:${labelC};min-width:100px">${label}</span>
+        ${pm?`<span style="font-size:8px;color:#90CAF9">6am: $${pm.price.toFixed(2)} ${pm.changePct>=0?"▲":"▼"}${Math.abs(pm.changePct).toFixed(1)}%</span>`:""}
+        ${op?`<span style="font-size:8px;color:#00C853">9:45: $${op.price.toFixed(2)} ${op.changePct>=0?"▲":"▼"}${Math.abs(op.changePct).toFixed(1)}%</span>`:""}
+        ${pm&&op?`<span style="font-size:8px;color:#FFD600">move: ${((op.price-pm.price)/pm.price*100).toFixed(1)}%</span>`:""}
+        <span style="font-size:8px;color:#546E7A;margin-left:auto">📈 TradingView</span>
+      </div>`;
+    }).join("")}`;
+}
+
+// ── Toggle auto alert ─────────────────────────────────────
 function toggleAutoAlert(){
   if(autoAlertTimer){
     clearInterval(autoAlertTimer);
     autoAlertTimer = null;
     document.getElementById("autoStatus").className="auto-status auto-off";
-    document.getElementById("autoStatus").textContent="⏰ AUTO 6AM: OFF";
+    document.getElementById("autoStatus").textContent="⏰ AUTO: OFF";
     log("Auto-alert disabled","warn","a");
   } else {
-    // Check every minute if it's 6am ET
     autoAlertTimer = setInterval(()=>{
       const et = new Date(new Date().toLocaleString("en-US",{timeZone:"America/New_York"}));
-      if(et.getHours()===6 && et.getMinutes()===0){
-        log("⏰ 6:00 AM ET — running automatic morning alerts...","info","a");
+      const h=et.getHours(), m=et.getMinutes();
+      // Auto-run at 6:00 AM ET (pre-market)
+      if(h===6 && m===0){
+        document.getElementById("alertSession").value="premarket";
+        log("⏰ 6:00 AM ET — running pre-market alerts...","info","a");
+        runMorningAlerts();
+      }
+      // Auto-run at 9:45 AM ET (market open)
+      if(h===9 && m===45){
+        document.getElementById("alertSession").value="open";
+        log("⏰ 9:45 AM ET — running market open alerts...","info","a");
         runMorningAlerts();
       }
     }, 60000);
     document.getElementById("autoStatus").className="auto-status auto-on";
-    document.getElementById("autoStatus").textContent="⏰ AUTO 6AM: ON";
-    log("Auto-alert enabled — will run at 6:00 AM ET","ok","a");
+    document.getElementById("autoStatus").textContent="⏰ AUTO: ON (6AM + 9:45AM)";
+    log("Auto-alert ON — runs at 6:00 AM + 9:45 AM ET daily","ok","a");
     requestNotifPermission();
   }
 }
@@ -1868,10 +2018,10 @@ async function runMorningAlerts(){
   const tickers   = listVal==="sp500"?[...SP500]:listVal==="catalyst"?[...SMALLCAP]:[...WATCHLIST];
 
   const sess = getMarketSession();
-  log("🔔 Morning alert scan: "+tickers.length+" stocks · min move "+minMove+"% · vol "+minVol+"x+","info","a");
-  log("Session: "+sess.toUpperCase()+" · "+new Date().toLocaleTimeString(),"info","a");
-  if(sess==="closed"||sess==="weekend")
-    log("⚠ Market closed — using previous session data","warn","a");
+  const sessionKey = document.getElementById("alertSession")?.value||"manual";
+  const sessionLabel = sessionKey==="premarket"?"🌅 6AM PRE-MARKET":sessionKey==="open"?"🟢 9:45AM OPEN":"📊 MANUAL";
+  log("🔔 "+sessionLabel+" scan: "+tickers.length+" stocks · min move "+minMove+"%","info","a");
+  log("Market: "+sess.toUpperCase()+" · "+new Date().toLocaleTimeString(),"info","a");
 
   const alerts = [];
   const calData = {};
@@ -1936,15 +2086,29 @@ async function runMorningAlerts(){
     await sleep(300); // Finnhub free = light usage here
   }
 
-  document.getElementById("a-progMsg").textContent="Done — "+alerts.length+" alerts found";
+    // Save to session slot for comparison
+  const sk = document.getElementById("alertSession")?.value||"manual";
+  const sessionLabel2 = sk==="premarket"?"🌅 6AM PRE-MARKET":sk==="open"?"🟢 9:45AM OPEN":"📊 MANUAL";
+  if(sk==="premarket"||sk==="open"){
+    sessionAlerts[sk].alerts = [...alerts];
+    sessionAlerts[sk].time = new Date().toLocaleTimeString();
+    // Save to localStorage (this device)
+    try{ localStorage.setItem("cs_alerts_"+sk, JSON.stringify({alerts, time:new Date().toISOString()})); }catch(e){}
+    // Save to Firebase (all devices)
+    if(window.firebaseReady){
+      window.fbSave("alerts_"+sk, {alerts, time:new Date().toISOString()});
+      log("☁️ Alerts synced to Firebase ("+sk+")","info","a");
+    }
+  }
+
+  document.getElementById("a-progMsg").textContent="Done — "+alerts.length+" alerts · "+sessionLabel2;
   document.getElementById("a-progPct").textContent="100%";
   document.getElementById("alertRunBtn").disabled=false;
   document.getElementById("alertStopBtn").disabled=true;
   alertRunning=false;
 
-  // Also render calendar
   renderCalendar(calData);
-  log("✅ Alert scan complete. "+alerts.length+" movers found.","info","a");
+  log("✅ "+sessionLabel2+" complete. "+alerts.length+" movers found.","info","a");
 }
 
 function renderAlerts(alerts){
