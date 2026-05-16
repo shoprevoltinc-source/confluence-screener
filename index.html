@@ -850,6 +850,7 @@ pre.dout{
   <button class="chip" onclick="setRFilter(4,this)">4/6</button>
   <button class="chip" onclick="setRFilter(3,this)">3/6</button>
   <button class="chip" onclick="setRFilter('jax',this)">🟢 JAX</button>
+  <button class="chip" onclick="setRFilter('c7',this)">📉 DEEP</button>
   <select class="sort-select" id="r-sortSel" onchange="renderRecovery()">
     <option value="jax">🟢 JAX First</option>
     <option value="score">Best Score</option>
@@ -2085,8 +2086,9 @@ function renderRecovery(){
   const min=parseInt(document.getElementById("minSel").value);
   const sort=document.getElementById("r-sortSel")?.value||"jax";
   const tickerSearch=(document.getElementById("r-tickerSearch")?.value||"").toUpperCase().trim();
-  let f=rResults.filter(r=>r.score>=min);
-  if(rFilter==="jax") f=f.filter(r=>r.greenArrow);
+  let f=rResults.filter(r=>r.score>=min || r.c7); // C7 deep bounce always shows
+  if(rFilter==="jax")     f=f.filter(r=>r.greenArrow);
+  else if(rFilter==="c7") f=f.filter(r=>r.c7);
   else if(rFilter!=="all") f=f.filter(r=>r.score===rFilter);
   if(tickerSearch) f=f.filter(r=>r.sym.includes(tickerSearch));
   f.sort((a,b)=>{
@@ -2194,6 +2196,13 @@ async function debugRecovery(sym){
       p(s.c6,"C6 -25% off 52w Hi  ",s.pctHi.toFixed(1)+"%  Hi: $"+s.high52.toFixed(2)),
       "",
       "SCORE: "+s.score+"/6  "+[s.c1,s.c2,s.c3,s.c4,s.c5,s.c6].map((c,i)=>"C"+(i+1)+":"+(c?"✅":"❌")).join(" "),
+      "",
+      "── C7 DEEP VALUE BOUNCE "+(s.c7?"✅ CONFIRMED":"❌ Not triggered")+" ──",
+      "  -50%+ crash:    "+(s.deepCrash?"✅ YES ("+s.pctHi.toFixed(1)+"% off hi)":"❌ NO ("+s.pctHi.toFixed(1)+"% off hi)"),
+      "  RSI was <40:    "+(s.rsiWasLow?"✅ YES":"❌ NO"),
+      "  RSI turning up: "+(s.rsiTurningUp?"✅ YES (current RSI "+s.rsi.toFixed(1)+")":"❌ NO"),
+      "  EMA stabilizing:"+(s.emaFlattening?"✅ YES":"❌ NO"),
+      s.c7?"  → QUALIFIES via C7 DEEP BOUNCE ✅":"",
       "",
       "── JAX PRO "+(s.greenArrow?"🟢 GREEN ARROW ACTIVE":"⚪ Waiting for signal")+" ──",
       ...(s.jaxHasData?[
