@@ -1960,13 +1960,19 @@ function scoreRecovery(sym,closes,highs,lows){
   const c1=rsi<45,c2=wr<-65,c3=price>ema21,c4=emaRising,c5=pctEMA>-10,c6=pctHi<-25;
 
   // ── C7: Deep Value Bounce — catches NOW-type crashes ─────────────────────
-  // Stock crashed -50%+ off high, RSI hit rock bottom, now turning back up
+  // Stock crashed -50%+ off high, RSI bottomed recently, now recovering
   const deepCrash    = pctHi < -50;
-  const rsiOld       = calcRSI(validC.slice(0,-3), 14); // RSI 3 days ago
-  const rsiWasLow    = rsiOld < 40;                     // was deeply oversold recently
-  const rsiTurningUp = rsi > rsiOld;                    // RSI now rising
-  const emaFlattening= Math.abs(ema21 - ema21old) / ema21old < 0.005; // EMA stabilizing
-  const c7 = deepCrash && rsiWasLow && rsiTurningUp && (c3||emaFlattening);
+  // Check if RSI was below 45 at ANY point in the last 30 bars
+  const rsiHistory   = [];
+  for(let i=Math.max(0,validC.length-30); i<validC.length-1; i++){
+    rsiHistory.push(calcRSI(validC.slice(0,i+1), 14));
+  }
+  const rsiMinRecent = rsiHistory.length ? Math.min(...rsiHistory) : 100;
+  const rsiWasLow    = rsiMinRecent < 45;               // was oversold in last 30 days
+  const rsiOld       = rsiHistory.length>=5 ? rsiHistory[rsiHistory.length-5] : rsi;
+  const rsiTurningUp = rsi > rsiOld;                    // RSI trending up
+  const emaFlattening= Math.abs(ema21 - ema21old) / ema21old < 0.01; // EMA stabilizing
+  const c7 = deepCrash && rsiWasLow && rsiTurningUp;   // relaxed - no EMA requirement
 
   const conds=[c1,c2,c3,c4,c5,c6];
   const score=conds.filter(Boolean).length;
@@ -1976,7 +1982,8 @@ function scoreRecovery(sym,closes,highs,lows){
 
   return {sym,price,change,rsi,wr,ema21,emaRising,high52,pctHi,pctEMA,
     c1,c2,c3,c4,c5,c6,c7,score,conds,
-    deepCrash, rsiTurningUp, rsiWasLow, emaFlattening, qualifies};
+    deepCrash, rsiTurningUp, rsiWasLow, emaFlattening, qualifies,
+    rsiMinRecent, rsiOld};
 }
 
 async function startRecoveryScan(){
@@ -2198,11 +2205,10 @@ async function debugRecovery(sym){
       "SCORE: "+s.score+"/6  "+[s.c1,s.c2,s.c3,s.c4,s.c5,s.c6].map((c,i)=>"C"+(i+1)+":"+(c?"✅":"❌")).join(" "),
       "",
       "── C7 DEEP VALUE BOUNCE "+(s.c7?"✅ CONFIRMED":"❌ Not triggered")+" ──",
-      "  -50%+ crash:    "+(s.deepCrash?"✅ YES ("+s.pctHi.toFixed(1)+"% off hi)":"❌ NO ("+s.pctHi.toFixed(1)+"% off hi)"),
-      "  RSI was <40:    "+(s.rsiWasLow?"✅ YES":"❌ NO"),
-      "  RSI turning up: "+(s.rsiTurningUp?"✅ YES (current RSI "+s.rsi.toFixed(1)+")":"❌ NO"),
-      "  EMA stabilizing:"+(s.emaFlattening?"✅ YES":"❌ NO"),
-      s.c7?"  → QUALIFIES via C7 DEEP BOUNCE ✅":"",
+      "  -50%+ crash:      "+(s.deepCrash?"✅ YES ("+s.pctHi.toFixed(1)+"% off hi)":"❌ NO ("+s.pctHi.toFixed(1)+"% off hi, needs -50%)"),
+      "  RSI was <45 (30d):"+(s.rsiWasLow?"✅ YES (min RSI "+s.rsiMinRecent.toFixed(1)+")":"❌ NO (min RSI "+s.rsiMinRecent.toFixed(1)+")"),
+      "  RSI turning up:   "+(s.rsiTurningUp?"✅ YES ("+s.rsi.toFixed(1)+" vs "+s.rsiOld.toFixed(1)+" 5d ago)":"❌ NO"),
+      s.c7?"  → QUALIFIES via C7 DEEP BOUNCE ✅":"  → C7 not triggered",
       "",
       "── JAX PRO "+(s.greenArrow?"🟢 GREEN ARROW ACTIVE":"⚪ Waiting for signal")+" ──",
       ...(s.jaxHasData?[
