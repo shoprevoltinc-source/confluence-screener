@@ -1110,9 +1110,19 @@ pre.dout{
 <div class="tab-panel" id="panel-journal">
 
 <div class="jnl-toolbar">
-  <button class="btn-scan" onclick="addManualEntry()" style="font-size:9px;padding:6px 14px">+ LOG STOCK</button>
+  <input type="text" id="jnl-sym-input" placeholder="TICKER" 
+    style="width:90px;text-transform:uppercase;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 8px;font-family:var(--mono);font-size:10px;border-radius:2px"
+    onkeydown="if(event.key==='Enter')document.getElementById('jnl-price-input').focus()">
+  <input type="number" id="jnl-price-input" placeholder="ENTRY $" 
+    style="width:90px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 8px;font-family:var(--mono);font-size:10px;border-radius:2px"
+    onkeydown="if(event.key==='Enter')addManualEntry()">
+  <button class="btn-scan" onclick="addManualEntry()" style="font-size:9px;padding:6px 14px">+ LOG</button>
   <button class="btn-clear" onclick="clearJournal()">🗑 CLEAR ALL</button>
-  <span style="font-size:8px;color:var(--muted2);margin-left:8px;letter-spacing:1px">Click + LOG on any screener card · or add manually here · Results sync via Firebase</span>
+  <button class="btn-scan" onclick="fetchClosingPrices()" style="font-size:9px;padding:6px 14px;background:linear-gradient(135deg,#1565C0,#1976D2);box-shadow:0 0 12px rgba(21,101,192,0.3)">🔄 UPDATE PRICES</button>
+  <span style="font-size:8px;color:var(--muted2);margin-left:8px;letter-spacing:1px">
+    Auto-updates at <span style="color:var(--blue)">4:15 PM ET</span> · or tap UPDATE PRICES anytime · Syncs via Firebase
+  </span>
+  <span id="jnl-last-update" style="font-size:8px;color:var(--muted);margin-left:auto"></span>
 </div>
 
 <div class="jnl-stats">
@@ -1131,6 +1141,7 @@ pre.dout{
         <th>DATE</th>
         <th>TICKER</th>
         <th>ENTRY $</th>
+        <th>CLOSE $</th>
         <th>SCORE</th>
         <th>SOURCE</th>
         <th>SESSION</th>
@@ -1140,7 +1151,7 @@ pre.dout{
       </tr>
     </thead>
     <tbody id="jnl-body">
-      <tr><td colspan="9" class="jnl-empty">
+      <tr><td colspan="10" class="jnl-empty">
         <span style="font-size:24px;display:block;margin-bottom:8px">📓</span>
         No entries yet — click LOG on any screener card<br>
         <span style="font-size:8px;color:var(--muted)">Every flagged stock gets logged automatically with price, score, and source</span>
@@ -2532,6 +2543,21 @@ async function debugCatalyst(sym){
 // ── Utilities ──────────────────────────────────────────────
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 
+// ── Toast notification — brief confirmation without switching tabs ─────────
+function showToast(msg){
+  let toast = document.getElementById("toast");
+  if(!toast){
+    toast = document.createElement("div");
+    toast.id = "toast";
+    toast.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0d1625;border:1px solid rgba(0,200,83,0.4);color:var(--green2);padding:8px 18px;font-family:var(--mono);font-size:10px;border-radius:3px;z-index:9999;letter-spacing:1px;box-shadow:0 4px 20px rgba(0,200,83,0.2);transition:opacity 0.3s";
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = "1";
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(()=>{ toast.style.opacity="0"; }, 2500);
+}
+
 function toggleDebug(panel){
   const body=document.getElementById(panel+"-debug-body");
   const arrow=document.getElementById(panel+"-debug-arrow");
@@ -2916,6 +2942,8 @@ function loadJournal(){
 function saveJournal(){
   try{ localStorage.setItem("cs_journal", JSON.stringify(journalEntries)); }catch(e){}
   if(window.firebaseReady) window.fbSave("journal", journalEntries);
+  const el = document.getElementById("jnl-last-update");
+  if(el) el.textContent = "last updated " + new Date().toLocaleTimeString();
 }
 
 function logToJournal(entry){
@@ -2934,17 +2962,22 @@ function logToJournal(entry){
   });
   saveJournal();
   renderJournal();
-  // Switch to journal tab to show the entry
-  switchTab("journal");
+  // Show toast instead of switching tabs
+  showToast("📓 "+entry.sym+" logged · $"+entry.price.toFixed(2)+" · "+entry.score+"/6");
   log("📓 Logged "+entry.sym+" to journal · $"+entry.price.toFixed(2)+" · "+entry.score+"/6","ok");
 }
 
 function addManualEntry(){
-  const sym = prompt("Enter ticker symbol:")?.trim().toUpperCase();
-  if(!sym) return;
-  const price = parseFloat(prompt("Entry price (e.g. 27.50):"));
-  if(isNaN(price)||price<=0) return;
-  logToJournal({sym, price, score:"?", source:"manual", session:"manual"});
+  const symEl   = document.getElementById("jnl-sym-input");
+  const priceEl = document.getElementById("jnl-price-input");
+  const sym   = symEl?.value.trim().toUpperCase();
+  const price = parseFloat(priceEl?.value);
+  if(!sym){ symEl?.focus(); return; }
+  if(isNaN(price)||price<=0){ priceEl?.focus(); return; }
+  logToJournal({sym, price, score:"?", source:"manual", session:getMarketSession()});
+  if(symEl)   symEl.value   = "";
+  if(priceEl) priceEl.value = "";
+  symEl?.focus();
 }
 
 function updateResult(id, val){
@@ -3018,6 +3051,7 @@ function renderJournal(){
         ${e.greenArrow?'<span class="badge jax" style="font-size:7px;padding:1px 4px;margin-left:4px">🟢</span>':''}
       </td>
       <td style="font-weight:700">$${parseFloat(e.price).toFixed(2)}</td>
+      <td style="color:${e.closePrice?(parseFloat(e.closePrice)>parseFloat(e.price)?"var(--green2)":"var(--red)"):"var(--muted)"}">${e.closePrice?"$"+parseFloat(e.closePrice).toFixed(2):"—"}</td>
       <td><span class="jnl-score" style="background:${scoreBg};color:${scoreColor}">${e.score}/6</span></td>
       <td><span class="jnl-source">${e.source}</span></td>
       <td style="color:var(--muted2)">${sessBadge}</td>
@@ -3039,6 +3073,62 @@ function renderJournal(){
     </tr>`;
   }).join("");
 }
+
+// ── Auto-fetch closing prices at 4:15pm ET ───────────────────────────────────
+let closeAutoTimer = null;
+
+async function fetchClosingPrices(){
+  const openEntries = journalEntries.filter(e=>e.status==="open" && e.price > 0);
+  if(!openEntries.length){ log("Journal: no open entries to update","info"); return; }
+
+  log("📓 Auto-fetching closing prices for "+openEntries.length+" open entries...","info");
+
+  for(const entry of openEntries){
+    try{
+      const q = await fetchLiveQuote(entry.sym);
+      if(q && q.price > 0){
+        const entryPrice = parseFloat(entry.price);
+        const closePrice = q.price;
+        const resultPct  = ((closePrice - entryPrice) / entryPrice * 100);
+        entry.result     = resultPct.toFixed(2);
+        entry.closePrice = closePrice;
+        entry.closedAt   = new Date().toISOString();
+        entry.status     = resultPct >= 0 ? "win" : "loss";
+        log("📓 "+entry.sym+" → close $"+closePrice.toFixed(2)+" · result "+(resultPct>=0?"+":"")+resultPct.toFixed(2)+"%","ok");
+      }
+    }catch(e){ log("📓 "+entry.sym+": could not fetch close","warn"); }
+    await sleep(300);
+  }
+
+  saveJournal();
+  renderJournal();
+  log("📓 Closing prices updated for "+openEntries.length+" entries","ok");
+
+  // Send notification
+  const wins   = journalEntries.filter(e=>e.status==="win").length;
+  const losses = journalEntries.filter(e=>e.status==="loss").length;
+  sendNotification(
+    "📓 Journal Updated — Market Closed",
+    wins+" wins · "+losses+" losses · Open journal to review",
+    "journal"
+  );
+}
+
+function startCloseAutoTimer(){
+  if(closeAutoTimer) clearInterval(closeAutoTimer);
+  closeAutoTimer = setInterval(()=>{
+    const et = new Date(new Date().toLocaleString("en-US",{timeZone:"America/New_York"}));
+    const h = et.getHours(), m = et.getMinutes(), day = et.getDay();
+    // 4:15pm ET on weekdays only
+    if(day > 0 && day < 6 && h === 16 && m === 15){
+      log("⏰ 4:15 PM ET — auto-fetching closing prices...","info");
+      fetchClosingPrices();
+    }
+  }, 60000);
+}
+
+// Start the auto-close timer when page loads
+startCloseAutoTimer();
 
 loadSaved();
 renderWatchlistUI();
