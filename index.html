@@ -1024,8 +1024,9 @@ pre.dout{
 <div class="controls">
   <button class="btn-scan alert" id="alertRunBtn" onclick="runMorningAlerts()">🔔 RUN ALERTS</button>
   <button class="btn-stop" id="alertStopBtn" onclick="stopScan()" disabled>■ STOP</button>
-  <span class="auto-status auto-off" id="autoStatus" style="font-size:8px;padding:2px 8px;border-radius:2px;border:1px solid var(--border2);color:var(--muted);letter-spacing:1px">⏰ AUTO: OFF</span>
+  <span class="auto-status auto-off" id="autoStatus" style="font-size:8px;padding:2px 8px;border-radius:2px;border:1px solid var(--border2);color:var(--muted);letter-spacing:1px">⏰ BROWSER AUTO: OFF</span>
   <button onclick="toggleAutoAlert()" class="btn-clear">TOGGLE AUTO</button>
+  <span style="font-size:8px;padding:2px 8px;border-radius:2px;border:1px solid rgba(0,200,83,0.3);color:var(--green2);letter-spacing:1px">⚙️ GITHUB ACTIONS: ACTIVE</span>
   <span class="ctrl-label">SESSION</span>
   <select id="alertSession">
     <option value="premarket">🌅 6AM Pre-Market</option>
@@ -1432,7 +1433,10 @@ const SMALLCAP = [...new Set([
   // Comm Services
   "DISH","LUMN","VSAT","IRDM","GSAT","SHEN","IDT","OOMA","GOGO","AVNW","CLFD","ATEX",
   // Fiber/Optical — AI infrastructure buildout
-  "LITE","AAOI","VIAV","CIEN","INFN","CRDO","POET","ANGO","ADTN","CASA","DZSI","FYBR","CALX","COMM"
+  "LITE","AAOI","VIAV","CIEN","INFN","CRDO","POET","ANGO","ADTN","CASA","DZSI","FYBR","CALX","COMM",
+  "IIVI","NTGR","AAON","GLOW",
+  // Comm Services additions
+  "TMUS","SATS","SPOK","XPOF","LIQT","NTELOS","MNRO"
 ])];
 
 // ── State ───────────────────────────────────────────────────
@@ -1610,6 +1614,21 @@ async function loadSaved(){
             sessionAlerts.open.time   = new Date(fb.data.time).toLocaleTimeString();
             if(activeSession==="open") renderAlerts(fb.data.alerts);
             log("🔴 LIVE market-open alerts synced from another device","info","a");
+          }
+        });
+
+        // ── GitHub Actions JAX monitor alerts ──────────────────────────────
+        window.fbListen("screener/jax_last_run", (fb)=>{
+          if(fb && fb.signals && fb.signals.length > 0){
+            const t = new Date(fb.time).toLocaleTimeString();
+            fb.signals.forEach(sym=>{
+              log("🟢 GitHub Actions JAX SIGNAL: "+sym+" · "+t,"ok","a");
+              sendNotification(
+                "🟢 "+sym+" JAX GREEN ARROW — GitHub Actions",
+                "Fired at "+t+" · Open TradingView to confirm entry",
+                sym
+              );
+            });
           }
         });
 
