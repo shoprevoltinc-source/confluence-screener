@@ -911,7 +911,7 @@ pre.dout{
   <button class="btn-clear" onclick="clearSaved('catalyst')">🗑</button>
   <span class="ctrl-label">SECTOR</span>
   <select id="catSector">
-    <option value="all">All (142)</option>
+    <option value="all">All $2-$150</option>
     <option value="Quantum/AI">⚛ Quantum/AI</option>
     <option value="Defense/Gov">🛡 Defense</option>
     <option value="Biotech">🧬 Biotech</option>
@@ -926,7 +926,7 @@ pre.dout{
     <option value="Fiber/Optical">🔆 Fiber/Optical</option>
   </select>
   <span class="ctrl-label">MAX $</span>
-  <input type="number" class="ctrl-input" id="catMaxPrice" value="75" min="1" max="500" style="width:60px">
+  <input type="number" class="ctrl-input" id="catMaxPrice" value="150" min="1" max="500" style="width:60px">
   <span class="ctrl-label">VOL</span>
   <select id="catVolSpike">
     <option value="2" selected>2x</option>
@@ -1310,7 +1310,7 @@ async function runWorker(keyIndex, tickers, minScore, isCatalyst, maxPrice, minV
         // Overlay live quote for pre-market price
         const lq = await fetchLiveQuote(sym);
         if(lq&&lq.price>0){ result.price=lq.price; result.change=lq.changePct||result.change; result.liveQuote=lq; result.session=getMarketSession(); }
-        if(result.score>=minScore) onResult(result, true);
+        if(result.score>=minScore || result.c7) onResult(result, true);
         else onResult(result, false);
       }
     }catch(e){
@@ -1957,9 +1957,25 @@ function scoreRecovery(sym,closes,highs,lows){
   const high52=Math.max(...validH);
   const pctHi=(price-high52)/high52*100, pctEMA=(price-ema21)/ema21*100;
   const c1=rsi<45,c2=wr<-65,c3=price>ema21,c4=emaRising,c5=pctEMA>-10,c6=pctHi<-25;
+
+  // ── C7: Deep Value Bounce — catches NOW-type crashes ─────────────────────
+  // Stock crashed -50%+ off high, RSI hit rock bottom, now turning back up
+  const deepCrash    = pctHi < -50;
+  const rsiOld       = calcRSI(validC.slice(0,-3), 14); // RSI 3 days ago
+  const rsiWasLow    = rsiOld < 40;                     // was deeply oversold recently
+  const rsiTurningUp = rsi > rsiOld;                    // RSI now rising
+  const emaFlattening= Math.abs(ema21 - ema21old) / ema21old < 0.005; // EMA stabilizing
+  const c7 = deepCrash && rsiWasLow && rsiTurningUp && (c3||emaFlattening);
+
   const conds=[c1,c2,c3,c4,c5,c6];
+  const score=conds.filter(Boolean).length;
+
+  // C7 override: if deep value bounce confirmed, qualify even with lower score
+  const qualifies = score >= 4 || (c7 && score >= 2);
+
   return {sym,price,change,rsi,wr,ema21,emaRising,high52,pctHi,pctEMA,
-    c1,c2,c3,c4,c5,c6,score:conds.filter(Boolean).length,conds};
+    c1,c2,c3,c4,c5,c6,c7,score,conds,
+    deepCrash, rsiTurningUp, rsiWasLow, emaFlattening, qualifies};
 }
 
 async function startRecoveryScan(){
@@ -2086,7 +2102,9 @@ function renderRecovery(){
   const grid=document.getElementById("r-results");
   if(!f.length){grid.innerHTML='<div class="empty">No results yet.</div>';return;}
   grid.innerHTML=f.map((s,i)=>{
-    const g={6:{l:"A+ PERFECT",bg:"var(--green2)",fg:"#000"},5:{l:"A STRONG",bg:"var(--yellow)",fg:"#000"},4:{l:"B+ WATCH",bg:"var(--orange)",fg:"#fff"},3:{l:"B WEAK",bg:"#FF6D00",fg:"#fff"}}[s.score]||{l:"MONITOR",bg:"var(--muted)",fg:"#fff"};
+    const g=s.c7&&s.score<4
+      ? {l:"📉 DEEP BOUNCE",bg:"var(--blue)",fg:"#000"}
+      : ({6:{l:"A+ PERFECT",bg:"var(--green2)",fg:"#000"},5:{l:"A STRONG",bg:"var(--yellow)",fg:"#000"},4:{l:"B+ WATCH",bg:"var(--orange)",fg:"#fff"},3:{l:"B WEAK",bg:"#FF6D00",fg:"#fff"}}[s.score]||{l:"MONITOR",bg:"var(--muted)",fg:"#fff"});
     const LABELS=["RSI<45","WR<-65","Above EMA21","EMA21 Rising","±10% EMA21","25%+ Off Hi"];
     const rC=s.rsi<30?"var(--green2)":s.rsi<45?"#64DD17":s.rsi>70?"var(--red)":"var(--muted2)";
     const wC=s.wr<-80?"var(--green2)":s.wr<-65?"#64DD17":"var(--muted2)";
@@ -2114,6 +2132,7 @@ function renderRecovery(){
       <div class="badges">
         ${s.greenArrow?'<span class="badge jax jax-pulse">🟢 JAX SIGNAL</span>':''}
         ${(s.bullScore>=4&&!s.greenArrow)?'<span class="badge jax">⚡ BULL '+s.bullScore+'/5</span>':''}
+        ${s.c7?'<span class="badge" style="background:rgba(0,176,255,0.12);color:var(--blue);border:1px solid rgba(0,176,255,0.3)">📉 DEEP BOUNCE</span>':''}
       </div>
       <div class="dots-row">${dots}<span class="score-label" style="color:${g.bg}">${s.score}/6</span></div>
       <div class="bars-grid">
@@ -2948,8 +2967,30 @@ function saveJournal(){
 
 function logToJournal(entry){
   // entry = { sym, price, score, source, session, greenArrow, heat }
-  const id = Date.now();
   const today = new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"2-digit"});
+
+  // ── No duplicates: same ticker + same date = update existing entry ────────
+  const existing = journalEntries.find(e=>e.sym===entry.sym && e.date===today);
+  if(existing){
+    // Update price if different (e.g. re-logged after price moved)
+    const oldPrice = parseFloat(existing.price).toFixed(2);
+    const newPrice = parseFloat(entry.price).toFixed(2);
+    if(oldPrice !== newPrice){
+      existing.price = entry.price;
+      existing.score = entry.score;
+      existing.greenArrow = entry.greenArrow||false;
+      saveJournal();
+      renderJournal();
+      showToast("📓 "+entry.sym+" updated · $"+entry.price.toFixed(2)+" (was $"+oldPrice+")");
+      log("📓 Updated "+entry.sym+" in journal · $"+entry.price.toFixed(2),"info");
+    } else {
+      showToast("⚠ "+entry.sym+" already logged today at $"+oldPrice);
+    }
+    return;
+  }
+
+  // New entry
+  const id = Date.now();
   journalEntries.unshift({
     id, date: today, sym: entry.sym,
     price: entry.price, score: entry.score,
@@ -2962,7 +3003,6 @@ function logToJournal(entry){
   });
   saveJournal();
   renderJournal();
-  // Show toast instead of switching tabs
   showToast("📓 "+entry.sym+" logged · $"+entry.price.toFixed(2)+" · "+entry.score+"/6");
   log("📓 Logged "+entry.sym+" to journal · $"+entry.price.toFixed(2)+" · "+entry.score+"/6","ok");
 }
