@@ -1,0 +1,74 @@
+name: Confluence Screener — Auto Scan
+
+on:
+  schedule:
+    # 6:00 AM ET = 10:00 UTC
+    - cron: '0 10 * * 1-5'
+    # 9:45 AM ET = 13:45 UTC
+    - cron: '45 13 * * 1-5'
+    # Every 30 min during market hours 9:30AM-4:00PM ET = 13:30-20:00 UTC
+    - cron: '0,30 14,15,16,17,18,19 * * 1-5'
+    - cron: '30 13 * * 1-5'
+    - cron: '0 20 * * 1-5'
+
+  # Allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Scan type'
+        required: true
+        default: 'jax_monitor'
+        type: choice
+        options:
+          - jax_monitor
+          - premarket
+          - market_open
+          - full_catalyst
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests firebase-admin pytz
+
+      - name: Determine scan type
+        id: scan_type
+        run: |
+          # Manual trigger
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "type=${{ github.event.inputs.scan_type }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Get current ET time
+          HOUR=$(TZ="America/New_York" date +%-H)
+          MIN=$(TZ="America/New_York" date +%-M)
+          echo "ET time: $HOUR:$MIN"
+
+          if [ "$HOUR" -eq 6 ] && [ "$MIN" -lt 15 ]; then
+            echo "type=premarket" >> $GITHUB_OUTPUT
+          elif [ "$HOUR" -eq 9 ] && [ "$MIN" -ge 45 ]; then
+            echo "type=market_open" >> $GITHUB_OUTPUT
+          else
+            echo "type=jax_monitor" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run scanner
+        env:
+          TD_KEYS: ${{ secrets.TD_KEYS }}
+          FH_KEY: ${{ secrets.FH_KEY }}
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          SCAN_TYPE: ${{ steps.scan_type.outputs.type }}
+        run: python scanner.py
