@@ -559,15 +559,20 @@ def run_full_catalyst():
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    if not TD_KEYS or not TD_KEYS[0]:
-        print("ERROR: TD_KEYS secret not set")
+    # Clean keys — strip whitespace and filter empty
+    TD_KEYS[:] = [k.strip() for k in TD_KEYS if k.strip()]
+    if not TD_KEYS:
+        print("ERROR: TD_KEYS secret not set or empty")
+        print("Expected: key1,key2,key3 (no spaces)")
         exit(1)
-    if not FH_KEY:
+    if not FH_KEY.strip():
         print("ERROR: FH_KEY secret not set")
         exit(1)
-    if not DB_URL:
+    if not DB_URL.strip():
         print("ERROR: FIREBASE_DB_URL secret not set")
         exit(1)
+    print(f"Keys loaded: {len(TD_KEYS)}")
+    print(f"Firebase: {DB_URL[:40]}...")
 
     print(f"Scan type: {SCAN_TYPE}")
     print(f"Firebase: {DB_URL}")
