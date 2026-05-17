@@ -1999,10 +1999,28 @@ function scoreRecovery(sym,closes,highs,lows){
   // C7 override: if deep value bounce confirmed, qualify even with lower score
   const qualifies = score >= 4 || (c7 && score >= 2);
 
+  // ── JAX PRO — calculate if enough bars ──────────────────────────────────
+  const jax         = validC.length >= 70 ? calcJAXPRO(validC, validH, validL) : null;
+  const greenArrow  = jax ? jax.greenArrow  : false;
+  const bullScore   = jax ? jax.bullScore   : 0;
+  const jaxHasData  = jax !== null;
+  const jaxRsiBull  = jax ? jax.rsiBull     : false;
+  const jaxWrBull   = jax ? jax.wrBull      : false;
+  const jaxEmaStack = jax ? jax.emaStack    : false;
+  const jaxMacdBull = jax ? jax.macdBull    : false;
+  const jaxStBull   = jax ? jax.stBull      : false;
+  const jaxUtBuy    = jax ? jax.atrTS.utBuy : false;
+  const jaxStFlip   = jax ? jax.st.flipped  : false;
+  const jaxTrail    = jax ? jax.trailVal    : 0;
+
   return {sym,price,change,rsi,wr,ema21,emaRising,high52,pctHi,pctEMA,
     c1,c2,c3,c4,c5,c6,c7,score,conds,
     deepCrash, rsiTurningUp, rsiWasLow, emaFlattening, qualifies,
-    rsiMinRecent, rsiOld};
+    rsiMinRecent, rsiOld,
+    // JAX PRO — flat fields survive Firebase JSON round-trip
+    jax, greenArrow, bullScore, jaxHasData,
+    jaxRsiBull, jaxWrBull, jaxEmaStack, jaxMacdBull,
+    jaxStBull, jaxUtBuy, jaxStFlip, jaxTrail};
 }
 
 async function startRecoveryScan(){
