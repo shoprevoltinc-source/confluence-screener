@@ -2,16 +2,18 @@ name: Confluence Screener — Auto Scan
 
 on:
   schedule:
-    # 6:00 AM ET = 10:00 UTC
+    # 6:00 AM ET = 10:00 UTC — Pre-market scan
     - cron: '0 10 * * 1-5'
-    # 9:45 AM ET = 13:45 UTC
+    # 9:45 AM ET = 13:45 UTC — Market open scan
     - cron: '45 13 * * 1-5'
-    # Every 30 min during market hours 9:30AM-4:00PM ET = 13:30-20:00 UTC
-    - cron: '0,30 14,15,16,17,18,19 * * 1-5'
-    - cron: '30 13 * * 1-5'
-    - cron: '0 20 * * 1-5'
+    # 12:00 PM ET = 16:00 UTC — Midday JAX check
+    - cron: '0 16 * * 1-5'
+    # 2:00 PM ET = 18:00 UTC — Afternoon JAX check
+    - cron: '0 18 * * 1-5'
+    # 3:30 PM ET = 19:30 UTC — Pre-close JAX check
+    - cron: '30 19 * * 1-5'
 
-  # Allow manual trigger from GitHub Actions tab
+  # Manual trigger from GitHub Actions tab
   workflow_dispatch:
     inputs:
       scan_type:
@@ -51,12 +53,12 @@ jobs:
             exit 0
           fi
 
-          # Get current ET time
+          # Get current ET hour and minute
           HOUR=$(TZ="America/New_York" date +%-H)
           MIN=$(TZ="America/New_York" date +%-M)
           echo "ET time: $HOUR:$MIN"
 
-          if [ "$HOUR" -eq 6 ] && [ "$MIN" -lt 15 ]; then
+          if [ "$HOUR" -eq 6 ]; then
             echo "type=premarket" >> $GITHUB_OUTPUT
           elif [ "$HOUR" -eq 9 ] && [ "$MIN" -ge 45 ]; then
             echo "type=market_open" >> $GITHUB_OUTPUT
