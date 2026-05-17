@@ -296,11 +296,11 @@ def send_alert(sym, title, body, alert_type="jax"):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def run_jax_monitor():
-    """Check watchlist every 30min for JAX green arrow"""
-    print(f"\n── JAX MONITOR ({len(WATCHLIST)} stocks) ──")
+    """Check Catalyst Universe for JAX green arrow signals"""
+    print(f"\n── JAX MONITOR ({len(CATALYST_UNIVERSE)} stocks) ──")
     alerts_fired = []
 
-    for sym in WATCHLIST:
+    for sym in CATALYST_UNIVERSE:
         print(f"  Checking {sym}...", end=" ")
         candles = get_candles(sym)
         if not candles:
@@ -332,7 +332,8 @@ def run_jax_monitor():
     fb_push("screener/jax_last_run", {
         "time":    datetime.now(ET).isoformat(),
         "signals": alerts_fired,
-        "scanned": len(WATCHLIST)
+        "scanned": len(CATALYST_UNIVERSE),
+        "scanType": SCAN_TYPE
     })
 
 def run_premarket_scan():
