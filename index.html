@@ -195,16 +195,21 @@ body::before{
   background:var(--bg2);
   border-bottom:1px solid var(--border);
   padding:0 20px;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
 }
+.tabs::-webkit-scrollbar{display:none}
 .tab{
-  padding:12px 20px;
+  padding:12px 16px;
   font-family:var(--mono);font-size:10px;font-weight:500;
-  letter-spacing:2px;text-transform:uppercase;
+  letter-spacing:1px;text-transform:uppercase;
   cursor:pointer;color:var(--muted2);
   border-bottom:2px solid transparent;
   margin-bottom:-1px;
   transition:all 0.15s;
   white-space:nowrap;
+  flex-shrink:0;
 }
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--green);border-bottom-color:var(--green)}
@@ -410,10 +415,10 @@ select:focus,.ctrl-input:focus{outline:none;border-color:var(--blue)}
    RESULTS GRID
 ═══════════════════════════════════════════════════════════ */
 .results{
-  padding:16px 20px;
+  padding:12px;
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
-  gap:10px;
+  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:8px;
 }
 
 /* ── Stock Card ── */
@@ -732,6 +737,16 @@ pre.dout{
 
 /* Mobile */
 @media(max-width:768px){
+  /* Controls scroll on mobile */
+  .controls{overflow-x:auto;flex-wrap:nowrap;padding:8px 12px;gap:5px;-webkit-overflow-scrolling:touch}
+  .controls::-webkit-scrollbar{display:none}
+  .btn-scan{white-space:nowrap;flex-shrink:0}
+  .ctrl-label{white-space:nowrap;flex-shrink:0}
+  /* Watchlist bar */
+  .wl-bar{padding:5px 12px}
+  /* Header logo smaller */
+  .logo{font-size:14px;letter-spacing:2px}
+  .hdr-right{display:none} /* hide Firebase badge on mobile */
   /* Journal table — horizontal scroll on mobile */
   .jnl-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .jnl-table{min-width:700px;font-size:9px}
@@ -1456,7 +1471,7 @@ const SECTORS = {
   "Quantum/AI":    ["QUBT","IONQ","RGTI","SOUN","BBAI","ARQQ","QBTS","LPSN","MTTR","AAOI","COHU","FORM","SMTC","VIAV","CEVA","PLAB","DIOD","VRNT"],
   "Defense/Gov":   ["MRAM","KTOS","AVAV","RCAT","ASTS","LUNR","RDW","SPIR","BBAI","CDRE","DRS","CACI","SAIC","BWXT","AXON","HWM","TDG","ACHR","JOBY","LILM"],
   "Biotech":       ["MGNX","RXRX","DNLI","BEAM","EDIT","CRSP","NTLA","VERV","NUVL","ALLO","HIMS","OCGN","NVAX","VXRT","INO","PSNL","BLUE","ARVN","PRTA","IMVT","KYMR","PTGX","RCKT","SAGE","TGTX","IOVA","APLS","FOLD","DAWN","YMAB"],
-  "Semiconductors":["NVTS","AMPX","SMTC","AAOI","COHU","FORM","ONTO","ACMR","IIVI","PLAB","DIOD","CEVA","VIAV","POWI","MAXN","AEVA","LAZR","MVIS","OUST","AMKR","WOLF","AMBA","SLAB","SITM","NXPI"],
+  "Semiconductors":["NVTS","AMPX","SMTC","AAOI","COHU","FORM","ONTO","ACMR","IIVI","PLAB","DIOD","CEVA","VIAV","POWI","AEVA","LAZR","MVIS","OUST","AMKR","WOLF","AMBA","SLAB","SITM","NXPI"],
   "Clean Energy":  ["BLNK","CHPT","EVGO","STEM","ARRY","NOVA","SHLS","FLNC","BLDP","FCEL","PLUG","RUN","CSIQ","DQ","JKS","BE","CWEN","GPRE","AMRC","VNET","CLSK","IREN","HUT","MARA"],
   "Fintech":       ["SOFI","HOOD","AFRM","UPST","DAVE","MQ","LMND","ROOT","DKNG","PENN","RBLX","MSTR","IREN","CIFR","RIOT","MARA","HUT","FOUR","RELY"],
   // ── Mid-Cap additions $25–$75 ──────────────────────────────────────────
@@ -1477,7 +1492,7 @@ const SMALLCAP = [...new Set([
   "HIMS","OCGN","NVAX","VXRT","INO","PSNL","BLUE","ARVN","PRTA","IMVT",
   "KYMR","PTGX","RCKT","SAGE","TGTX","IOVA","APLS","FOLD","DAWN","YMAB",
   "NVTS","AMPX","SMTC","AAOI","COHU","FORM","ONTO","ACMR","PLAB","DIOD",
-  "VIAV","POWI","MAXN","AEVA","LAZR","MVIS","OUST","WOLF","AMBA","SLAB",
+  "VIAV","POWI","AEVA","LAZR","MVIS","OUST","WOLF","AMBA","SLAB",
   "BLNK","CHPT","EVGO","STEM","ARRY","NOVA","SHLS","FLNC","BLDP","FCEL",
   "PLUG","RUN","CSIQ","DQ","JKS","BE","CWEN","GPRE","AMRC","VNET","CLSK","IREN","HUT","MARA",
   "SOFI","HOOD","AFRM","UPST","DAVE","MQ","LMND","ROOT","DKNG","PENN",
@@ -2328,7 +2343,7 @@ function scoreCatalyst(sym, closes, highs, lows, volumes, maxPrice, minVolSpike,
 
   const price   = closes[closes.length-1];
   const prev    = closes[closes.length-2];
-  if(!price||!prev||price<=0) throw new Error("Invalid price data for "+sym);
+  if(!price||!prev||price<=0) throw new Error("SKIP:invalid price");
   const change  = ((price-prev)/prev)*100;
 
   // ── ATR Coil (from your Python logic) ────────────────────
@@ -2384,7 +2399,7 @@ function scoreCatalyst(sym, closes, highs, lows, volumes, maxPrice, minVolSpike,
   // ══════════════════════════════════════════════════════════
   // 6 CONDITIONS — ATR + 15m RVOL upgraded system
   // ══════════════════════════════════════════════════════════
-  const c1 = price >= 2 && price <= maxPrice;                    // Price in range
+  const c1 = price >= 2 && price <= maxPrice;                    // Price in range (min $2)
   const c2 = atrCoiling || (isTight && flatDaysCount >= 8);      // ATR coiling OR price tight
   const c3 = isIgniting || dailySpike >= minVolSpike || volDryUp; // 15m ignition OR daily spike OR dry-up
   const c4 = hasEarnings || breakout || change > 8;              // Catalyst present
