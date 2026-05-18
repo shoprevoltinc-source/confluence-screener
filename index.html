@@ -2380,7 +2380,7 @@ function renderRecovery(){
           <span class="grade" style="background:${g.bg};color:${g.fg}">${g.l}</span>
           <div class="card-hint" style="display:flex;gap:6px;align-items:center">
             <span>#${i+1} · CLICK → TRADINGVIEW</span>
-            <button class="log-btn" onclick="event.stopPropagation();logToJournal({sym:'${s.sym}',price:${s.price},score:${s.score},source:'recovery',session:getMarketSession(),greenArrow:${!!s.greenArrow}})">📓 LOG</button>
+            <button class="log-btn" onclick="event.stopPropagation();logRecoveryStock('${s.sym}',${s.price},${s.score},${s.greenArrow?1:0})">📓 LOG</button>
           </div>
         </div>
         <div class="card-right">
@@ -2731,7 +2731,7 @@ function renderCatalyst(){
           <span class="grade" style="background:${heatBg};color:#000">${heat}</span>
           <div class="card-hint" style="display:flex;gap:6px;align-items:center">
             <span>#${i+1} · CLICK → TRADINGVIEW</span>
-            <button class="log-btn" onclick="event.stopPropagation();logToJournal({sym:'${s.sym}',price:${s.price},score:${s.score},source:'catalyst',session:getMarketSession(),greenArrow:${!!s.greenArrow},heat:${s.heat}})">📓 LOG</button>
+            <button class="log-btn" onclick="event.stopPropagation();logCatalystStock('${s.sym}',${s.price},${s.score},${s.greenArrow?1:0},${s.heat})">📓 LOG</button>
           </div>
         </div>
         <div class="card-right">
@@ -3087,8 +3087,14 @@ async function runMorningAlerts(){
 
     // Save to session slot for comparison
   const sk = document.getElementById("alertSession")?.value||"manual";
-  const sessionLabel2 = sk==="premarket"?"🌅 6AM PRE-MARKET":sk==="open"?"🟢 9:45AM OPEN":"📊 MANUAL";
-  if(sk==="premarket"||sk==="open"){
+  const sessionLabel2 = sk==="premarket"?"🌅 6AM PRE-MARKET":
+    sk==="open"?"🟢 9:45AM OPEN":
+    sk==="midday"?"☀️ 12PM MIDDAY":
+    sk==="afternoon"?"🕑 2PM AFTERNOON":
+    sk==="preclose"?"🔔 3:30PM PRE-CLOSE":"📊 MANUAL";
+  const validSessions = ["premarket","open","midday","afternoon","preclose"];
+  if(validSessions.includes(sk)){
+    if(!sessionAlerts[sk]) sessionAlerts[sk] = {alerts:[], time:null, label:sk};
     sessionAlerts[sk].alerts = [...alerts];
     sessionAlerts[sk].time = new Date().toLocaleTimeString();
     // Save to localStorage (this device)
@@ -3686,6 +3692,29 @@ function setJAXFilter(v, btn){
   renderJAX();
 }
 
+function logRecoveryStock(sym, price, score, greenArrow){
+  logToJournal({sym, price, score, source:'recovery',
+    session:getMarketSession(), greenArrow:!!greenArrow, tradeType:'Swing'});
+}
+
+function logCatalystStock(sym, price, score, greenArrow, heat){
+  logToJournal({sym, price, score, source:'catalyst',
+    session:getMarketSession(), greenArrow:!!greenArrow,
+    heat, tradeType:'Catalyst'});
+}
+
+function logJAXStock(sym, price, bullScore){
+  logToJournal({
+    sym:        sym,
+    price:      price,
+    score:      bullScore,
+    source:     'jax',
+    session:    getMarketSession(),
+    greenArrow: true,
+    tradeType:  'Swing'
+  });
+}
+
 function clearJAX(){
   jaxResults=[];
   try{ localStorage.removeItem("cs_jax"); }catch(e){}
@@ -3720,7 +3749,7 @@ function renderJAX(){
           <span class="grade" style="background:${bullBg};color:#000">🟢 BULL ${s.bullScore}/5</span>
           <div class="card-hint" style="display:flex;gap:6px;align-items:center">
             <span>#${i+1} · CLICK → TRADINGVIEW</span>
-            <button class="log-btn" onclick="event.stopPropagation();logToJournal({sym:'${s.sym}',price:${s.price},score:s.bullScore+'/5',source:'jax',greenArrow:true})">📓 LOG</button>
+            <button class="log-btn" onclick="event.stopPropagation();logJAXStock('${s.sym}',${s.price},${s.bullScore})">📓 LOG</button>
           </div>
         </div>
         <div class="card-right">
