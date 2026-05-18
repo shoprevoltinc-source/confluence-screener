@@ -3618,12 +3618,16 @@ async function startJAXScan(){
     document.getElementById("jax-savedBanner").style.display="block";
     document.getElementById("jax-savedBanner").textContent =
       "🟢 "+jaxResults.length+" JAX signals · "+new Date().toLocaleTimeString();
-    // Save to Firebase
+    // Save to localStorage (this device)
+    try{ localStorage.setItem("cs_jax", JSON.stringify(jaxResults)); }catch(e){}
+    // Save to Firebase (all devices)
     if(window.firebaseReady) window.fbSave("jax_scan", {
       data: JSON.stringify(jaxResults),
       savedAt: new Date().toISOString(),
       device: navigator.userAgent.includes("Mobile")?"mobile":"desktop"
     });
+    document.getElementById("jax-savedBanner").textContent =
+      "🟢 "+jaxResults.length+" JAX signals saved · "+new Date().toLocaleTimeString();
   }
   log("✅ JAX scan complete — "+jaxResults.length+" green arrows found","info","jax");
 }
@@ -3637,6 +3641,8 @@ function setJAXFilter(v, btn){
 
 function clearJAX(){
   jaxResults=[];
+  try{ localStorage.removeItem("cs_jax"); }catch(e){}
+  if(window.firebaseReady) window.fbSave("jax_scan", {data:"[]", savedAt:new Date().toISOString(), device:"cleared"});
   document.getElementById("jax-savedBanner").style.display="none";
   document.getElementById("jax-filterBar").style.display="none";
   document.getElementById("jax-results").innerHTML='<div class="empty"><span class="empty-icon">🟢</span>Cleared.</div>';
@@ -3717,9 +3723,54 @@ function renderJAX(){
   }).join("");
 }
 
+// ── Load JAX results ─────────────────────────────────────
+function loadJAX(){
+  try{
+    const saved = localStorage.getItem("cs_jax");
+    if(saved){
+      jaxResults = JSON.parse(saved);
+      if(jaxResults.length){
+        const el = document.getElementById("jax-savedBanner");
+        const fb = document.getElementById("jax-filterBar");
+        if(el){ el.style.display="block"; el.textContent="💾 "+jaxResults.length+" JAX signals · last scan"; }
+        if(fb) fb.style.display="flex";
+        renderJAX();
+      }
+    }
+  }catch(e){ jaxResults=[]; }
+
+  document.addEventListener("firebaseReady", async()=>{
+    try{
+      const fb = await window.fbLoad("jax_scan");
+      if(fb && fb.data && fb.data.length > 0){
+        jaxResults = fb.data;
+        localStorage.setItem("cs_jax", JSON.stringify(jaxResults));
+        const el = document.getElementById("jax-savedBanner");
+        const fb2 = document.getElementById("jax-filterBar");
+        if(el){ el.style.display="block"; el.textContent="☁️ "+(fb.device||"cloud")+" · "+new Date(fb.savedAt).toLocaleString()+" — "+jaxResults.length+" signals"; }
+        if(fb2) fb2.style.display="flex";
+        renderJAX();
+      }
+      window.fbListen("jax_scan", (fb)=>{
+        if(fb && fb.data && fb.data.length > 0){
+          jaxResults = fb.data;
+          localStorage.setItem("cs_jax", JSON.stringify(jaxResults));
+          const el = document.getElementById("jax-savedBanner");
+          const fb2 = document.getElementById("jax-filterBar");
+          if(el){ el.style.display="block"; el.textContent="🔴 LIVE from "+(fb.device||"cloud")+" · "+new Date(fb.savedAt).toLocaleTimeString(); }
+          if(fb2) fb2.style.display="flex";
+          renderJAX();
+        }
+      });
+    }catch(e){ console.warn("JAX Firebase:", e); }
+  });
+}
+
+
 loadSaved();
 renderWatchlistUI();
 loadJournal();
+loadJAX();
 // Auto-load calendar on startup
 setTimeout(()=>{ try{ loadCalendar(); }catch(e){} }, 2000);
 
