@@ -787,6 +787,53 @@ pre.dout{
 </style>
 </head>
 <body>
+<script>
+// ── Service Worker Registration ───────────────────────────
+// Enables background notifications even when browser is closed
+if('serviceWorker' in navigator && location.hostname.includes('github.io')){
+  window.addEventListener('load', async()=>{
+    try{
+      const reg = await navigator.serviceWorker.register('/confluence-screener/sw.js', {
+        scope: '/confluence-screener/'
+      });
+      console.log('[SW] Registered:', reg.scope);
+      window._swReg = reg;
+
+      // Request notification permission
+      if(Notification.permission === 'default'){
+        const perm = await Notification.requestPermission();
+        console.log('[SW] Notification permission:', perm);
+      }
+
+      // Register for periodic background sync if supported
+      if('periodicSync' in reg){
+        try{
+          await reg.periodicSync.register('check-alerts', {
+            minInterval: 5 * 60 * 1000 // 5 minutes
+          });
+          console.log('[SW] Periodic sync registered');
+        }catch(e){ console.log('[SW] Periodic sync not supported:', e); }
+      }
+
+      // Update Firebase status to show SW active
+      setTimeout(()=>{
+        const el = document.getElementById('fbStatus');
+        if(el && Notification.permission === 'granted'){
+          el.textContent = '🟢 FIREBASE · 🔔 ALERTS ON';
+        }
+      }, 2000);
+
+    }catch(e){ console.warn('[SW] Registration failed:', e); }
+  });
+
+  // Listen for messages from service worker
+  navigator.serviceWorker.addEventListener('message', event=>{
+    if(event.data?.type === 'NEW_ALERT'){
+      showToast('🔔 New alert: '+event.data.sym);
+    }
+  });
+}
+</script>
 
 <!-- ═══ HEADER ═══ -->
 <div class="hdr">
@@ -2063,7 +2110,11 @@ function calcJAXPRO(closes, highs, lows){
   const atrTS = calcATRTrailStop(highs, lows, closes, 10, 3.5);
 
   // JAX PRO bull_score (5 points — matches Pine Script exactly)
-  const emaStack = ema20>ema40 && ema40>ema60 && price>ema20;
+  // EMA Stack — relaxed: price above EMA20 AND EMA20 trending up
+  // Full stack (ema20>ema40>ema60) requires months of uptrend — too strict for recovery plays
+  const ema20old  = calcEMA(closes.slice(0,-5), 20);
+  const ema20rising = ema20 > ema20old;
+  const emaStack  = price > ema20 && ema20rising; // price above rising EMA20
   const macdBull = hist > 0;
   const rsiBull  = rsi14 > 50;
   const wrBull   = wr14 > -50;
@@ -3621,11 +3672,7 @@ async function startJAXScan(){
     // Save to localStorage (this device)
     try{ localStorage.setItem("cs_jax", JSON.stringify(jaxResults)); }catch(e){}
     // Save to Firebase (all devices)
-    if(window.firebaseReady) window.fbSave("jax_scan", {
-      data: JSON.stringify(jaxResults),
-      savedAt: new Date().toISOString(),
-      device: navigator.userAgent.includes("Mobile")?"mobile":"desktop"
-    });
+    if(window.firebaseReady) window.fbSave("jax_scan", jaxResults);
     document.getElementById("jax-savedBanner").textContent =
       "🟢 "+jaxResults.length+" JAX signals saved · "+new Date().toLocaleTimeString();
   }
@@ -3742,9 +3789,13 @@ function loadJAX(){
   document.addEventListener("firebaseReady", async()=>{
     try{
       const fb = await window.fbLoad("jax_scan");
-      if(fb && fb.data && Array.isArray(fb.data) && fb.data.length > 0){
-        // fbLoad already parses JSON - fb.data is already an array
-        jaxResults = fb.data;
+      // fbLoad parses JSON internally - fb.data should be an array
+      // Handle both array and object (backwards compat with old saves)
+      const jaxData = Array.isArray(fb?.data) ? fb.data :
+                      Array.isArray(fb?.data?.data) ? fb.data.data :
+                      (typeof fb?.data?.data === "string") ? JSON.parse(fb.data.data) : null;
+      if(jaxData && jaxData.length > 0){
+        jaxResults = jaxData;
         localStorage.setItem("cs_jax", JSON.stringify(jaxResults));
         const el = document.getElementById("jax-savedBanner");
         const fb2 = document.getElementById("jax-filterBar");
@@ -3753,8 +3804,11 @@ function loadJAX(){
         renderJAX();
       }
       window.fbListen("jax_scan", (fb)=>{
-        if(fb && fb.data && Array.isArray(fb.data) && fb.data.length > 0){
-          jaxResults = fb.data;
+        const jaxD = Array.isArray(fb?.data) ? fb.data :
+                     Array.isArray(fb?.data?.data) ? fb.data.data :
+                     (typeof fb?.data?.data === "string") ? JSON.parse(fb.data.data) : null;
+        if(jaxD && jaxD.length > 0){
+          jaxResults = jaxD;
           localStorage.setItem("cs_jax", JSON.stringify(jaxResults));
           const el = document.getElementById("jax-savedBanner");
           const fb2 = document.getElementById("jax-filterBar");
