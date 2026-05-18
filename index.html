@@ -820,6 +820,7 @@ pre.dout{
 <div class="tabs">
   <div class="tab active" id="tab-recovery" onclick="switchTab('recovery')">📈 Recovery</div>
   <div class="tab" id="tab-catalyst" onclick="switchTab('catalyst')">⚡ Catalyst</div>
+  <div class="tab" id="tab-jax" onclick="switchTab('jax')">🟢 JAX Scanner</div>
   <div class="tab" id="tab-alerts" onclick="switchTab('alerts')">🔔 Alerts</div>
   <div class="tab" id="tab-journal" onclick="switchTab('journal')">📓 Journal</div>
 </div>
@@ -1068,6 +1069,82 @@ pre.dout{
 <!-- ═══════════════════════════════════════════════════════
      TAB 3: MORNING ALERTS
 ═══════════════════════════════════════════════════════════ -->
+<!-- ═══ JAX SCANNER TAB ═══ -->
+<div class="tab-panel" id="panel-jax">
+
+<div class="controls">
+  <button class="btn-scan" id="jaxRunBtn" onclick="startJAXScan()" style="background:linear-gradient(135deg,#00C853,#00E676);box-shadow:0 0 16px rgba(0,200,83,0.3)">🟢 JAX SCAN</button>
+  <button class="btn-stop" id="jaxStopBtn" onclick="stopScan()" disabled>■ STOP</button>
+  <button class="btn-clear" onclick="clearJAX()">🗑</button>
+  <span class="ctrl-label">LIST</span>
+  <select id="jaxListSel">
+    <option value="sp500">S&P 500 (487)</option>
+    <option value="catalyst">Catalyst Universe</option>
+    <option value="watchlist">My Watchlist</option>
+    <option value="custom">Custom</option>
+  </select>
+  <span class="ctrl-label">MIN BULL</span>
+  <select id="jaxMinBull">
+    <option value="1">1/5+</option>
+    <option value="2">2/5+</option>
+    <option value="3" selected>3/5+</option>
+    <option value="4">4/5+</option>
+    <option value="5">5/5</option>
+  </select>
+  <input type="text" class="ctrl-input" id="jaxCustomTk" placeholder="MSFT,XOM,NOW...">
+</div>
+
+<div style="padding:7px 20px;background:rgba(0,200,83,0.04);border-bottom:1px solid rgba(0,200,83,0.15)">
+  <div style="font-size:9px;color:var(--green2);font-weight:700;letter-spacing:2px;margin-bottom:4px">🟢 JAX PRO — Pure Green Arrow Scanner</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <span style="font-size:8px;padding:2px 8px;border-radius:1px;border:1px solid rgba(0,200,83,0.2);color:var(--muted2)">No RSI floor — catches MSFT, XOM, NOW</span>
+    <span style="font-size:8px;padding:2px 8px;border-radius:1px;border:1px solid rgba(0,200,83,0.2);color:var(--muted2)">UTBuy OR SuperTrend flip</span>
+    <span style="font-size:8px;padding:2px 8px;border-radius:1px;border:1px solid rgba(0,200,83,0.2);color:var(--muted2)">Bull score ≥ 3/5</span>
+    <span style="font-size:8px;padding:2px 8px;border-radius:1px;border:1px solid rgba(0,200,83,0.2);color:var(--muted2)">RSI &lt; 70 only</span>
+  </div>
+</div>
+
+<div class="prog-wrap" id="jax-prog">
+  <div class="prog-row"><span class="prog-msg" id="jax-progMsg">Scanning...</span><span class="prog-pct" id="jax-progPct">0%</span></div>
+  <div class="prog-track"><div class="prog-fill" id="jax-progFill" style="background:linear-gradient(90deg,var(--green2),var(--green))"></div></div>
+</div>
+
+<div class="banner green" id="jax-savedBanner"></div>
+
+<div class="filter-bar" id="jax-filterBar">
+  <span class="filter-label">BULL</span>
+  <button class="chip on" onclick="setJAXFilter('all',this)">ALL</button>
+  <button class="chip" onclick="setJAXFilter(5,this)">5/5 🔥</button>
+  <button class="chip" onclick="setJAXFilter(4,this)">4/5</button>
+  <button class="chip" onclick="setJAXFilter(3,this)">3/5</button>
+  <select class="sort-select" id="jax-sortSel" onchange="renderJAX()">
+    <option value="bull">Bull Score</option>
+    <option value="rsi">RSI Lowest</option>
+    <option value="pullback">Deepest Pullback</option>
+  </select>
+  <input type="text" class="search-input" id="jax-tickerSearch" placeholder="🔍 ticker..." oninput="renderJAX()" style="margin-left:4px">
+  <span class="res-count" id="jax-resCount"></span>
+</div>
+
+<div class="accordion">
+  <div class="accordion-hdr" onclick="toggleAccordion('jax-log-body','jax-log-arrow')">
+    <span>▸ ACTIVITY LOG</span><span class="accordion-arrow" id="jax-log-arrow">▾</span>
+  </div>
+  <div class="accordion-body" id="jax-log-body">
+    <div class="log-panel" id="jax-log"></div>
+  </div>
+</div>
+
+<div class="results" id="jax-results">
+  <div class="empty">
+    <span class="empty-icon">🟢</span>
+    JAX Scanner — Pure green arrow detection<br>
+    <span style="font-size:8px;color:var(--muted)">No RSI filter · Catches MSFT, XOM, NOW · UTBuy or ST flip + Bull score</span>
+  </div>
+</div>
+
+</div><!-- end panel-jax -->
+
 <div class="tab-panel" id="panel-alerts">
 
 <div class="controls">
@@ -1535,16 +1612,28 @@ function switchTab(tab){
     document.getElementById("mainSubtitle").textContent="4× TWELVE DATA · LIVE PRICES · "+sessLabel;
     updateHdr(rResults);
     if(rResults.length){ renderRecovery(); document.getElementById("r-filterBar").style.display="flex"; document.getElementById("statsRow").style.display="flex"; }
-  } else {
+  } else if(tab==="catalyst"){
     document.getElementById("mainSubtitle").textContent="⚡ CATALYST SCANNER · SMALL CAP · MRAM-TYPE SETUPS";
     updateHdr(cResults);
     if(cResults.length){ renderCatalyst(); document.getElementById("c-filterBar").style.display="flex"; }
+  } else if(tab==="jax"){
+    document.getElementById("mainSubtitle").textContent="🟢 JAX SCANNER · PURE GREEN ARROW · NO RSI FILTER";
+    if(jaxResults.length){ renderJAX(); document.getElementById("jax-filterBar").style.display="flex"; }
+  } else if(tab==="alerts"){
+    const sess=getMarketSession();
+    const sessLabel={"premarket":"🌅 PRE-MARKET","open":"🟢 MARKET OPEN","afterhours":"🌙 AFTER HOURS","closed":"⚪ MARKET CLOSED","weekend":"⚪ WEEKEND"}[sess]||"";
+    document.getElementById("mainSubtitle").textContent="🔔 MORNING ALERTS · "+sessLabel;
+    document.getElementById("alertTime").textContent=new Date().toLocaleTimeString();
+  } else if(tab==="journal"){
+    document.getElementById("mainSubtitle").textContent="📓 TRADE JOURNAL · TRACK EVERY FLAGGED STOCK";
+    renderJournal();
   }
 }
 
 // ── Logging ────────────────────────────────────────────────
 function log(msg,type="",panel="r"){
   const p=document.getElementById(panel+"-log");
+  if(!p) return;
   const d=document.createElement("div");
   d.className="ll "+type;
   d.textContent="["+new Date().toLocaleTimeString()+"] "+msg;
@@ -3395,6 +3484,238 @@ function startCloseAutoTimer(){
 
 // Start the auto-close timer when page loads
 startCloseAutoTimer();
+
+// ══════════════════════════════════════════════════════════
+// JAX SCANNER — Pure green arrow, no RSI restriction
+// ══════════════════════════════════════════════════════════
+let jaxResults = [];
+let jaxFilter  = "all";
+
+function scoreJAX(sym, closes, highs, lows){
+  if(closes.length < 70) throw new Error("Need 70+ bars");
+  const jax = calcJAXPRO(closes, highs, lows);
+  if(!jax) throw new Error("JAX calc failed");
+  const price   = closes[closes.length-1];
+  const prev    = closes[closes.length-2];
+  const change  = ((price-prev)/prev)*100;
+  const high52  = Math.max(...highs);
+  const low52   = Math.min(...lows);
+  const pctHi   = (price-high52)/high52*100;
+  const ema21   = calcEMA(closes, 21);
+  const ema21old= calcEMA(closes.slice(0,-5), 21);
+  return {
+    sym, price, change,
+    rsi:        jax.rsi14||calcRSI(closes,14),
+    greenArrow: jax.greenArrow,
+    bullScore:  jax.bullScore,
+    utBuy:      jax.atrTS.utBuy,
+    stFlipped:  jax.st.flipped,
+    emaStack:   jax.emaStack,
+    macdBull:   jax.macdBull,
+    rsiBull:    jax.rsiBull,
+    wrBull:     jax.wrBull,
+    stBull:     jax.stBull,
+    trailVal:   jax.trailVal,
+    high52, low52, pctHi, ema21,
+    emaRising: ema21 > ema21old,
+  };
+}
+
+async function startJAXScan(){
+  if(isRunning) return;
+  isRunning=true; stopReq=false; jaxResults=[]; scanned=0; errCount=0;
+  document.getElementById("jaxRunBtn").disabled=true;
+  document.getElementById("jaxStopBtn").disabled=false;
+  document.getElementById("jax-prog").style.display="block";
+  document.getElementById("jax-filterBar").style.display="none";
+  document.getElementById("jax-savedBanner").style.display="none";
+  document.getElementById("jax-results").innerHTML="";
+  document.getElementById("jax-log").innerHTML="";
+  updateKeyStatus([0,1,2,3,4]);
+
+  const listVal   = document.getElementById("jaxListSel").value;
+  const minBull   = parseInt(document.getElementById("jaxMinBull").value)||3;
+  const tickers   = listVal==="sp500"?[...SP500]:
+                    listVal==="catalyst"?[...SMALLCAP]:
+                    listVal==="watchlist"?[...WATCHLIST]:
+                    document.getElementById("jaxCustomTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
+
+  const nKeys  = TD_KEYS.length;
+  const chunks = splitInterleaved(tickers, nKeys);
+  const total  = tickers.length;
+  let done     = 0;
+
+  log("🟢 JAX scan: "+total+" stocks · min bull "+minBull+"/5 · no RSI floor","info","jax");
+  log("Catches MSFT/XOM/NOW type moves — UTBuy or ST flip","info","jax");
+
+  const progInterval = setInterval(()=>{
+    const pct = Math.round(done/total*100);
+    document.getElementById("jax-progPct").textContent = pct+"%";
+    document.getElementById("jax-progFill").style.width = pct+"%";
+  }, 500);
+
+  function onJAXResult(r, passed){
+    done++;
+    document.getElementById("jax-progMsg").textContent =
+      "Scanning... "+done+"/"+total+" · "+jaxResults.length+" signals found";
+    if(r.error){ errCount++; return; }
+    if(passed){
+      jaxResults.push(r); renderJAX();
+      const trigger = r.utBuy?"UTBuy":r.stFlipped?"ST Flip":"—";
+      log("🟢 "+r.sym.padEnd(6)+" bull:"+r.bullScore+"/5 RSI:"+r.rsi.toFixed(0)+" "+trigger+" $"+r.price.toFixed(2)+(r.pctHi<-25?" 📉"+r.pctHi.toFixed(0)+"%":""),"ok","jax");
+      // Push notification for high conviction
+      if(r.bullScore>=4){
+        sendNotification(
+          "🟢 "+r.sym+" JAX SIGNAL — bull "+r.bullScore+"/5",
+          "$"+r.price.toFixed(2)+" · "+trigger+" · RSI "+r.rsi.toFixed(0)+" · Click to open TradingView",
+          r.sym
+        );
+      }
+    } else { scanned++; }
+    document.getElementById("h-scanned").textContent = done;
+    document.getElementById("h-passed").textContent  = jaxResults.length;
+  }
+
+  function onJAXProgress(sym, ki){
+    document.getElementById("jax-progMsg").textContent =
+      "K"+(ki+1)+": "+sym+" · "+done+"/"+total+" · "+jaxResults.length+" signals";
+  }
+
+  // Custom worker for JAX — no earnings fetch needed, just candles + JAX
+  async function runJAXWorker(keyIdx, tickers){
+    const DELAY = 8500;
+    for(let i=0; i<tickers.length; i++){
+      if(stopReq) break;
+      const sym = tickers[i];
+      onJAXProgress(sym, keyIdx);
+      try{
+        const candles = await fetchCandlesWithKey(sym, keyIdx);
+        const r = scoreJAX(sym, candles.closes, candles.highs, candles.lows);
+        const lq = await fetchLiveQuote(sym);
+        if(lq&&lq.price>0){ r.price=lq.price; r.change=lq.changePct||r.change; r.session=getMarketSession(); }
+        if(r.greenArrow && r.bullScore>=minBull) onJAXResult(r, true);
+        else onJAXResult(r, false);
+      }catch(e){
+        if(!e.message.startsWith("SKIP:")) onJAXResult({sym,error:e.message}, false);
+        else onJAXResult({sym,error:null}, false);
+      }
+      if(i<tickers.length-1) await sleep(DELAY);
+    }
+  }
+
+  await Promise.all(chunks.map((chunk,ki)=>runJAXWorker(ki,chunk)));
+
+  clearInterval(progInterval);
+  document.getElementById("jax-progMsg").textContent = "Done — "+jaxResults.length+" JAX signals found";
+  document.getElementById("jax-progPct").textContent = "100%";
+  document.getElementById("jax-progFill").style.width = "100%";
+  document.getElementById("jaxRunBtn").disabled=false;
+  document.getElementById("jaxStopBtn").disabled=true;
+  isRunning=false;
+
+  if(jaxResults.length){
+    document.getElementById("jax-filterBar").style.display="flex";
+    document.getElementById("jax-savedBanner").style.display="block";
+    document.getElementById("jax-savedBanner").textContent =
+      "🟢 "+jaxResults.length+" JAX signals · "+new Date().toLocaleTimeString();
+    // Save to Firebase
+    if(window.firebaseReady) window.fbSave("jax_scan", {
+      data: JSON.stringify(jaxResults),
+      savedAt: new Date().toISOString(),
+      device: navigator.userAgent.includes("Mobile")?"mobile":"desktop"
+    });
+  }
+  log("✅ JAX scan complete — "+jaxResults.length+" green arrows found","info","jax");
+}
+
+function setJAXFilter(v, btn){
+  jaxFilter=v;
+  document.querySelectorAll("#jax-filterBar .chip").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on");
+  renderJAX();
+}
+
+function clearJAX(){
+  jaxResults=[];
+  document.getElementById("jax-savedBanner").style.display="none";
+  document.getElementById("jax-filterBar").style.display="none";
+  document.getElementById("jax-results").innerHTML='<div class="empty"><span class="empty-icon">🟢</span>Cleared.</div>';
+}
+
+function renderJAX(){
+  const sort   = document.getElementById("jax-sortSel")?.value||"bull";
+  const search = (document.getElementById("jax-tickerSearch")?.value||"").toUpperCase().trim();
+  const minB   = parseInt(document.getElementById("jaxMinBull")?.value)||3;
+
+  let f = [...jaxResults];
+  if(jaxFilter!=="all") f=f.filter(r=>r.bullScore===jaxFilter);
+  if(search) f=f.filter(r=>r.sym.includes(search));
+  f.sort((a,b)=>sort==="rsi"?a.rsi-b.rsi:sort==="pullback"?a.pctHi-b.pctHi:b.bullScore-a.bullScore||b.rsi-a.rsi);
+
+  document.getElementById("jax-resCount").textContent=f.length+" signals";
+  const grid = document.getElementById("jax-results");
+  if(!f.length){ grid.innerHTML='<div class="empty">No JAX signals found yet.</div>'; return; }
+
+  grid.innerHTML=f.map((s,i)=>{
+    const bullBg = s.bullScore>=5?"var(--green2)":s.bullScore>=4?"#64DD17":s.bullScore>=3?"var(--yellow)":"var(--orange)";
+    const trigger= s.utBuy?"🟢 UTBuy fired":s.stFlipped?"🟢 ST Flip":"🟢 Signal";
+    const sessBadge=s.session==="premarket"?'<span class="badge pm">🌅 PRE-MKT</span>':s.session==="afterhours"?'<span class="badge ah">🌙 AH</span>':'<span class="badge live">🔴 LIVE</span>';
+    return `<div class="card jax" onclick="window.open('https://www.tradingview.com/chart/?symbol=${s.sym}','_blank')">
+      <div class="card-hdr">
+        <div class="card-left">
+          <div class="card-ticker">${s.sym}</div>
+          <span class="grade" style="background:${bullBg};color:#000">🟢 BULL ${s.bullScore}/5</span>
+          <div class="card-hint" style="display:flex;gap:6px;align-items:center">
+            <span>#${i+1} · CLICK → TRADINGVIEW</span>
+            <button class="log-btn" onclick="event.stopPropagation();logToJournal({sym:'${s.sym}',price:${s.price},score:s.bullScore+'/5',source:'jax',greenArrow:true})">📓 LOG</button>
+          </div>
+        </div>
+        <div class="card-right">
+          <div class="card-price">$${s.price.toFixed(2)}</div>
+          ${sessBadge}
+          <div class="card-chg ${s.change>=0?"up":"dn"}">${s.change>=0?"▲":"▼"}${Math.abs(s.change).toFixed(2)}%</div>
+        </div>
+      </div>
+      <div class="badges">
+        <span class="badge jax jax-pulse">${trigger}</span>
+        ${s.pctHi<-25?'<span class="badge" style="background:rgba(0,176,255,0.12);color:var(--blue);border:1px solid rgba(0,176,255,0.3)">📉 '+s.pctHi.toFixed(0)+'% off hi</span>':''}
+        ${s.emaRising?'<span class="badge" style="background:rgba(0,200,83,0.1);color:var(--green2);border:1px solid rgba(0,200,83,0.2)">↑ EMA RISING</span>':''}
+      </div>
+      <div class="bars-grid">
+        <div class="bar-item">
+          <div class="bar-lbl">RSI 14 (no restriction)</div>
+          <div class="bar-row">
+            <div class="bar-track"><div class="bar-fill" style="width:${s.rsi}%;background:${s.rsi<45?"var(--green2)":s.rsi<55?"var(--yellow)":s.rsi>70?"var(--red)":"var(--blue)"}"></div></div>
+            <span class="bar-val" style="color:${s.rsi<45?"var(--green2)":s.rsi<55?"var(--yellow)":s.rsi>70?"var(--red)":"var(--blue)"}">${s.rsi.toFixed(1)}</span>
+          </div>
+        </div>
+        <div class="bar-item">
+          <div class="bar-lbl">ATR Trail Stop</div>
+          <div class="bar-row">
+            <span style="font-size:10px;color:var(--green2);font-weight:700">$${s.trailVal.toFixed(2)}</span>
+            <span style="font-size:8px;color:var(--muted);margin-left:6px">stop level</span>
+          </div>
+        </div>
+      </div>
+      <div class="jax-panel active">
+        <div class="jax-title" style="color:var(--green2)">
+          🟢 JAX PRO CONFIRMED <span style="float:right">${s.bullScore}/5</span>
+        </div>
+        <div class="jax-conditions">
+          <span class="jax-c ${s.emaStack?"pass":"fail"}">EMA STACK</span>
+          <span class="jax-c ${s.macdBull?"pass":"fail"}">MACD+</span>
+          <span class="jax-c ${s.rsiBull?"pass":"fail"}">RSI&gt;50</span>
+          <span class="jax-c ${s.wrBull?"pass":"fail"}">WR&gt;-50</span>
+          <span class="jax-c ${s.stBull?"pass":"fail"}">SUPERTREND</span>
+        </div>
+        <div class="jax-trail">
+          Trail $${s.trailVal.toFixed(2)} · ${s.utBuy?"🟢 UTBuy fired!":s.stFlipped?"🟢 ST Flip!":"Signal active"}
+          <span style="float:right;color:var(--muted)">52w hi $${s.high52.toFixed(2)} · ${s.pctHi.toFixed(0)}% off</span>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
 
 loadSaved();
 renderWatchlistUI();
