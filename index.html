@@ -3742,24 +3742,31 @@ function loadJAX(){
   document.addEventListener("firebaseReady", async()=>{
     try{
       const fb = await window.fbLoad("jax_scan");
-      if(fb && fb.data && fb.data.length > 0){
-        jaxResults = fb.data;
-        localStorage.setItem("cs_jax", JSON.stringify(jaxResults));
-        const el = document.getElementById("jax-savedBanner");
-        const fb2 = document.getElementById("jax-filterBar");
-        if(el){ el.style.display="block"; el.textContent="☁️ "+(fb.device||"cloud")+" · "+new Date(fb.savedAt).toLocaleString()+" — "+jaxResults.length+" signals"; }
-        if(fb2) fb2.style.display="flex";
-        renderJAX();
-      }
-      window.fbListen("jax_scan", (fb)=>{
-        if(fb && fb.data && fb.data.length > 0){
-          jaxResults = fb.data;
+      if(fb && fb.data){
+        // fb.data is a JSON string — parse it to array
+        const parsed = typeof fb.data === "string" ? JSON.parse(fb.data) : fb.data;
+        if(Array.isArray(parsed) && parsed.length > 0){
+          jaxResults = parsed;
           localStorage.setItem("cs_jax", JSON.stringify(jaxResults));
           const el = document.getElementById("jax-savedBanner");
           const fb2 = document.getElementById("jax-filterBar");
-          if(el){ el.style.display="block"; el.textContent="🔴 LIVE from "+(fb.device||"cloud")+" · "+new Date(fb.savedAt).toLocaleTimeString(); }
+          if(el){ el.style.display="block"; el.textContent="☁️ "+(fb.device||"cloud")+" · "+new Date(fb.savedAt).toLocaleString()+" — "+jaxResults.length+" signals"; }
           if(fb2) fb2.style.display="flex";
           renderJAX();
+        }
+      }
+      window.fbListen("jax_scan", (fb)=>{
+        if(fb && fb.data){
+          const parsed = typeof fb.data === "string" ? JSON.parse(fb.data) : fb.data;
+          if(Array.isArray(parsed) && parsed.length > 0){
+            jaxResults = parsed;
+            localStorage.setItem("cs_jax", JSON.stringify(jaxResults));
+            const el = document.getElementById("jax-savedBanner");
+            const fb2 = document.getElementById("jax-filterBar");
+            if(el){ el.style.display="block"; el.textContent="🔴 LIVE from "+(fb.device||"cloud")+" · "+new Date(fb.savedAt).toLocaleTimeString()+" — "+jaxResults.length+" signals"; }
+            if(fb2) fb2.style.display="flex";
+            renderJAX();
+          }
         }
       });
     }catch(e){ console.warn("JAX Firebase:", e); }
