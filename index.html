@@ -3056,10 +3056,16 @@ function loadJournal(){
       }
       // Real-time sync
       window.fbListen("journal", (fb)=>{
-        if(fb.data && fb.data.length > 0){
-          journalEntries = fb.data;
-          localStorage.setItem("cs_journal", JSON.stringify(journalEntries));
-          renderJournal();
+        if(fb.data !== undefined){
+          const localClearedStr = localStorage.getItem("cs_journal_cleared");
+          const localCleared = localClearedStr ? new Date(localClearedStr).getTime() : 0;
+          const fbSavedAt = new Date(fb.savedAt||0).getTime();
+          if(fb.data.length === 0 || (fb.data.length > 0 && fbSavedAt > localCleared)){
+            journalEntries = fb.data;
+            localStorage.setItem("cs_journal", JSON.stringify(journalEntries));
+            renderJournal();
+            if(fb.data.length === 0) showToast("📓 Journal cleared");
+          }
         }
       });
     }catch(e){}
@@ -3175,8 +3181,16 @@ function deleteEntry(id){
 function clearJournal(){
   if(!confirm("Clear entire journal? This cannot be undone.")) return;
   journalEntries = [];
-  saveJournal();
+  try{
+    localStorage.setItem("cs_journal", JSON.stringify([]));
+    localStorage.setItem("cs_journal_cleared", new Date().toISOString());
+  }catch(e){}
+  if(window.firebaseReady){
+    window.fbSave("journal", []);
+    window.fbSave("journal_cleared", {time: new Date().toISOString()});
+  }
   renderJournal();
+  showToast("📓 Journal cleared on all devices");
 }
 
 function renderJournal(){
