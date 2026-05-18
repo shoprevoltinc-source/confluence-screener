@@ -128,12 +128,12 @@ body::before{
 .hdr{
   background:linear-gradient(180deg,#060c18 0%,#080d16 100%);
   border-bottom:1px solid var(--border2);
-  padding:0 20px;
+  padding:0 12px;
   position:sticky;top:0;z-index:99;
 }
 .hdr-top{
   display:flex;justify-content:space-between;align-items:center;
-  height:52px;
+  height:52px;overflow:hidden;gap:8px;
 }
 .logo{
   font-family:var(--sans);
@@ -155,7 +155,7 @@ body::before{
   margin-top:1px;font-family:var(--mono)
 }
 .hstats{
-  display:flex;gap:24px;align-items:center;
+  display:flex;gap:16px;align-items:center;flex-shrink:1;min-width:0;
 }
 .hs{text-align:center}
 .hs-v{
@@ -737,6 +737,14 @@ pre.dout{
 
 /* Mobile */
 @media(max-width:768px){
+  /* Header */
+  .hdr-top{height:auto;padding:8px 0;gap:6px}
+  .logo{font-size:13px;letter-spacing:1px}
+  .logo-sub{font-size:7px;letter-spacing:1px}
+  .hstats{gap:8px}
+  .hs-v{font-size:14px}
+  .hs-l{font-size:6px;letter-spacing:0.5px}
+  .hdr-right{display:none}
   /* Controls scroll on mobile */
   .controls{overflow-x:auto;flex-wrap:nowrap;padding:8px 12px;gap:5px;-webkit-overflow-scrolling:touch}
   .controls::-webkit-scrollbar{display:none}
