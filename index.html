@@ -731,13 +731,35 @@ pre.dout{
 .log-btn:hover{background:rgba(0,200,83,0.08)}
 
 /* Mobile */
-@media(max-width:600px){
+@media(max-width:768px){
+  /* Journal table — horizontal scroll on mobile */
+  .jnl-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .jnl-table{min-width:700px;font-size:9px}
+  .jnl-table th{padding:6px 8px;font-size:7px;letter-spacing:1px}
+  .jnl-table td{padding:7px 8px}
+  .jnl-sym{font-size:11px}
+  .jnl-score{font-size:7px;padding:1px 4px}
+  .jnl-result-input{width:58px;font-size:9px;padding:2px 4px}
+  /* Hide less important columns on mobile */
+  .jnl-hide-mobile{display:none}
+  /* Journal toolbar wraps */
+  .jnl-toolbar{gap:5px}
+  .jnl-toolbar input{width:65px}
+  .jnl-stats{gap:10px;padding:8px 12px}
+  .jnl-stat-v{font-size:16px}
+  /* Controls */
+  .controls{padding:8px 12px;gap:5px}
+  /* Results */
+  .results{padding:10px 12px}
+  /* Header stats */
   .hstats{gap:12px}
   .hs-v{font-size:16px}
+  /* Alerts */
   .alerts-grid{grid-template-columns:1fr}
   .alerts-col+.alerts-col{border-left:none;border-top:1px solid var(--border)}
-  .results{padding:10px 12px}
-  .controls{padding:8px 12px}
+  /* Session tabs wrap */
+  .session-tabs{flex-wrap:wrap;gap:3px}
+  .stab{font-size:7px;padding:2px 6px}
 }
 </style>
 </head>
@@ -974,6 +996,10 @@ pre.dout{
     <option value="atr">ATR Tightest</option>
     <option value="volspike">Daily Vol Spike</option>
   </select>
+  <input type="text" class="search-input" id="c-tickerSearch" 
+    placeholder="🔍 ticker..." 
+    oninput="renderCatalyst()" 
+    style="width:110px;margin-left:4px">
   <span class="res-count" id="c-resCount"></span>
 </div>
 
@@ -1030,8 +1056,11 @@ pre.dout{
   <span class="ctrl-label">SESSION</span>
   <select id="alertSession">
     <option value="premarket">🌅 6AM Pre-Market</option>
-    <option value="open">🟢 9:45AM Open</option>
-    <option value="manual">Manual</option>
+    <option value="open">🟢 9:45AM Market Open</option>
+    <option value="midday">☀️ 12PM Midday</option>
+    <option value="afternoon">🕑 2PM Afternoon</option>
+    <option value="preclose">🔔 3:30PM Pre-Close</option>
+    <option value="manual">📊 Manual</option>
   </select>
   <span class="ctrl-label">MIN MOVE</span>
   <select id="alertMinMove">
@@ -1065,11 +1094,17 @@ pre.dout{
     <div class="col-hdr">
       <span class="col-title">🔔 MOVERS</span>
       <span class="col-time" id="alertTime"></span>
+      <input type="text" id="alert-search" placeholder="🔍 ticker..."
+        style="width:90px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:2px 6px;font-family:var(--mono);font-size:8px;border-radius:2px"
+        oninput="renderAlerts(sessionAlerts[activeSession]?.alerts||[])">
       <button class="btn-compare" onclick="showComparison()">📊 COMPARE</button>
     </div>
     <div class="session-tabs">
       <button class="stab on" id="ses-tab-pm" onclick="showSession('premarket',this)">🌅 6AM</button>
-      <button class="stab" id="ses-tab-open" onclick="showSession('open',this)">🟢 9:45AM</button>
+      <button class="stab" id="ses-tab-open" onclick="showSession('open',this)">🟢 9:45</button>
+      <button class="stab" id="ses-tab-mid" onclick="showSession('midday',this)">☀️ 12PM</button>
+      <button class="stab" id="ses-tab-aft" onclick="showSession('afternoon',this)">🕑 2PM</button>
+      <button class="stab" id="ses-tab-pre" onclick="showSession('preclose',this)">🔔 3:30</button>
     </div>
     <div id="alertResults">
       <div style="font-size:9px;color:var(--muted);padding:20px 0;text-align:center;letter-spacing:1px">
@@ -1112,22 +1147,41 @@ pre.dout{
 <div class="tab-panel" id="panel-journal">
 
 <div class="jnl-toolbar">
-  <input type="text" id="jnl-sym-input" placeholder="TICKER" 
-    style="width:90px;text-transform:uppercase;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 8px;font-family:var(--mono);font-size:10px;border-radius:2px"
+  <input type="text" id="jnl-sym-input" placeholder="TICKER"
+    style="width:75px;text-transform:uppercase;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 8px;font-family:var(--mono);font-size:10px;border-radius:2px"
     onkeydown="if(event.key==='Enter')document.getElementById('jnl-price-input').focus()">
-  <input type="number" id="jnl-price-input" placeholder="ENTRY $" 
-    style="width:90px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 8px;font-family:var(--mono);font-size:10px;border-radius:2px"
+  <input type="number" id="jnl-price-input" placeholder="ENTRY $"
+    style="width:80px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 8px;font-family:var(--mono);font-size:10px;border-radius:2px"
+    onkeydown="if(event.key==='Enter')document.getElementById('jnl-stop-input').focus()">
+  <input type="number" id="jnl-stop-input" placeholder="STOP $"
+    style="width:75px;background:var(--bg3);border:1px solid rgba(255,23,68,0.3);color:var(--red);padding:6px 8px;font-family:var(--mono);font-size:10px;border-radius:2px"
+    onkeydown="if(event.key==='Enter')document.getElementById('jnl-t1-input').focus()">
+  <input type="number" id="jnl-t1-input" placeholder="TARGET 1"
+    style="width:80px;background:var(--bg3);border:1px solid rgba(0,200,83,0.2);color:var(--green2);padding:6px 8px;font-family:var(--mono);font-size:10px;border-radius:2px"
+    onkeydown="if(event.key==='Enter')document.getElementById('jnl-t2-input').focus()">
+  <input type="number" id="jnl-t2-input" placeholder="TARGET 2"
+    style="width:80px;background:var(--bg3);border:1px solid rgba(0,200,83,0.15);color:#64DD17;padding:6px 8px;font-family:var(--mono);font-size:10px;border-radius:2px"
     onkeydown="if(event.key==='Enter')addManualEntry()">
+  <select id="jnl-type-input" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text2);padding:6px 8px;font-family:var(--mono);font-size:9px;border-radius:2px">
+    <option value="">Type</option>
+    <option value="Catalyst">⚡ Catalyst</option>
+    <option value="Deep Bounce">📉 Deep Bounce</option>
+    <option value="Swing">📈 Swing</option>
+    <option value="Watchlist">👀 Watchlist</option>
+  </select>
   <button class="btn-scan" onclick="addManualEntry()" style="font-size:9px;padding:6px 14px">+ LOG</button>
   <button class="btn-clear" onclick="clearJournal()">🗑 CLEAR ALL</button>
   <button class="btn-scan" onclick="fetchClosingPrices()" style="font-size:9px;padding:6px 14px;background:linear-gradient(135deg,#1565C0,#1976D2);box-shadow:0 0 12px rgba(21,101,192,0.3)">🔄 UPDATE PRICES</button>
   <span style="font-size:8px;color:var(--muted2);margin-left:8px;letter-spacing:1px">
     Auto-updates at <span style="color:var(--blue)">4:15 PM ET</span> · or tap UPDATE PRICES anytime · Syncs via Firebase
   </span>
+  <input type="text" id="jnl-search" placeholder="🔍 search ticker..."
+    style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:5px 8px;font-family:var(--mono);font-size:9px;border-radius:2px;width:130px;margin-left:8px"
+    oninput="renderJournal()">
   <span id="jnl-last-update" style="font-size:8px;color:var(--muted);margin-left:auto"></span>
 </div>
 
-<div class="jnl-stats">
+<div class="jnl-stats" style="flex-wrap:wrap">
   <div class="jnl-stat"><div class="jnl-stat-v" id="jnl-total" style="color:var(--blue)">0</div><div class="jnl-stat-l">TOTAL LOGGED</div></div>
   <div class="jnl-stat"><div class="jnl-stat-v" id="jnl-wins" style="color:var(--green2)">0</div><div class="jnl-stat-l">WINS</div></div>
   <div class="jnl-stat"><div class="jnl-stat-v" id="jnl-losses" style="color:var(--red)">0</div><div class="jnl-stat-l">LOSSES</div></div>
@@ -1136,24 +1190,27 @@ pre.dout{
   <div class="jnl-stat"><div class="jnl-stat-v" id="jnl-avgloss" style="color:var(--red)">—</div><div class="jnl-stat-l">AVG LOSS</div></div>
 </div>
 
-<div style="overflow-x:auto;padding:0 20px 20px">
+<div class="jnl-table-wrap" style="padding:0 20px 20px">
   <table class="jnl-table">
     <thead>
       <tr>
         <th>DATE</th>
         <th>TICKER</th>
+        <th>TYPE</th>
         <th>ENTRY $</th>
+        <th>STOP $</th>
+        <th>TARGET 1</th>
+        <th class="jnl-hide-mobile">TARGET 2</th>
         <th>CLOSE $</th>
         <th>SCORE</th>
-        <th>SOURCE</th>
-        <th>SESSION</th>
         <th>RESULT %</th>
+        <th class="jnl-hide-mobile">R:R</th>
         <th>STATUS</th>
         <th></th>
       </tr>
     </thead>
     <tbody id="jnl-body">
-      <tr><td colspan="10" class="jnl-empty">
+      <tr><td colspan="13" class="jnl-empty">
         <span style="font-size:24px;display:block;margin-bottom:8px">📓</span>
         No entries yet — click LOG on any screener card<br>
         <span style="font-size:8px;color:var(--muted)">Every flagged stock gets logged automatically with price, score, and source</span>
@@ -1396,7 +1453,7 @@ function renderWatchlistUI(){
 // Based on QUBT/MGNX/NVTS/AMPX pattern analysis
 
 const SECTORS = {
-  "Quantum/AI":    ["QUBT","IONQ","RGTI","SOUN","BBAI","ARQQ","QBTS","CRKN","LPSN","MTTR","AAOI","COHU","FORM","SMTC","VIAV","CEVA","PLAB","DIOD","VRNT","DM"],
+  "Quantum/AI":    ["QUBT","IONQ","RGTI","SOUN","BBAI","ARQQ","QBTS","LPSN","MTTR","AAOI","COHU","FORM","SMTC","VIAV","CEVA","PLAB","DIOD","VRNT"],
   "Defense/Gov":   ["MRAM","KTOS","AVAV","RCAT","ASTS","LUNR","RDW","SPIR","BBAI","CDRE","DRS","CACI","SAIC","BWXT","AXON","HWM","TDG","ACHR","JOBY","LILM"],
   "Biotech":       ["MGNX","RXRX","DNLI","BEAM","EDIT","CRSP","NTLA","VERV","NUVL","ALLO","HIMS","OCGN","NVAX","VXRT","INO","PSNL","BLUE","ARVN","PRTA","IMVT","KYMR","PTGX","RCKT","SAGE","TGTX","IOVA","APLS","FOLD","DAWN","YMAB"],
   "Semiconductors":["NVTS","AMPX","SMTC","AAOI","COHU","FORM","ONTO","ACMR","IIVI","PLAB","DIOD","CEVA","VIAV","POWI","MAXN","AEVA","LAZR","MVIS","OUST","AMKR","WOLF","AMBA","SLAB","SITM","NXPI"],
@@ -1406,16 +1463,16 @@ const SECTORS = {
   "Mid-Cap Tech":  ["CRWD","DDOG","ZS","GTLB","BILL","DOCS","BRZE","SEMR","CFLT","ASAN","SMAR","WEAV","ALKT","JAMF","TASK","SPSC","FOUR","ACMR","ONTO","FORM"],
   "Mid-Cap Health":["HIMS","TDOC","ACCD","PRVA","GDRX","PGNY","ONEM","CANO","TALK","ALHC","DOCS","CERT","XERS","INVA","TMDX","LUNG","NVRO","NVCR","FATE","ALLO"],
   "Mid-Cap Defense":["KTOS","AVAV","CDRE","BWXT","CACI","DRS","LDOS","SAIC","HWM","TDG","AXON","ACHR","JOBY","RDW","ASTS","SPIR","LUNR","RCAT","BBAI","MRCY"],
-  "Mid-Cap Energy": ["CWEN","BE","ARRY","NOVA","SHLS","STEM","FLNC","GPRE","AMRC","REGI","CLNE","GEVO","REX","HYLN","EVGO","BLNK","CHPT"],
-  "Comm Services":  ["DISH","LUMN","VSAT","IRDM","GSAT","SHEN","IDT","SPOK","OOMA","LMND","GOGO","MNRO","TMUS","SATS","XPOF","ATEX","LIQT","AVNW","NTELOS","CLFD"],
-  "Fiber/Optical":  ["LITE","AAOI","VIAV","CIEN","INFN","CRDO","POET","ANGO","IIVI","COHU","FORM","ADTN","CASA","DZSI","FYBR","AAON","CALX","NTGR","COMM","GLOW"]
+  "Mid-Cap Energy": ["CWEN","BE","ARRY","NOVA","SHLS","STEM","FLNC","GPRE","AMRC","REGI","CLNE","GEVO","EVGO","BLNK","CHPT"],
+  "Comm Services":  ["DISH","LUMN","VSAT","IRDM","GSAT","SHEN","IDT","SPOK","OOMA","LMND","GOGO","TMUS","SATS","AVNW","CLFD"],
+  "Fiber/Optical":  ["LITE","AAOI","VIAV","CIEN","INFN","CRDO","POET","ANGO","IIVI","COHU","FORM","ADTN","CASA","DZSI","FYBR","CALX","NTGR","COMM"]
 };
 
 // Combined flat list — Small Cap ($2-$25) + Mid Cap ($25-$75) = full catalyst universe
 const SMALLCAP = [...new Set([
   // Small Cap — explosive catalyst plays
   "MRAM","KTOS","AVAV","RCAT","ACHR","JOBY","ASTS","LUNR","RDW","SPIR",
-  "BBAI","CDRE","QUBT","IONQ","RGTI","SOUN","ARQQ","QBTS","CRKN","VRNT",
+  "BBAI","CDRE","QUBT","IONQ","RGTI","SOUN","ARQQ","QBTS","VRNT",
   "MGNX","RXRX","DNLI","BEAM","EDIT","CRSP","NTLA","VERV","NUVL","ALLO",
   "HIMS","OCGN","NVAX","VXRT","INO","PSNL","BLUE","ARVN","PRTA","IMVT",
   "KYMR","PTGX","RCKT","SAGE","TGTX","IOVA","APLS","FOLD","DAWN","YMAB",
@@ -1431,13 +1488,10 @@ const SMALLCAP = [...new Set([
   "TMDX","NVCR","MRCY","GEVO","CLNE","REGI","AXON","SITM","NXPI","AMKR",
   "HIMS","NVRO","FATE","CWEN","ARRY","NOVA","SHLS","STEM","FLNC","ONTO",
   // Comm Services
-  "DISH","LUMN","VSAT","IRDM","GSAT","SHEN","IDT","OOMA","GOGO","AVNW","CLFD","ATEX",
-  // Fiber/Optical — AI infrastructure buildout
+  "DISH","LUMN","VSAT","IRDM","GSAT","SHEN","IDT","OOMA","GOGO","AVNW","CLFD",// Fiber/Optical — AI infrastructure buildout
   "LITE","AAOI","VIAV","CIEN","INFN","CRDO","POET","ANGO","ADTN","CASA","DZSI","FYBR","CALX","COMM",
-  "IIVI","NTGR","AAON","GLOW",
-  // Comm Services additions
-  "TMUS","SATS","SPOK","XPOF","LIQT","NTELOS","MNRO"
-])];
+  "IIVI","NTGR",// Comm Services additions
+  "TMUS","SATS","SPOK"])];
 
 // ── State ───────────────────────────────────────────────────
 let rResults=[], cResults=[], stopReq=false, isRunning=false;
@@ -1502,13 +1556,15 @@ async function loadSaved(){
     const cr  = localStorage.getItem("cs_catalyst");
     const at  = localStorage.getItem("cs_saved_at");
     // Load alert sessions from localStorage instantly
-    for(const sk of ["premarket","open"]){
+    for(const sk of ["premarket","open","midday","afternoon","preclose"]){
       try{
         const raw = localStorage.getItem("cs_alerts_"+sk);
         if(raw){
           const parsed = JSON.parse(raw);
-          sessionAlerts[sk].alerts = parsed.alerts||[];
-          sessionAlerts[sk].time   = new Date(parsed.time).toLocaleTimeString();
+          if(sessionAlerts[sk]){
+            sessionAlerts[sk].alerts = parsed.alerts||[];
+            sessionAlerts[sk].time   = new Date(parsed.time).toLocaleTimeString();
+          }
         }
       }catch(e){}
     }
@@ -1599,22 +1655,18 @@ async function loadSaved(){
           }catch(e){}
         }
 
-        // Real-time alert listener — phone sees laptop's alerts instantly
-        window.fbListen("alerts_premarket", (fb)=>{
-          if(fb.data && fb.data.alerts){
-            sessionAlerts.premarket.alerts = fb.data.alerts;
-            sessionAlerts.premarket.time   = new Date(fb.data.time).toLocaleTimeString();
-            if(activeSession==="premarket") renderAlerts(fb.data.alerts);
-            log("🔴 LIVE pre-market alerts synced from another device","info","a");
-          }
-        });
-        window.fbListen("alerts_open", (fb)=>{
-          if(fb.data && fb.data.alerts){
-            sessionAlerts.open.alerts = fb.data.alerts;
-            sessionAlerts.open.time   = new Date(fb.data.time).toLocaleTimeString();
-            if(activeSession==="open") renderAlerts(fb.data.alerts);
-            log("🔴 LIVE market-open alerts synced from another device","info","a");
-          }
+        // Real-time alert listeners for all sessions
+        ["premarket","open","midday","afternoon","preclose"].forEach(sk=>{
+          window.fbListen("alerts_"+sk, (fb)=>{
+            if(fb.data && fb.data.alerts){
+              if(sessionAlerts[sk]){
+                sessionAlerts[sk].alerts = fb.data.alerts;
+                sessionAlerts[sk].time   = new Date(fb.data.time).toLocaleTimeString();
+                if(activeSession===sk) renderAlerts(fb.data.alerts);
+                log("🔴 LIVE "+sk+" alerts synced","info","a");
+              }
+            }
+          });
         });
 
         // ── GitHub Actions JAX monitor alerts ──────────────────────────────
@@ -2255,9 +2307,7 @@ async function debugRecovery(sym){
         (s.jaxWrBull?"✅":"❌")+" WR > -50  ("+s.wr.toFixed(1)+")",
         (s.jaxStBull?"✅":"❌")+" SuperTrend bullish",
         "Bull Score: "+s.bullScore+"/5",
-        "ATR Trail:  $"+s.jaxTrail.toFixed(2)+" · "+(s.jaxUtBuy?"🟢 UTBuy fired!":s.jaxStFlip?"🟢 ST Flipped!":"Waiting for flip"),
-      ]:["Need 70+ bars for JAX PRO (have "+bars+")"]),
-    ].join("\n");
+        "ATR Trail:  $"+s.jaxTrail.toFixed(2)+" · "+(s.jaxUtBuy?"🟢 UTBuy fired!":s.jaxStFlip?"🟢 ST Flipped!":"Waiting for flip")]:["Need 70+ bars for JAX PRO (have "+bars+")"])].join("\n");
   }catch(e){out.style.color="#FF5252";out.textContent=sym+" ERROR: "+e.message;}
 }
 
@@ -2488,9 +2538,11 @@ function setCFilter(v,btn){
 }
 
 function renderCatalyst(){
-  const sort=document.getElementById("c-sortSel")?.value||"score";
+  const sort=document.getElementById("c-sortSel")?.value||"heat";
+  const catSearch=(document.getElementById("c-tickerSearch")?.value||"").toUpperCase().trim();
   let f=[...cResults];
   if(cFilter!=="all") f=f.filter(r=>r.score===cFilter);
+  if(catSearch) f=f.filter(r=>r.sym.includes(catSearch));
   f.sort((a,b)=>{
     if(sort==="rvol")     return b.rvolNow-a.rvolNow;
     if(sort==="earnings") return (a.earningsDays||999)-(b.earningsDays||999);
@@ -2688,8 +2740,11 @@ function sendNotification(title, body, sym){
 
 // Session storage for comparison
 let sessionAlerts = {
-  premarket: { alerts:[], time:null, label:"6AM Pre-Market" },
-  open:      { alerts:[], time:null, label:"9:45AM Market Open" }
+  premarket:  { alerts:[], time:null, label:"6AM Pre-Market" },
+  open:       { alerts:[], time:null, label:"9:45AM Market Open" },
+  midday:     { alerts:[], time:null, label:"12PM Midday" },
+  afternoon:  { alerts:[], time:null, label:"2PM Afternoon" },
+  preclose:   { alerts:[], time:null, label:"3:30PM Pre-Close" }
 };
 let activeSession = "premarket";
 
@@ -2894,6 +2949,8 @@ async function runMorningAlerts(){
 
 function renderAlerts(alerts){
   const el = document.getElementById("alertResults");
+  const alertSearch = (document.getElementById("alert-search")?.value||"").toUpperCase().trim();
+  if(alertSearch) alerts = alerts.filter(a=>a.sym.includes(alertSearch));
   if(!alerts.length){
     el.innerHTML='<div style="font-size:10px;color:#546E7A;padding:20px 0;text-align:center">No movers above threshold yet...</div>';
     return;
@@ -3050,6 +3107,11 @@ function logToJournal(entry){
     session: entry.session||getMarketSession(),
     greenArrow: entry.greenArrow||false,
     heat: entry.heat||0,
+    tradeType: entry.tradeType||"",
+    stopLoss: entry.stopLoss||"",
+    target1: entry.target1||"",
+    target2: entry.target2||"",
+    notes: entry.notes||"",
     result: "", status: "open",
     loggedAt: new Date().toISOString()
   });
@@ -3062,13 +3124,22 @@ function logToJournal(entry){
 function addManualEntry(){
   const symEl   = document.getElementById("jnl-sym-input");
   const priceEl = document.getElementById("jnl-price-input");
-  const sym   = symEl?.value.trim().toUpperCase();
-  const price = parseFloat(priceEl?.value);
+  const stopEl  = document.getElementById("jnl-stop-input");
+  const t1El    = document.getElementById("jnl-t1-input");
+  const t2El    = document.getElementById("jnl-t2-input");
+  const typeEl  = document.getElementById("jnl-type-input");
+  const sym     = symEl?.value.trim().toUpperCase();
+  const price   = parseFloat(priceEl?.value);
   if(!sym){ symEl?.focus(); return; }
   if(isNaN(price)||price<=0){ priceEl?.focus(); return; }
-  logToJournal({sym, price, score:"?", source:"manual", session:getMarketSession()});
-  if(symEl)   symEl.value   = "";
-  if(priceEl) priceEl.value = "";
+  const stopLoss  = parseFloat(stopEl?.value)||"";
+  const target1   = parseFloat(t1El?.value)||"";
+  const target2   = parseFloat(t2El?.value)||"";
+  const tradeType = typeEl?.value||"";
+  logToJournal({sym, price, score:"?", source:"manual",
+    session:getMarketSession(), stopLoss, target1, target2, tradeType});
+  [symEl,priceEl,stopEl,t1El,t2El].forEach(el=>{ if(el) el.value=""; });
+  if(typeEl) typeEl.value="";
   symEl?.focus();
 }
 
@@ -3083,6 +3154,14 @@ function updateResult(id, val){
     entry.result = val;
     entry.status = "open";
   }
+  saveJournal();
+  renderJournal();
+}
+
+function updateField(id, field, val){
+  const entry = journalEntries.find(e=>e.id===id);
+  if(!entry) return;
+  entry[field] = val;
   saveJournal();
   renderJournal();
 }
@@ -3103,6 +3182,7 @@ function clearJournal(){
 function renderJournal(){
   const body = document.getElementById("jnl-body");
   if(!body) return;
+  const jnlSearch = (document.getElementById("jnl-search")?.value||"").toUpperCase().trim();
 
   // Stats
   const closed = journalEntries.filter(e=>e.status==="win"||e.status==="loss");
@@ -3119,6 +3199,10 @@ function renderJournal(){
   document.getElementById("jnl-avgwin").textContent   = avgWin  ? "+"+avgWin+"%" : "—";
   document.getElementById("jnl-avgloss").textContent  = avgLoss ? avgLoss+"%" : "—";
 
+  const filteredEntries = jnlSearch
+    ? journalEntries.filter(e=>e.sym.includes(jnlSearch))
+    : journalEntries;
+
   if(!journalEntries.length){
     body.innerHTML = `<tr><td colspan="9" class="jnl-empty">
       <span style="font-size:24px;display:block;margin-bottom:8px">📓</span>
@@ -3128,25 +3212,65 @@ function renderJournal(){
     return;
   }
 
-  body.innerHTML = journalEntries.map(e=>{
+  body.innerHTML = filteredEntries.map(e=>{
     const resultPct = parseFloat(e.result);
     const hasResult = !isNaN(resultPct) && e.result!=="";
     const resultColor = hasResult ? (resultPct>0?"var(--green2)":resultPct<0?"var(--red)":"var(--muted)") : "var(--muted)";
     const rowCls = e.status==="win"?"win":e.status==="loss"?"loss":"open";
     const scoreBg = e.score>=6?"var(--green2)":e.score>=5?"var(--yellow)":e.score>=4?"var(--orange)":"var(--muted)";
     const scoreColor = e.score>=5?"#000":"#fff";
-    const sessBadge = e.session==="premarket"?"🌅 6AM":e.session==="open"?"🟢 9:45AM":"📊 Manual";
+    // Risk:Reward calculation
+    const ep = parseFloat(e.price)||0;
+    const sl = parseFloat(e.stopLoss)||0;
+    const t1 = parseFloat(e.target1)||0;
+    const risk    = sl>0&&ep>0 ? ep-sl : 0;
+    const reward  = t1>0&&ep>0 ? t1-ep : 0;
+    const rrRatio = risk>0&&reward>0 ? (reward/risk).toFixed(1)+"R" : "—";
+    const rrColor = risk>0&&reward>0 ? (reward/risk>=2?"var(--green2)":reward/risk>=1?"var(--yellow)":"var(--red)") : "var(--muted)";
+    // Type badge
+    const typeBg = e.tradeType==="Catalyst"?"rgba(255,109,0,0.15)":e.tradeType==="Deep Bounce"?"rgba(0,176,255,0.15)":e.tradeType==="Swing"?"rgba(0,200,83,0.12)":"var(--bg3)";
+    const typeColor = e.tradeType==="Catalyst"?"var(--orange)":e.tradeType==="Deep Bounce"?"var(--blue)":e.tradeType==="Swing"?"var(--green2)":"var(--muted)";
     return `<tr class="${rowCls}">
       <td style="color:var(--muted2);white-space:nowrap">${e.date}</td>
       <td>
         <span class="jnl-sym" style="cursor:pointer" onclick="window.open('https://www.tradingview.com/chart/?symbol=${e.sym}','_blank')">${e.sym}</span>
         ${e.greenArrow?'<span class="badge jax" style="font-size:7px;padding:1px 4px;margin-left:4px">🟢</span>':''}
       </td>
-      <td style="font-weight:700">$${parseFloat(e.price).toFixed(2)}</td>
-      <td style="color:${e.closePrice?(parseFloat(e.closePrice)>parseFloat(e.price)?"var(--green2)":"var(--red)"):"var(--muted)"}">${e.closePrice?"$"+parseFloat(e.closePrice).toFixed(2):"—"}</td>
+      <td>
+        ${e.tradeType?`<span style="font-size:8px;padding:1px 6px;border-radius:1px;background:${typeBg};color:${typeColor}">${e.tradeType}</span>`:"<span style='color:var(--muted);font-size:8px'>—</span>"}
+        <select onchange="updateField(${e.id},'tradeType',this.value)" style="font-size:8px;background:transparent;border:none;color:var(--muted);cursor:pointer;margin-left:2px">
+          <option value="">edit</option>
+          <option value="Catalyst">⚡ Catalyst</option>
+          <option value="Deep Bounce">📉 Deep Bounce</option>
+          <option value="Swing">📈 Swing</option>
+          <option value="Watchlist">👀 Watchlist</option>
+        </select>
+      </td>
+      <td style="font-weight:700">$${ep.toFixed(2)}</td>
+      <td>
+        ${sl>0?`<span style="color:var(--red);font-size:10px">$${sl.toFixed(2)}</span>`:""}
+        <input class="jnl-result-input" type="number" value="${e.stopLoss||''}" placeholder="stop"
+          onchange="updateField(${e.id},'stopLoss',parseFloat(this.value)||'')"
+          style="width:65px;color:var(--red);border-color:rgba(255,23,68,0.2);${sl>0?'display:none':''}">
+      </td>
+      <td>
+        ${t1>0?`<span style="color:var(--green2);font-size:10px">$${t1.toFixed(2)}</span><br><span style="font-size:8px;color:var(--muted)">(+${((t1-ep)/ep*100).toFixed(1)}%)</span>`:""}
+        <input class="jnl-result-input" type="number" value="${e.target1||''}" placeholder="T1"
+          onchange="updateField(${e.id},'target1',parseFloat(this.value)||'')"
+          style="width:65px;color:var(--green2);border-color:rgba(0,200,83,0.2);${t1>0?'display:none':''}">
+      </td>
+      <td>
+        ${parseFloat(e.target2||0)>0?`<span style="color:#64DD17;font-size:10px">$${parseFloat(e.target2).toFixed(2)}</span>`:""}
+        <input class="jnl-result-input" type="number" value="${e.target2||''}" placeholder="T2"
+          onchange="updateField(${e.id},'target2',parseFloat(this.value)||'')"
+          style="width:65px;color:#64DD17;border-color:rgba(100,221,23,0.2);${parseFloat(e.target2||0)>0?'display:none':''}">
+      </td>
+      <td style="color:${e.closePrice?(parseFloat(e.closePrice)>ep?"var(--green2)":parseFloat(e.closePrice)<ep?"var(--red)":"var(--muted)"):"var(--muted)"}">
+        ${e.closePrice?"$"+parseFloat(e.closePrice).toFixed(2)+(Math.abs(parseFloat(e.result||0))<0.01?" (flat)":""):"—"}
+      </td>
       <td><span class="jnl-score" style="background:${scoreBg};color:${scoreColor}">${e.score}/6</span></td>
       <td><span class="jnl-source">${e.source}</span></td>
-      <td style="color:var(--muted2)">${sessBadge}</td>
+      <td style="color:var(--muted2);font-size:9px">${e.session==="premarket"?"🌅 6AM":e.session==="open"?"🟢 9:45AM":e.session==="manual"?"📊 Manual":"—"}</td>
       <td>
         <input class="jnl-result-input" type="text" 
           value="${e.result}" 
@@ -3154,6 +3278,14 @@ function renderJournal(){
           onchange="updateResult(${e.id}, this.value)"
           style="color:${resultColor}">
       </td>
+      <td>
+        <input class="jnl-result-input" type="text"
+          value="${e.result}"
+          placeholder="+10.5"
+          onchange="updateResult(${e.id}, this.value)"
+          style="color:${resultColor}">
+      </td>
+      <td><span style="color:${rrColor};font-size:10px;font-weight:700">${rrRatio}</span></td>
       <td>
         <span class="jnl-pct" style="color:${resultColor}">
           ${hasResult?(resultPct>0?"▲ +":"▼ ")+Math.abs(resultPct).toFixed(1)+"%":e.status==="open"?"⏳ OPEN":"—"}
@@ -3182,10 +3314,15 @@ async function fetchClosingPrices(){
         const entryPrice = parseFloat(entry.price);
         const closePrice = q.price;
         const resultPct  = ((closePrice - entryPrice) / entryPrice * 100);
-        entry.result     = resultPct.toFixed(2);
         entry.closePrice = closePrice;
         entry.closedAt   = new Date().toISOString();
-        entry.status     = resultPct >= 0 ? "win" : "loss";
+        if(Math.abs(resultPct) >= 0.01){
+          entry.result = resultPct.toFixed(2);
+          entry.status = resultPct >= 0 ? "win" : "loss";
+        } else {
+          entry.result = "0.00";
+          entry.status = "open";
+        }
         log("📓 "+entry.sym+" → close $"+closePrice.toFixed(2)+" · result "+(resultPct>=0?"+":"")+resultPct.toFixed(2)+"%","ok");
       }
     }catch(e){ log("📓 "+entry.sym+": could not fetch close","warn"); }
