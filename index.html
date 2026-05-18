@@ -1138,16 +1138,25 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
     <option value="4">4/5+</option>
     <option value="5">5/5</option>
   </select>
+  <span class="ctrl-label">MODE</span>
+  <select id="jaxMode">
+    <option value="standard">Standard</option>
+    <option value="deep">Deep Recovery</option>
+    <option value="both">Both + Merge</option>
+  </select>
+  <button class="btn-scan" id="jaxMergeBtn" onclick="mergeJAXResults()" 
+    style="display:none;font-size:9px;padding:6px 12px;background:linear-gradient(135deg,#1565C0,#1976D2);box-shadow:0 0 12px rgba(21,101,192,0.3)">
+    🔀 MERGE
+  </button>
   <input type="text" class="ctrl-input" id="jaxCustomTk" placeholder="MSFT,XOM,NOW...">
 </div>
 
 <div style="padding:7px 20px;background:rgba(0,200,83,0.04);border-bottom:1px solid rgba(0,200,83,0.15)">
-  <div style="font-size:9px;color:var(--green2);font-weight:700;letter-spacing:2px;margin-bottom:4px">🟢 JAX PRO — Pure Green Arrow Scanner</div>
-  <div style="display:flex;gap:6px;flex-wrap:wrap">
-    <span style="font-size:8px;padding:2px 8px;border-radius:1px;border:1px solid rgba(0,200,83,0.2);color:var(--muted2)">No RSI floor — catches MSFT, XOM, NOW</span>
-    <span style="font-size:8px;padding:2px 8px;border-radius:1px;border:1px solid rgba(0,200,83,0.2);color:var(--muted2)">UTBuy OR SuperTrend flip</span>
-    <span style="font-size:8px;padding:2px 8px;border-radius:1px;border:1px solid rgba(0,200,83,0.2);color:var(--muted2)">Bull score ≥ 3/5</span>
-    <span style="font-size:8px;padding:2px 8px;border-radius:1px;border:1px solid rgba(0,200,83,0.2);color:var(--muted2)">RSI &lt; 70 only</span>
+  <div style="font-size:9px;color:var(--green2);font-weight:700;letter-spacing:2px;margin-bottom:4px" id="jaxModeTitle">🟢 JAX PRO — Pure Green Arrow Scanner</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap" id="jaxModeDesc">
+    <span style="font-size:8px;padding:2px 8px;border-radius:1px;border:1px solid rgba(0,200,83,0.2);color:var(--muted2)">Standard: RSI &lt; 70</span>
+    <span style="font-size:8px;padding:2px 8px;border-radius:1px;border:1px solid rgba(0,176,255,0.2);color:var(--blue)">Deep Recovery: RSI &lt; 80 · -20%+ off high</span>
+    <span style="font-size:8px;padding:2px 8px;border-radius:1px;border:1px solid rgba(0,200,83,0.2);color:var(--muted2)">UTBuy OR ST flip · Bull ≥ 3/5</span>
   </div>
 </div>
 
@@ -3580,7 +3589,8 @@ function scoreJAX(sym, closes, highs, lows){
 
 async function startJAXScan(){
   if(isRunning) return;
-  isRunning=true; stopReq=false; jaxResults=[]; scanned=0; errCount=0;
+  const mode = document.getElementById("jaxMode")?.value || "standard";
+  isRunning=true; stopReq=false; jaxResults=[]; jaxDeepResults=[]; scanned=0; errCount=0;
   document.getElementById("jaxRunBtn").disabled=true;
   document.getElementById("jaxStopBtn").disabled=false;
   document.getElementById("jax-prog").style.display="block";
@@ -3588,6 +3598,15 @@ async function startJAXScan(){
   document.getElementById("jax-savedBanner").style.display="none";
   document.getElementById("jax-results").innerHTML="";
   document.getElementById("jax-log").innerHTML="";
+  const mb = document.getElementById("jaxMergeBtn");
+  if(mb) mb.style.display="none";
+  const titleEl = document.getElementById("jaxModeTitle");
+  if(titleEl){
+    titleEl.textContent = mode==="deep"?"🔵 JAX DEEP RECOVERY — RSI<80 · -20%+ off high":
+                          mode==="both"?"🟢🔵 BOTH MODES — Standard + Deep Recovery":
+                          "🟢 JAX PRO — Standard Mode · RSI<70";
+    titleEl.style.color = mode==="deep"?"var(--blue)":"var(--green2)";
+  }
   updateKeyStatus([0,1,2,3,4]);
 
   const listVal   = document.getElementById("jaxListSel").value;
@@ -3602,7 +3621,7 @@ async function startJAXScan(){
   const total  = tickers.length;
   let done     = 0;
 
-  log("🟢 JAX scan: "+total+" stocks · min bull "+minBull+"/5 · no RSI floor","info","jax");
+  log("🟢 JAX scan: "+total+" stocks · min bull "+minBull+"/5 · mode:"+mode.toUpperCase(),"info","jax");
   log("Catches MSFT/XOM/NOW type moves — UTBuy or ST flip","info","jax");
 
   const progInterval = setInterval(()=>{
@@ -3682,7 +3701,30 @@ async function startJAXScan(){
     document.getElementById("jax-savedBanner").textContent =
       "🟢 "+jaxResults.length+" JAX signals saved · "+new Date().toLocaleTimeString();
   }
-  log("✅ JAX scan complete — "+jaxResults.length+" green arrows found","info","jax");
+  // If mode is deep or both — run Deep Recovery scan too
+  const finalMode = document.getElementById("jaxMode")?.value || "standard";
+  if(finalMode === "deep" || finalMode === "both"){
+    if(finalMode === "deep") jaxResults = []; // deep only — clear standard results
+    document.getElementById("jax-progMsg").textContent = "Running Deep Recovery scan...";
+    document.getElementById("jax-progFill").style.background = "linear-gradient(90deg,var(--blue),#42A5F5)";
+    await startJAXDeepScan(tickers, minBull);
+
+    if(finalMode === "both" && jaxDeepResults.length > 0){
+      // Show merge button
+      const mb = document.getElementById("jaxMergeBtn");
+      if(mb) mb.style.display = "inline-block";
+    } else if(finalMode === "deep"){
+      // Render deep results directly
+      jaxResults = [...jaxDeepResults];
+      renderJAX();
+      const banner = document.getElementById("jax-savedBanner");
+      if(banner){ banner.style.display="block"; banner.textContent="🔵 "+jaxResults.length+" deep recovery signals · "+new Date().toLocaleTimeString(); }
+      document.getElementById("jax-filterBar").style.display="flex";
+    }
+  }
+
+  log("✅ JAX scan complete — "+jaxResults.length+" standard"+
+      (jaxDeepResults.length?" + "+jaxDeepResults.length+" deep":"")+" signals","info","jax");
 }
 
 function setJAXFilter(v, btn){
@@ -3715,6 +3757,120 @@ function logJAXStock(sym, price, bullScore){
   });
 }
 
+// ══════════════════════════════════════════════════════════
+// JAX DEEP RECOVERY — Separate scan, standard mode untouched
+// Relaxed RSI ceiling for beaten-down large caps
+// ZS, XOM, NOW, MSFT type plays — still deep in the hole
+// ══════════════════════════════════════════════════════════
+let jaxDeepResults = [];
+
+function scoreJAXDeep(sym, closes, highs, lows){
+  if(closes.length < 70) throw new Error("Need 70+ bars");
+  const jax   = calcJAXPRO(closes, highs, lows);
+  if(!jax) throw new Error("JAX calc failed");
+  const price  = closes[closes.length-1];
+  const prev   = closes[closes.length-2];
+  const change = ((price-prev)/prev)*100;
+  const high52 = Math.max(...highs);
+  const low52  = Math.min(...lows);
+  const pctHi  = (price-high52)/high52*100;
+  const ema21  = calcEMA(closes, 21);
+  const ema21old = calcEMA(closes.slice(0,-5), 21);
+  const rsi    = jax.rsi14 || calcRSI(closes, 14);
+
+  // ── Deep Recovery conditions (DIFFERENT from standard) ─────────────────
+  // RSI ceiling raised to 80 (vs 70 standard)
+  // Must still be -20%+ off 52w high (genuinely beaten down)
+  // Must be above EMA20 (trend turning)
+  const deepGreenArrow = (jax.atrTS.utBuy || jax.st.flipped)
+    && jax.bullScore >= 1
+    && rsi < 80          // ← relaxed from 70
+    && pctHi < -20       // ← still deep in the hole
+    && price > jax.ema20; // ← trend turning up
+
+  if(!deepGreenArrow) throw new Error("SKIP:no deep signal");
+
+  return {
+    sym, price, change, rsi,
+    greenArrow:  true,
+    bullScore:   jax.bullScore,
+    utBuy:       jax.atrTS.utBuy,
+    stFlipped:   jax.st.flipped,
+    emaStack:    jax.emaStack,
+    macdBull:    jax.macdBull,
+    rsiBull:     jax.rsiBull,
+    wrBull:      jax.wrBull,
+    stBull:      jax.stBull,
+    trailVal:    jax.trailVal,
+    high52, low52, pctHi, ema21,
+    emaRising:   ema21 > ema21old,
+    isDeepRecovery: true,  // ← blue badge flag
+    rsiCeiling:  80,
+  };
+}
+
+async function startJAXDeepScan(tickers, minBull){
+  log("🔵 Deep Recovery scan: "+tickers.length+" stocks · RSI<80 · -20%+ off high","info","jax");
+  log("Catches ZS, XOM, NOW type plays still recovering","info","jax");
+
+  const nKeys  = TD_KEYS.length;
+  const chunks = splitInterleaved(tickers, nKeys);
+  const total  = tickers.length;
+  let done     = 0;
+
+  async function runDeepWorker(keyIdx, tickers){
+    const DELAY = 8500;
+    for(let i=0; i<tickers.length; i++){
+      if(stopReq) break;
+      const sym = tickers[i];
+      document.getElementById("jax-progMsg").textContent =
+        "K"+(keyIdx+1)+" [DEEP]: "+sym+" · "+done+"/"+total;
+      try{
+        const candles = await fetchCandlesWithKey(sym, keyIdx);
+        const r = scoreJAXDeep(sym, candles.closes, candles.highs, candles.lows);
+        const lq = await fetchLiveQuote(sym);
+        if(lq&&lq.price>0){ r.price=lq.price; r.change=lq.changePct||r.change; r.session=getMarketSession(); }
+        if(r.bullScore >= minBull){
+          jaxDeepResults.push(r);
+          log("🔵 DEEP: "+r.sym.padEnd(6)+" bull:"+r.bullScore+"/5 RSI:"+r.rsi.toFixed(0)+" pctHi:"+r.pctHi.toFixed(0)+"%","info","jax");
+        }
+      }catch(e){
+        if(!e.message.startsWith("SKIP:") && !e.message.startsWith("Need"))
+          log("⚠ "+sym+": "+e.message,"warn","jax");
+      }
+      done++;
+      const pct = Math.round(done/total*100);
+      document.getElementById("jax-progPct").textContent = pct+"%";
+      document.getElementById("jax-progFill").style.width = pct+"%";
+      if(i<tickers.length-1) await sleep(DELAY);
+    }
+  }
+
+  await Promise.all(chunks.map((chunk,ki)=>runDeepWorker(ki,chunk)));
+  log("🔵 Deep Recovery complete — "+jaxDeepResults.length+" signals found","info","jax");
+}
+
+function mergeJAXResults(){
+  // Merge standard + deep, remove duplicates, render together
+  const standardSyms = new Set(jaxResults.map(r=>r.sym));
+  const newDeep = jaxDeepResults.filter(r=>!standardSyms.has(r.sym));
+  const merged  = [...jaxResults, ...newDeep];
+  const banner  = document.getElementById("jax-savedBanner");
+  if(banner){
+    banner.style.display = "block";
+    banner.textContent   = "🟢 "+jaxResults.length+" standard + 🔵 "+newDeep.length+" deep recovery = "+merged.length+" total";
+  }
+  // Temporarily render merged
+  const tempResults = [...jaxResults];
+  jaxResults.push(...newDeep);
+  renderJAX();
+  // Restore — deep results stay separate
+  jaxResults.length = 0;
+  jaxResults.push(...tempResults);
+  document.getElementById("jaxMergeBtn").textContent = "🔀 MERGED ("+merged.length+")";
+  log("🔀 Merged: "+jaxResults.length+" standard + "+newDeep.length+" new deep = "+merged.length+" total","ok","jax");
+}
+
 function clearJAX(){
   jaxResults=[];
   try{ localStorage.removeItem("cs_jax"); }catch(e){}
@@ -3742,7 +3898,8 @@ function renderJAX(){
     const bullBg = s.bullScore>=5?"var(--green2)":s.bullScore>=4?"#64DD17":s.bullScore>=3?"var(--yellow)":"var(--orange)";
     const trigger= s.utBuy?"🟢 UTBuy fired":s.stFlipped?"🟢 ST Flip":"🟢 Signal";
     const sessBadge=s.session==="premarket"?'<span class="badge pm">🌅 PRE-MKT</span>':s.session==="afterhours"?'<span class="badge ah">🌙 AH</span>':'<span class="badge live">🔴 LIVE</span>';
-    return `<div class="card jax" onclick="window.open('https://www.tradingview.com/chart/?symbol=${s.sym}','_blank')">
+    const cardStyle=s.isDeepRecovery?"style=\"border-color:rgba(21,101,192,0.4);box-shadow:0 4px 20px rgba(21,101,192,0.08)\"":"";
+    return `<div class="card jax" ${cardStyle} onclick="window.open('https://www.tradingview.com/chart/?symbol=${s.sym}','_blank')">
       <div class="card-hdr">
         <div class="card-left">
           <div class="card-ticker">${s.sym}</div>
@@ -3759,9 +3916,12 @@ function renderJAX(){
         </div>
       </div>
       <div class="badges">
-        <span class="badge jax jax-pulse">${trigger}</span>
+        ${s.isDeepRecovery?
+          '<span class="badge" style="background:rgba(21,101,192,0.2);color:#90CAF9;border:1px solid rgba(21,101,192,0.4);font-weight:700">🔵 DEEP RECOVERY</span>':
+          '<span class="badge jax jax-pulse">'+trigger+'</span>'}
         ${s.pctHi<-25?'<span class="badge" style="background:rgba(0,176,255,0.12);color:var(--blue);border:1px solid rgba(0,176,255,0.3)">📉 '+s.pctHi.toFixed(0)+'% off hi</span>':''}
         ${s.emaRising?'<span class="badge" style="background:rgba(0,200,83,0.1);color:var(--green2);border:1px solid rgba(0,200,83,0.2)">↑ EMA RISING</span>':''}
+        ${s.isDeepRecovery?'<span class="badge" style="background:rgba(255,214,0,0.1);color:var(--yellow);border:1px solid rgba(255,214,0,0.2)">RSI '+s.rsi.toFixed(0)+' &lt;80</span>':''}
       </div>
       <div class="bars-grid">
         <div class="bar-item">
