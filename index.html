@@ -1378,6 +1378,8 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
         <th class="jnl-hide-mobile">TARGET 2</th>
         <th>CLOSE $</th>
         <th>SCORE</th>
+        <th class="jnl-hide-mobile">SOURCE</th>
+        <th class="jnl-hide-mobile">SESSION</th>
         <th>RESULT %</th>
         <th class="jnl-hide-mobile">R:R</th>
         <th>STATUS</th>
@@ -1596,6 +1598,25 @@ function calcJAXPRO(closes, highs, lows){
 }
 
 // ── Indicators ────────────────────────────────────────────────────────────────
+function calcATR(highs, lows, closes, period=14){
+  if(highs.length < period+1) return {currentATR:0, avgATR20:0, isCoiling:false};
+  const trs = [];
+  for(let i=1; i<closes.length; i++){
+    const tr = Math.max(
+      highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i-1]),
+      Math.abs(lows[i]  - closes[i-1])
+    );
+    trs.push(tr);
+  }
+  const currentATR = trs.slice(-period).reduce((a,b)=>a+b,0)/period;
+  const atrSeries = [];
+  for(let i=period; i<=trs.length; i++){
+    atrSeries.push(trs.slice(i-period,i).reduce((a,b)=>a+b,0)/period);
+  }
+  const avgATR20 = atrSeries.slice(-20).reduce((a,b)=>a+b,0)/Math.min(atrSeries.length,20);
+  return { currentATR, avgATR20, isCoiling: currentATR < avgATR20 };
+}
 function calcRSI(c,p=14){
   if(c.length<p+1) return 50;
   let ag=0,al=0;
@@ -2085,38 +2106,6 @@ function updateHdr(arr){
   document.getElementById("cnt4").textContent=rResults.filter(r=>r.score===4).length;
 }
 
-// ── Twelve Data fetch ──────────────────────────────────────
-async function fetchCandles(sym, retries=3){
-  for(let attempt=0;attempt<retries;attempt++){
-    const key=getKey();
-    const url="https://api.twelvedata.com/time_series?symbol="+sym+"&interval=1day&outputsize=260&apikey="+key;
-    const r=await fetch(url);
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    const d=await r.json();
-    if(d.status==="error"){
-      if(d.message&&d.message.includes("API credits")){
-        keyIdx=(keyIdx+1)%TD_KEYS.length; keyCallCount=0; updateKeyStatus();
-        await sleep(1000); continue;
-      }
-      if(d.message&&(d.message.includes("Grow or Venture")||d.message.includes("not found")))
-        throw new Error("SKIP:"+d.message);
-      throw new Error(d.message||"API error");
-    }
-    if(!d.values||!d.values.length) throw new Error("No data");
-    const vals=[...d.values].reverse();
-    return {
-      closes: vals.map(v=>parseFloat(v.close)),
-      highs:  vals.map(v=>parseFloat(v.high)),
-      lows:   vals.map(v=>parseFloat(v.low)),
-      volumes:vals.map(v=>parseFloat(v.volume)||0),
-      bars:   vals.length
-    };
-  }
-  throw new Error("All keys rate limited");
-}
-
-// ── fetchCandles: single-stock wrapper for debug (uses key 0) ──────────────
-async function fetchCandles(sym){ return fetchCandlesWithKey(sym, 0); }
 
 // ── Fetch 15-minute intraday candles from Finnhub ────────────────────────────
 async function fetch15mCandles(sym){
@@ -3392,13 +3381,6 @@ function renderJournal(){
         <input class="jnl-result-input" type="text" 
           value="${e.result}" 
           placeholder="e.g. +10.5"
-          onchange="updateResult(${e.id}, this.value)"
-          style="color:${resultColor}">
-      </td>
-      <td>
-        <input class="jnl-result-input" type="text"
-          value="${e.result}"
-          placeholder="+10.5"
           onchange="updateResult(${e.id}, this.value)"
           style="color:${resultColor}">
       </td>
