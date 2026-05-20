@@ -1447,11 +1447,12 @@ async function fetchLiveQuote(sym){
     const r   = await fetch(url);
     const d   = await r.json();
     if(!d||!d.c||d.c===0) return null;
+    const changePct = d.pc && d.pc > 0 ? ((d.c - d.pc) / d.pc) * 100 : (d.dp||0);
     return {
       price:     d.c,
       prev:      d.pc,
-      change:    d.d||0,
-      changePct: d.dp||0,
+      change:    d.c - d.pc,
+      changePct: changePct,
       high:      d.h||0,
       low:       d.l||0,
       open:      d.o||0,
@@ -1959,7 +1960,12 @@ async function loadSaved(){
     }
 
     // Then check Firebase for newer results from another device
-    document.addEventListener("firebaseReady", async ()=>{
+    // Use helper to handle race condition where Firebase init fires before listener
+    const onFirebaseReady = async (cb) => {
+      if(window.firebaseReady) { await cb(); return; }
+      document.addEventListener("firebaseReady", async () => await cb(), {once:true});
+    };
+    onFirebaseReady(async ()=>{
       try{
         const fbR = await window.fbLoad("recovery");
         const fbC = await window.fbLoad("catalyst");
@@ -2011,8 +2017,8 @@ async function loadSaved(){
           }
         });
 
-        // ── Load alert sessions from Firebase ──────────────────────
-        for(const sk of ["premarket","open"]){
+        // ── Load alert sessions from Firebase — ALL 5 sessions ───────
+        for(const sk of ["premarket","open","midday","afternoon","preclose"]){
           try{
             const fbA = await window.fbLoad("alerts_"+sk);
             if(fbA && fbA.data && fbA.data.alerts){
@@ -3033,7 +3039,7 @@ function renderAlerts(alerts){
     const heat = a.absChange>=10?"fire":a.absChange>=5?"hot":"warm";
     const icon = a.absChange>=10?"🚀":a.absChange>=5?"🔥":"📡";
     const reasons = [];
-    if(a.absChange>=a.absChange) reasons.push((up?"▲":"▼")+Math.abs(a.changePct).toFixed(1)+"% "+(a.sess==="premarket"?"pre-mkt":"today"));
+    if(a.absChange>=2) reasons.push((up?"▲":"▼")+Math.abs(a.changePct).toFixed(1)+"% "+(a.sess==="premarket"?"pre-mkt":"today"));
     if(a.hasEarningsSoon) reasons.push("📅 earnings in "+a.earnings.daysUntil+"d");
     return `<div class="alert-card ${heat}" onclick="window.open('https://www.tradingview.com/chart/?symbol=${a.sym}','_blank')">
       <div class="alert-icon">${icon}</div>
