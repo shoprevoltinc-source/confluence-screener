@@ -1645,7 +1645,7 @@ function scoreRecovery(sym, closes, highs, lows){
   return {
     sym, price, change, rsi, wr, ema21, emaRising, high52, pctHi, pctEMA,
     c1, c2, c3, c4, c5, c6, score, conds,
-    deepBounce, c7crash, c7rsiWas, c7rsiUp, minRSI30, rsi5ago,
+    deepBounce, deepCrash:c7crash, c7crash, c7rsiWas, c7rsiUp, minRSI30, rsi5ago,
     jax, greenArrow, bullScore,
     trailVal: jax ? jax.trailVal : 0,
     jaxEmaStack: jax ? jax.emaStack  : false,
@@ -1655,6 +1655,14 @@ function scoreRecovery(sym, closes, highs, lows){
     jaxStBull:   jax ? jax.stBull    : false,
     jaxUtBuy:    jax ? jax.atrTS.utBuy  : false,
     jaxStFlip:   jax ? jax.st.flipped   : false,
+    // aliases for debug/render compatibility
+    deepCrash:   c7crash,
+    rsiWasLow:   c7rsiWas,
+    rsiTurningUp:c7rsiUp,
+    jaxHasData:  jax !== null,
+    c7:          deepBounce,
+    liveQuote:   null,
+    session:     null,
   };
 }
 
@@ -2303,7 +2311,7 @@ function renderRecovery(){
             <span class="jax-c ${s.jaxWrBull?"pass":"fail"}">WR>-50</span>
             <span class="jax-c ${s.jaxStBull?"pass":"fail"}">SUPERTREND</span>
           </div>
-          <div class="jax-trail">Trail $${s.jaxTrail.toFixed(2)} · ${s.jaxUtBuy?"🟢 UTBuy!":s.jaxStFlip?"🟢 ST Flip!":"waiting..."}</div>
+          <div class="jax-trail">Trail $${s.trailVal.toFixed(2)} · ${s.jaxUtBuy?"🟢 UTBuy!":s.jaxStFlip?"🟢 ST Flip!":"waiting..."}</div>
         </div>`:""}
       </div>
     </div>`;
@@ -2343,8 +2351,8 @@ async function debugRecovery(sym){
       "",
       "── C7 DEEP VALUE BOUNCE "+(s.c7?"✅ CONFIRMED":"❌ Not triggered")+" ──",
       "  -50%+ crash:      "+(s.deepCrash?"✅ YES ("+s.pctHi.toFixed(1)+"% off hi)":"❌ NO ("+s.pctHi.toFixed(1)+"% off hi, needs -50%)"),
-      "  RSI was <45 (30d):"+(s.rsiWasLow?"✅ YES (min RSI "+s.rsiMinRecent.toFixed(1)+")":"❌ NO (min RSI "+s.rsiMinRecent.toFixed(1)+")"),
-      "  RSI turning up:   "+(s.rsiTurningUp?"✅ YES ("+s.rsi.toFixed(1)+" vs "+s.rsiOld.toFixed(1)+" 5d ago)":"❌ NO"),
+      "  RSI was <45 (30d):"+(s.rsiWasLow?"✅ YES (min RSI "+s.minRSI30.toFixed(1)+")":"❌ NO (min RSI "+s.minRSI30.toFixed(1)+")"),
+      "  RSI turning up:   "+(s.rsiTurningUp?"✅ YES ("+s.rsi.toFixed(1)+" vs "+s.rsi5ago.toFixed(1)+" 5d ago)":"❌ NO"),
       s.c7?"  → QUALIFIES via C7 DEEP BOUNCE ✅":"  → C7 not triggered",
       "",
       "── JAX PRO "+(s.greenArrow?"🟢 GREEN ARROW ACTIVE":"⚪ Waiting for signal")+" ──",
@@ -2355,7 +2363,7 @@ async function debugRecovery(sym){
         (s.jaxWrBull?"✅":"❌")+" WR > -50  ("+s.wr.toFixed(1)+")",
         (s.jaxStBull?"✅":"❌")+" SuperTrend bullish",
         "Bull Score: "+s.bullScore+"/5",
-        "ATR Trail:  $"+s.jaxTrail.toFixed(2)+" · "+(s.jaxUtBuy?"🟢 UTBuy fired!":s.jaxStFlip?"🟢 ST Flipped!":"Waiting for flip")]:["Need 70+ bars for JAX PRO (have "+bars+")"])].join("\n");
+        "ATR Trail:  $"+s.trailVal.toFixed(2)+" · "+(s.jaxUtBuy?"🟢 UTBuy fired!":s.jaxStFlip?"🟢 ST Flipped!":"Waiting for flip")]:["Need 70+ bars for JAX PRO (have "+bars+")"])].join("\n");
   }catch(e){out.style.color="#FF5252";out.textContent=sym+" ERROR: "+e.message;}
 }
 
@@ -2489,13 +2497,22 @@ function scoreCatalyst(sym, closes, highs, lows, volumes, maxPrice, minVolSpike,
     isTight, rangeWidth, flatDays:flatDaysCount, breakout,
     high20, high52, low52, pctFromHigh, pctFromLow, nearLow,
     // Catalyst data
-    earnings, hasEarnings, earningsDays,
+    hasEarnings, earningsDays,
     // JAX PRO — all flat fields (survive JSON serialization perfectly)
     greenArrow, bullScore, jaxHasData,
     jaxRsiBull, jaxWrBull, jaxEmaStack, jaxMacdBull,
     jaxStBull, jaxUtBuy, jaxStFlip, jaxTrail,
     // Indicators
-    rsi, avgVol:avgVol20, todayVol
+    rsi, avgVol:avgVol20, todayVol,
+    // condition flags
+    c1, c2, c3, c4, c5, c6,
+    // direct fields needed by debug/render
+    atrCoiling, greenArrow, hasEarnings,
+    rsi, earnings: earnings||null,
+    // aliases
+    volSpike: dailySpike,
+    rvolNow:  rvolNow||0,
+    trailVal: jax ? jax.trailVal : 0,
   };
 }
 
@@ -2669,7 +2686,7 @@ function renderCatalyst(){
             <span class="jax-c ${s.jaxStBull?"pass":"fail"}">ST</span>
             <span class="jax-c ${s.jaxUtBuy?"pass":"fail"}">UTBuy</span>
           </div>
-          <div class="jax-trail">Trail $${s.jaxTrail.toFixed(2)}</div>
+          <div class="jax-trail">Trail $${s.trailVal.toFixed(2)}</div>
         </div>`:""}
       </div>
     </div>`;
