@@ -1048,7 +1048,7 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
 
 <div class="cond-bar">
   <span style="font-size:8px;color:var(--orange);font-weight:700;letter-spacing:2px;margin-right:4px">CONDITIONS:</span>
-  <span class="cond-tag">C1: Price &gt; $1</span>
+  <span class="cond-tag">C1: $2–$250 range</span>
   <span class="cond-tag">C2: 🔄 ATR coiling</span>
   <span class="cond-tag">C3: 🔇 Vol dry-up / spike</span>
   <span class="cond-tag">C4: 📅 Earnings &lt;14d / breakout</span>
@@ -2431,7 +2431,7 @@ function scoreCatalyst(sym, closes, highs, lows, volumes, maxPrice, minVolSpike,
   // ══════════════════════════════════════════════════════════
   // 6 CONDITIONS — ATR + 15m RVOL upgraded system
   // ══════════════════════════════════════════════════════════
-  const c1 = price >= 1;                                         // Exclude sub-$1 penny stocks only
+  const c1 = price >= 2 && price <= maxPrice;                    // Price in range ($2 min, UI-controlled max)
   const c2 = atrCoiling || (isTight && flatDaysCount >= 8);      // ATR coiling OR price tight
   const c3 = isIgniting || dailySpike >= minVolSpike || volDryUp; // 15m ignition OR daily spike OR dry-up
   const c4 = hasEarnings || breakout || change > 8;              // Catalyst present
