@@ -1960,12 +1960,7 @@ async function loadSaved(){
     }
 
     // Then check Firebase for newer results from another device
-    // Use helper to handle race condition where Firebase init fires before listener
-    const onFirebaseReady = async (cb) => {
-      if(window.firebaseReady) { await cb(); return; }
-      document.addEventListener("firebaseReady", async () => await cb(), {once:true});
-    };
-    onFirebaseReady(async ()=>{
+    document.addEventListener("firebaseReady", async ()=>{
       try{
         const fbR = await window.fbLoad("recovery");
         const fbC = await window.fbLoad("catalyst");
@@ -2017,8 +2012,8 @@ async function loadSaved(){
           }
         });
 
-        // ── Load alert sessions from Firebase — ALL 5 sessions ───────
-        for(const sk of ["premarket","open","midday","afternoon","preclose"]){
+        // ── Load alert sessions from Firebase ──────────────────────
+        for(const sk of ["premarket","open"]){
           try{
             const fbA = await window.fbLoad("alerts_"+sk);
             if(fbA && fbA.data && fbA.data.alerts){
@@ -2044,7 +2039,7 @@ async function loadSaved(){
         });
 
         // ── GitHub Actions JAX monitor alerts ──────────────────────────────
-        window.fbListen("jax_last_run", (fb)=>{
+        window.fbListen("screener/jax_last_run", (fb)=>{
           if(fb && fb.signals && fb.signals.length > 0){
             const t = new Date(fb.time).toLocaleTimeString();
             fb.signals.forEach(sym=>{
