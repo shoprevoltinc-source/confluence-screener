@@ -2044,7 +2044,7 @@ async function loadSaved(){
         });
 
         // ── GitHub Actions JAX monitor alerts ──────────────────────────────
-        window.fbListen("screener/jax_last_run", (fb)=>{
+        window.fbListen("jax_last_run", (fb)=>{
           if(fb && fb.signals && fb.signals.length > 0){
             const t = new Date(fb.time).toLocaleTimeString();
             fb.signals.forEach(sym=>{
@@ -3125,7 +3125,7 @@ function loadJournal(){
     if(saved) journalEntries = JSON.parse(saved);
   }catch(e){ journalEntries = []; }
   // Also load from Firebase
-  document.addEventListener("firebaseReady", async()=>{
+  const _doJournalFirebase = async()=>{
     try{
       const fb = await window.fbLoad("journal");
       if(fb && fb.data && fb.data.length >= journalEntries.length){
@@ -3147,7 +3147,8 @@ function loadJournal(){
         }
       });
     }catch(e){}
-  });
+  };
+  if(window.firebaseReady){ _doJournalFirebase(); } else { document.addEventListener("firebaseReady", _doJournalFirebase, {once:true}); }
   renderJournal();
 }
 
@@ -3906,7 +3907,7 @@ function loadJAX(){
     }
   }catch(e){ jaxResults=[]; }
 
-  document.addEventListener("firebaseReady", async()=>{
+  const _doJAXFirebase = async()=>{
     try{
       const fb = await window.fbLoad("jax_scan");
       // fbLoad parses JSON internally - fb.data should be an array
@@ -3938,7 +3939,8 @@ function loadJAX(){
         }
       });
     }catch(e){ console.warn("JAX Firebase:", e); }
-  });
+  };
+  if(window.firebaseReady){ _doJAXFirebase(); } else { document.addEventListener("firebaseReady", _doJAXFirebase, {once:true}); }
 }
 
 
