@@ -1325,14 +1325,21 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
     <option value="Swing">📈 Swing</option>
     <option value="Watchlist">👀 Watchlist</option>
   </select>
+  <select id="jnl-entry-mode" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 8px;font-family:var(--mono);font-size:9px;border-radius:2px">
+    <option value="tracking">📊 Tracking</option>
+    <option value="trade">💰 Real Trade</option>
+  </select>
   <button class="btn-scan" onclick="addManualEntry()" style="font-size:9px;padding:6px 14px">+ LOG</button>
   <button class="btn-clear" onclick="clearJournal()">🗑 CLEAR ALL</button>
   <button class="btn-scan" onclick="fetchClosingPrices()" style="font-size:9px;padding:6px 14px;background:linear-gradient(135deg,#1565C0,#1976D2);box-shadow:0 0 12px rgba(21,101,192,0.3)">🔄 UPDATE PRICES</button>
   <span style="font-size:8px;color:var(--muted2);margin-left:8px;letter-spacing:1px">
     Auto-updates at <span style="color:var(--blue)">4:15 PM ET</span> · or tap UPDATE PRICES anytime · Syncs via Firebase
   </span>
+  <button class="chip on" id="jnl-filter-all" onclick="setJnlFilter('all',this)" style="font-size:8px;padding:2px 8px">ALL</button>
+  <button class="chip" id="jnl-filter-trade" onclick="setJnlFilter('trade',this)" style="font-size:8px;padding:2px 8px">💰 TRADES</button>
+  <button class="chip" id="jnl-filter-tracking" onclick="setJnlFilter('tracking',this)" style="font-size:8px;padding:2px 8px">📊 TRACKING</button>
   <input type="text" id="jnl-search" placeholder="🔍 search ticker..."
-    style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:5px 8px;font-family:var(--mono);font-size:9px;border-radius:2px;width:130px;margin-left:8px"
+    style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:5px 8px;font-family:var(--mono);font-size:9px;border-radius:2px;width:110px;margin-left:4px"
     oninput="renderJournal()">
   <span id="jnl-last-update" style="font-size:8px;color:var(--muted);margin-left:auto"></span>
 </div>
@@ -1380,121 +1387,71 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
 <script>
 
 // ── API Keys ────────────────────────────────────────────────
-const TD_KEYS = [
-  "fceed7ef4b7847d38e1ecd0bddcad5eb",
-  "c05d8242562f496e8709d5c9e0ce4109",
-  "9802166cf9694f42a64738bd776c22b9",
-  "5a13fcf43f1347c6b2b4459a0076ba51",
-  "257f261bbb394e8bad0c871eb5d9218d"
-];
-
-// Finnhub — live quote + earnings calendar
-const FH_KEY = "d819lthr01qler4hgk4gd819lthr01qler4hgk50";
+const PROXY_URL = "https://yellow-hall-2317confluence-proxy.kevonjones26.workers.dev";
+const TD_KEYS   = ["proxy"];
+const FH_KEY    = "proxy";
 
 // Cache earnings dates to avoid repeated API calls
 const earningsCache = {};
 
 async function fetchEarningsDate(sym){
-  if(earningsCache[sym] !== undefined) return earningsCache[sym];
   try{
-    const today = new Date().toISOString().split("T")[0];
-    const future = new Date(Date.now() + 30*86400000).toISOString().split("T")[0];
-    const url = "https://finnhub.io/api/v1/calendar/earnings?from="+today+"&to="+future+"&symbol="+sym+"&token="+FH_KEY;
-    const r = await fetch(url);
-    if(!r.ok){ earningsCache[sym]=null; return null; }
-    const d = await r.json();
-    const earnings = d.earningsCalendar||[];
-    if(earnings.length>0){
-      const next = earnings[0];
-      const daysUntil = Math.ceil((new Date(next.date)-new Date())/(86400000));
-      earningsCache[sym] = {date:next.date, daysUntil, eps:next.epsEstimate};
-      return earningsCache[sym];
-    }
-    earningsCache[sym] = null;
-    return null;
-  }catch(e){ earningsCache[sym]=null; return null; }
+    const url  = PROXY_URL+"/api/earnings?sym="+sym;
+    const r    = await fetch(url);
+    const d    = await r.json();
+    const list = d.earningsCalendar||[];
+    if(!list.length) return null;
+    const days = Math.round((new Date(list[0].date)-new Date())/(1000*60*60*24));
+    return {date:list[0].date, daysUntil:Math.max(0,days)};
+  }catch(e){ return null; }
 }
+
 
 async function fetchLiveQuote(sym){
   try{
-    const url = "https://finnhub.io/api/v1/quote?symbol="+sym+"&token="+FH_KEY;
-    const r = await fetch(url);
-    if(!r.ok) return null;
-    const d = await r.json();
-    if(!d||!d.c) return null;
+    const url = PROXY_URL+"/api/quote?sym="+sym;
+    const r   = await fetch(url);
+    const d   = await r.json();
+    if(!d||!d.c||d.c===0) return null;
     return {
-      price:  d.c,   // current/last price
-      open:   d.o,   // day open
-      high:   d.h,   // day high
-      low:    d.l,   // day low
-      prev:   d.pc,  // previous close
-      change: d.d,   // change from prev close
-      changePct: d.dp // % change from prev close
+      price:     d.c,
+      prev:      d.pc,
+      change:    d.d||0,
+      changePct: d.dp||0,
+      high:      d.h||0,
+      low:       d.l||0,
+      open:      d.o||0,
+      session:   d.c!==d.pc?"live":"closed"
     };
   }catch(e){ return null; }
 }
 
-// Detect if market is in pre-market, open, after-hours, or closed
-function getMarketSession(){
-  const now = new Date();
-  // Convert to ET
-  const et = new Date(now.toLocaleString("en-US", {timeZone:"America/New_York"}));
-  const h = et.getHours(), m = et.getMinutes();
-  const day = et.getDay(); // 0=Sun, 6=Sat
-  if(day===0||day===6) return "weekend";
-  const mins = h*60+m;
-  if(mins >= 240 && mins < 570)  return "premarket";  // 4:00am - 9:30am ET
-  if(mins >= 570 && mins < 960)  return "open";        // 9:30am - 4:00pm ET
-  if(mins >= 960 && mins < 1200) return "afterhours";  // 4:00pm - 8:00pm ET
-  return "closed";
-}
-// ── Parallel scan engine ─────────────────────────────────────────────────
-// Each key gets its own independent worker — all run simultaneously
-// Key i fetches stocks at indices: i, i+4, i+8, i+12... (interleaved)
-// This gives true parallelism without exceeding per-key rate limits
 
-let keyIdx=0; // still used for single-stock debug
-
-function updateKeyStatus(activeKeys=[]){
-  TD_KEYS.forEach((_,i)=>{
-    const el=document.getElementById("ks"+i);
-    if(el) el.className="ks"+(activeKeys.includes(i)?"active":"");
-  });
-}
-
-// Fetch candles using a specific key (no rotation — each worker owns its key)
-async function fetchCandlesWithKey(sym, keyIndex, retries=3){
+async function fetchCandlesWithKey(sym, keyIndex=0, retries=2){
   for(let attempt=0; attempt<retries; attempt++){
-    const key = TD_KEYS[keyIndex];
-    const url = "https://api.twelvedata.com/time_series?symbol="+sym+"&interval=1day&outputsize=260&apikey="+key;
-    const r = await fetch(url);
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    const d = await r.json();
-    if(d.status==="error"){
-      if(d.message&&d.message.includes("API credits")){
-        // This key hit its limit — wait for rate window reset
-        await sleep(62000);
-        continue;
-      }
-      if(d.message&&(d.message.includes("Grow or Venture")||d.message.includes("not found")||d.message.includes("missing or invalid")))
-        throw new Error("SKIP:"+d.message);
-      throw new Error(d.message||"API error");
+    try{
+      const url = PROXY_URL+"/api/candles?sym="+sym+"&keyIndex="+keyIndex+"&outputsize=260";
+      const r   = await fetch(url);
+      const d   = await r.json();
+      if(d.status==="error") throw new Error("SKIP:"+d.message);
+      if(d.error) throw new Error("SKIP:"+d.error);
+      const vals = [...(d.values||[])].reverse();
+      if(vals.length < 30) throw new Error("SKIP:not enough bars");
+      return {
+        closes:  vals.map(v=>parseFloat(v.close)),
+        highs:   vals.map(v=>parseFloat(v.high)),
+        lows:    vals.map(v=>parseFloat(v.low)),
+        volumes: vals.map(v=>parseFloat(v.volume||0)),
+        dates:   vals.map(v=>v.datetime)
+      };
+    }catch(e){
+      if(attempt===retries-1) throw e;
+      await sleep(2000);
     }
-    if(!d.values||!d.values.length) throw new Error("No data");
-    const vals=[...d.values].reverse();
-    return {
-      closes:  vals.map(v=>parseFloat(v.close)),
-      highs:   vals.map(v=>parseFloat(v.high)),
-      lows:    vals.map(v=>parseFloat(v.low)),
-      volumes: vals.map(v=>parseFloat(v.volume)||0),
-      bars:    vals.length
-    };
   }
-  throw new Error("Key "+keyIndex+" rate limited");
 }
 
-// Single worker: processes every Nth stock using key N
-// delay between each fetch = 8500ms to stay under 8/min per key
+
 async function runWorker(keyIndex, tickers, minScore, isCatalyst, maxPrice, minVolSpike, onResult, onProgress){
   const DELAY = 8500; // 8.5s between calls = 7 calls/min per key (safe under 8 limit)
   for(let i=0; i<tickers.length; i++){
@@ -1920,332 +1877,14 @@ async function fetchCandles(sym){ return fetchCandlesWithKey(sym, 0); }
 // ── Fetch 15-minute intraday candles from Finnhub ────────────────────────────
 async function fetch15mCandles(sym){
   try{
-    const now   = Math.floor(Date.now()/1000);
-    const from  = now - 11*24*60*60; // 11 days back (gets 10 trading days)
-    const url   = "https://finnhub.io/api/v1/stock/candle?symbol="+sym
-                  +"&resolution=15&from="+from+"&to="+now+"&token="+FH_KEY;
-    const r = await fetch(url);
-    if(!r.ok) return null;
-    const d = await r.json();
-    if(!d||d.s!=="ok"||!d.c||d.c.length<2) return null;
-    return {
-      closes:  d.c,
-      highs:   d.h,
-      lows:    d.l,
-      volumes: d.v,
-      times:   d.t  // UNIX timestamps — needed for time-slot matching
-    };
+    const url = PROXY_URL+"/api/candles15m?sym="+sym;
+    const r   = await fetch(url);
+    const d   = await r.json();
+    if(!d||d.s==="no_data"||!d.c) return null;
+    return d;
   }catch(e){ return null; }
 }
 
-// ── Calculate RVOL at the SAME 15-min time slot (your Python logic) ──────────
-function calcRVOL15m(times, volumes){
-  if(!times||!volumes||times.length<2) return 0;
-  // Get current bar time slot (hour + minute)
-  const nowTs    = times[times.length-1];
-  const nowDate  = new Date(nowTs*1000);
-  const nowHour  = nowDate.getHours();
-  const nowMin   = nowDate.getMinutes();
-  const curVol   = volumes[volumes.length-1];
-
-  // Find all bars from the SAME time slot over past 10 days
-  const sameSlot = [];
-  for(let i=0; i<times.length-1; i++){
-    const d = new Date(times[i]*1000);
-    if(d.getHours()===nowHour && d.getMinutes()===nowMin){
-      sameSlot.push(volumes[i]);
-    }
-  }
-  if(sameSlot.length===0) return 0;
-  const avgAtSlot = sameSlot.reduce((a,b)=>a+b,0)/sameSlot.length;
-  return avgAtSlot>0 ? curVol/avgAtSlot : 0;
-}
-
-// ── ATR calculation (True Range average) ────────────────────────────────────
-function calcATR(highs, lows, closes, period=14){
-  if(highs.length < period+1) return 0;
-  const trs = [];
-  for(let i=1; i<highs.length; i++){
-    const tr = Math.max(
-      highs[i] - lows[i],
-      Math.abs(highs[i] - closes[i-1]),
-      Math.abs(lows[i]  - closes[i-1])
-    );
-    trs.push(tr);
-  }
-  // Current ATR = average of last 14 TRs
-  const currentATR = trs.slice(-period).reduce((a,b)=>a+b,0)/period;
-  // 20-day ATR average = average of ATRs over last 20 bars
-  const atrSeries = [];
-  for(let i=period; i<=trs.length; i++){
-    atrSeries.push(trs.slice(i-period,i).reduce((a,b)=>a+b,0)/period);
-  }
-  const avgATR20 = atrSeries.slice(-20).reduce((a,b)=>a+b,0)/Math.min(atrSeries.length,20);
-  return { currentATR, avgATR20, isCoiling: currentATR < avgATR20 };
-}
-
-// ══════════════════════════════════════════════════════════
-// JAX PRO STRATEGY — ported from Pine Script v6
-// Green arrow = UTBuy/STFlip + bull_score >= entry_min + RSI < 70
-// ══════════════════════════════════════════════════════════
-
-function calcMACD(closes, fast=12, slow=26, signal=9){
-  if(closes.length < slow + signal) return {macdLine:0, signalLine:0, hist:0};
-  const emaFast = calcEMA(closes, fast);
-  const emaSlow = calcEMA(closes, slow);
-  const macdLine = emaFast - emaSlow;
-  // Signal line = EMA of MACD — approximate with last N macd values
-  const macdSeries = [];
-  for(let i=slow; i<=closes.length; i++){
-    const ef = calcEMA(closes.slice(0,i), fast);
-    const es = calcEMA(closes.slice(0,i), slow);
-    macdSeries.push(ef - es);
-  }
-  const signalLine = calcEMA(macdSeries, signal);
-  const hist = macdLine - signalLine;
-  return {macdLine, signalLine, hist};
-}
-
-function calcSuperTrend(highs, lows, closes, factor=1.5, period=10){
-  if(closes.length < period+1) return {bullish:false, flipped:false};
-  // SuperTrend uses ATR
-  const atrVals = [];
-  for(let i=1; i<closes.length; i++){
-    const tr = Math.max(
-      highs[i]-lows[i],
-      Math.abs(highs[i]-closes[i-1]),
-      Math.abs(lows[i]-closes[i-1])
-    );
-    atrVals.push(tr);
-  }
-  // Rolling ATR
-  const getATR = (idx) => {
-    const slice = atrVals.slice(Math.max(0,idx-period), idx);
-    return slice.reduce((a,b)=>a+b,0)/slice.length;
-  };
-
-  let st = null, stDir = 1;
-  const stHistory = [];
-  for(let i=period; i<closes.length; i++){
-    const atr = getATR(i);
-    const hl2 = (highs[i]+lows[i])/2;
-    const upperBand = hl2 + factor*atr;
-    const lowerBand = hl2 - factor*atr;
-    const prevST = stHistory.length>0 ? stHistory[stHistory.length-1] : null;
-    const prevDir = stHistory.length>0 ? prevST.dir : 1;
-    let newST, newDir;
-    if(prevST===null){
-      newST = lowerBand; newDir = 1;
-    } else if(prevDir===1){
-      newST = Math.max(prevST.val, lowerBand);
-      newDir = closes[i] > newST ? 1 : -1;
-      if(newDir===-1) newST = upperBand;
-    } else {
-      newST = Math.min(prevST.val, upperBand);
-      newDir = closes[i] < newST ? -1 : 1;
-      if(newDir===1) newST = lowerBand;
-    }
-    stHistory.push({val:newST, dir:newDir});
-  }
-  const last = stHistory[stHistory.length-1];
-  const prev = stHistory[stHistory.length-2];
-  const bullish = last && last.dir===1;
-  const flipped = last && prev && last.dir===1 && prev.dir===-1; // ST flip = green arrow
-  return {bullish, flipped, stVal: last ? last.val : 0};
-}
-
-function calcATRTrailStop(highs, lows, closes, period=10, mult=3.5){
-  // UTBot ATR Trailing Stop — the green arrow trigger
-  if(closes.length < period+2) return {dir:1, prevDir:1, utBuy:false};
-  const atrVals = [];
-  for(let i=1; i<closes.length; i++){
-    const tr = Math.max(
-      highs[i]-lows[i],
-      Math.abs(highs[i]-closes[i-1]),
-      Math.abs(lows[i]-closes[i-1])
-    );
-    atrVals.push(tr);
-  }
-  const getATR = (idx) => {
-    const slice = atrVals.slice(Math.max(0,idx-period), idx);
-    return slice.reduce((a,b)=>a+b,0)/Math.max(slice.length,1);
-  };
-
-  let trail = closes[0], tdir = 0;
-  const trailHistory = [];
-  for(let i=1; i<closes.length; i++){
-    const atrV  = getATR(i);
-    const nLoss = mult * atrV;
-    const trailUp   = closes[i] - nLoss;
-    const trailDown = closes[i] + nLoss;
-    const prevTrail = trail;
-    if(closes[i] > trail && closes[i-1] > trail)       trail = Math.max(trail, trailUp);
-    else if(closes[i] < trail && closes[i-1] < trail)  trail = Math.min(trail, trailDown);
-    else if(closes[i] > trail)                          trail = trailUp;
-    else                                                trail = trailDown;
-    const prevDir = tdir;
-    tdir = trail > prevTrail ? 1 : trail < prevTrail ? -1 : tdir;
-    trailHistory.push({trail, tdir, prevDir});
-  }
-  const last = trailHistory[trailHistory.length-1];
-  const prev = trailHistory[trailHistory.length-2]||{tdir:0};
-  const utBuy  = last.tdir===1  && prev.tdir===-1; // direction flipped UP = green arrow
-  const utSell = last.tdir===-1 && prev.tdir===1;
-  return {dir:last.tdir, prevDir:prev.tdir, utBuy, utSell, trailVal:last.trail};
-}
-
-function calcJAXPRO(closes, highs, lows){
-  // Full JAX PRO bull_score + green arrow detection
-  if(closes.length < 70) return null;
-
-  const ema20 = calcEMA(closes, 20);
-  const ema40 = calcEMA(closes, 40);
-  const ema60 = calcEMA(closes, 60);
-  const price = closes[closes.length-1];
-  const rsi14 = calcRSI(closes, 14);
-
-  // Williams %R
-  const hh = Math.max(...highs.slice(-14));
-  const ll = Math.min(...lows.slice(-14));
-  const wr14 = hh===ll ? -50 : ((hh-price)/(hh-ll))*-100;
-
-  // MACD
-  const {hist} = calcMACD(closes);
-
-  // SuperTrend (factor=1.5, period=10)
-  const st = calcSuperTrend(highs, lows, closes, 1.5, 10);
-
-  // ATR Trailing Stop (period=10, mult=3.5)
-  const atrTS = calcATRTrailStop(highs, lows, closes, 10, 3.5);
-
-  // JAX PRO bull_score (5 points — matches Pine Script exactly)
-  // EMA Stack — relaxed: price above EMA20 AND EMA20 trending up
-  // Full stack (ema20>ema40>ema60) requires months of uptrend — too strict for recovery plays
-  const ema20old  = calcEMA(closes.slice(0,-5), 20);
-  const ema20rising = ema20 > ema20old;
-  const emaStack  = price > ema20 && ema20rising; // price above rising EMA20
-  const macdBull = hist > 0;
-  const rsiBull  = rsi14 > 50;
-  const wrBull   = wr14 > -50;
-  const stBull   = st.bullish;
-
-  const bullScore = (emaStack?1:0)+(macdBull?1:0)+(rsiBull?1:0)+(wrBull?1:0)+(stBull?1:0);
-
-  // GREEN ARROW = (UTBuy OR ST flip) AND bull_score >= 1 AND RSI < 70
-  const greenArrow = (atrTS.utBuy || st.flipped) && bullScore >= 1 && rsi14 < 70;
-  // RED ARROW  = UTSell AND bull_score <= 2
-  const redArrow   = atrTS.utSell && bullScore <= 2;
-
-  return {
-    ema20, ema40, ema60, rsi14, wr14,
-    hist, st, atrTS,
-    emaStack, macdBull, rsiBull, wrBull, stBull,
-    bullScore, greenArrow, redArrow,
-    trailVal: atrTS.trailVal
-  };
-}
-
-// ── Indicators ─────────────────────────────────────────────
-function calcRSI(c,p=14){
-  if(c.length<p+1) return 50;
-  let ag=0,al=0;
-  for(let i=1;i<=p;i++){const d=c[i]-c[i-1];d>=0?ag+=d:al-=d;}
-  ag/=p;al/=p;
-  for(let i=p+1;i<c.length;i++){
-    const d=c[i]-c[i-1];
-    ag=(ag*(p-1)+Math.max(d,0))/p;
-    al=(al*(p-1)+Math.max(-d,0))/p;
-  }
-  return al===0?100:100-100/(1+ag/al);
-}
-function calcEMA(c,p=21){
-  if(c.length<p) return c[c.length-1];
-  const k=2/(p+1);
-  let e=c.slice(0,p).reduce((a,b)=>a+b,0)/p;
-  for(let i=p;i<c.length;i++) e=c[i]*k+e*(1-k);
-  return e;
-}
-function avgVol(volumes, period=20){
-  const recent=volumes.slice(-period-1,-1);
-  return recent.reduce((a,b)=>a+b,0)/recent.length;
-}
-function flatDays(closes, threshold=0.05){
-  // Count how many consecutive days the stock was within threshold% range
-  let days=0;
-  const price=closes[closes.length-1];
-  for(let i=closes.length-2;i>=0;i--){
-    if(Math.abs(closes[i]-price)/price<threshold) days++;
-    else break;
-  }
-  return days;
-}
-
-// ══════════════════════════════════════════════════════════
-// RECOVERY SCREENER
-// ══════════════════════════════════════════════════════════
-function scoreRecovery(sym,closes,highs,lows){
-  if(closes.length<36) throw new Error("Not enough bars");
-  // Filter out any null/NaN values
-  const validC = closes.filter(v=>v!=null&&!isNaN(v));
-  const validH = highs.filter(v=>v!=null&&!isNaN(v));
-  const validL = lows.filter(v=>v!=null&&!isNaN(v));
-  if(validC.length<36) throw new Error("Not enough valid bars");
-  const price=validC[validC.length-1], prev=validC[validC.length-2];
-  if(!price||!prev||price<=0) throw new Error("Invalid price data");
-  const change=((price-prev)/prev)*100;
-  const rsi=calcRSI(validC,14)||50;
-  const ema21=calcEMA(validC,21)||price, ema21old=calcEMA(validC.slice(0,-5),21)||price;
-  const emaRising=ema21>ema21old;
-  const hh=Math.max(...validH.slice(-14)), ll=Math.min(...validL.slice(-14));
-  const wr=hh===ll?-50:((hh-price)/(hh-ll))*-100;
-  const high52=Math.max(...validH);
-  const pctHi=(price-high52)/high52*100, pctEMA=(price-ema21)/ema21*100;
-  const c1=rsi<45,c2=wr<-65,c3=price>ema21,c4=emaRising,c5=pctEMA>-10,c6=pctHi<-25;
-
-  // ── C7: Deep Value Bounce — catches NOW-type crashes ─────────────────────
-  // Stock crashed -50%+ off high, RSI bottomed recently, now recovering
-  const deepCrash    = pctHi < -50;
-  // Check if RSI was below 45 at ANY point in the last 30 bars
-  const rsiHistory   = [];
-  for(let i=Math.max(0,validC.length-30); i<validC.length-1; i++){
-    rsiHistory.push(calcRSI(validC.slice(0,i+1), 14));
-  }
-  const rsiMinRecent = rsiHistory.length ? Math.min(...rsiHistory) : 100;
-  const rsiWasLow    = rsiMinRecent < 45;               // was oversold in last 30 days
-  const rsiOld       = rsiHistory.length>=5 ? rsiHistory[rsiHistory.length-5] : rsi;
-  const rsiTurningUp = rsi > rsiOld;                    // RSI trending up
-  const emaFlattening= Math.abs(ema21 - ema21old) / ema21old < 0.01; // EMA stabilizing
-  const c7 = deepCrash && rsiWasLow && rsiTurningUp;   // relaxed - no EMA requirement
-
-  const conds=[c1,c2,c3,c4,c5,c6];
-  const score=conds.filter(Boolean).length;
-
-  // C7 override: if deep value bounce confirmed, qualify even with lower score
-  const qualifies = score >= 4 || (c7 && score >= 2);
-
-  // ── JAX PRO — calculate if enough bars ──────────────────────────────────
-  const jax         = validC.length >= 70 ? calcJAXPRO(validC, validH, validL) : null;
-  const greenArrow  = jax ? jax.greenArrow  : false;
-  const bullScore   = jax ? jax.bullScore   : 0;
-  const jaxHasData  = jax !== null;
-  const jaxRsiBull  = jax ? jax.rsiBull     : false;
-  const jaxWrBull   = jax ? jax.wrBull      : false;
-  const jaxEmaStack = jax ? jax.emaStack    : false;
-  const jaxMacdBull = jax ? jax.macdBull    : false;
-  const jaxStBull   = jax ? jax.stBull      : false;
-  const jaxUtBuy    = jax ? jax.atrTS.utBuy : false;
-  const jaxStFlip   = jax ? jax.st.flipped  : false;
-  const jaxTrail    = jax ? jax.trailVal    : 0;
-
-  return {sym,price,change,rsi,wr,ema21,emaRising,high52,pctHi,pctEMA,
-    c1,c2,c3,c4,c5,c6,c7,score,conds,
-    deepCrash, rsiTurningUp, rsiWasLow, emaFlattening, qualifies,
-    rsiMinRecent, rsiOld,
-    // JAX PRO — flat fields survive Firebase JSON round-trip
-    jax, greenArrow, bullScore, jaxHasData,
-    jaxRsiBull, jaxWrBull, jaxEmaStack, jaxMacdBull,
-    jaxStBull, jaxUtBuy, jaxStFlip, jaxTrail};
-}
 
 async function startRecoveryScan(){
   if(isRunning) return;
@@ -3292,6 +2931,7 @@ function logToJournal(entry){
     greenArrow: entry.greenArrow||false,
     heat: entry.heat||0,
     tradeType: entry.tradeType||"",
+    entryMode: entry.entryMode||"tracking", // "tracking" or "trade"
     stopLoss: entry.stopLoss||"",
     target1: entry.target1||"",
     target2: entry.target2||"",
@@ -3320,8 +2960,9 @@ function addManualEntry(){
   const target1   = parseFloat(t1El?.value)||"";
   const target2   = parseFloat(t2El?.value)||"";
   const tradeType = typeEl?.value||"";
+  const entryMode = document.getElementById("jnl-entry-mode")?.value || "tracking";
   logToJournal({sym, price, score:"?", source:"manual",
-    session:getMarketSession(), stopLoss, target1, target2, tradeType});
+    session:getMarketSession(), stopLoss, target1, target2, tradeType, entryMode});
   [symEl,priceEl,stopEl,t1El,t2El].forEach(el=>{ if(el) el.value=""; });
   if(typeEl) typeEl.value="";
   symEl?.focus();
@@ -3371,29 +3012,44 @@ function clearJournal(){
   showToast("📓 Journal cleared on all devices");
 }
 
+let jnlModeFilter = "all";
+function setJnlFilter(mode, btn){
+  jnlModeFilter = mode;
+  document.querySelectorAll('[id^="jnl-filter-"]').forEach(b=>b.classList.remove("on"));
+  if(btn) btn.classList.add("on");
+  renderJournal();
+}
+
 function renderJournal(){
   const body = document.getElementById("jnl-body");
   if(!body) return;
   const jnlSearch = (document.getElementById("jnl-search")?.value||"").toUpperCase().trim();
 
   // Stats
-  const closed = journalEntries.filter(e=>e.status==="win"||e.status==="loss");
-  const wins   = journalEntries.filter(e=>e.status==="win");
-  const losses = journalEntries.filter(e=>e.status==="loss");
+  // Stats only on REAL TRADES for accuracy
+  const tradeEntries = journalEntries.filter(e=>e.entryMode==="trade"||!e.entryMode);
+  const allClosed = journalEntries.filter(e=>e.status==="win"||e.status==="loss");
+  const closed = tradeEntries.filter(e=>e.status==="win"||e.status==="loss");
+  const wins   = tradeEntries.filter(e=>e.status==="win");
+  const losses = tradeEntries.filter(e=>e.status==="loss");
   const winRate = closed.length ? Math.round(wins.length/closed.length*100) : null;
   const avgWin  = wins.length  ? (wins.reduce((a,e)=>a+parseFloat(e.result||0),0)/wins.length).toFixed(1)   : null;
   const avgLoss = losses.length? (losses.reduce((a,e)=>a+parseFloat(e.result||0),0)/losses.length).toFixed(1) : null;
 
-  document.getElementById("jnl-total").textContent   = journalEntries.length;
+  const realTrades = journalEntries.filter(e=>e.entryMode==="trade").length;
+  const tracking   = journalEntries.filter(e=>e.entryMode!=="trade").length;
+  document.getElementById("jnl-total").textContent   = realTrades+"/"+journalEntries.length;
   document.getElementById("jnl-wins").textContent     = wins.length;
   document.getElementById("jnl-losses").textContent   = losses.length;
   document.getElementById("jnl-winrate").textContent  = winRate!==null ? winRate+"%" : "—";
   document.getElementById("jnl-avgwin").textContent   = avgWin  ? "+"+avgWin+"%" : "—";
   document.getElementById("jnl-avgloss").textContent  = avgLoss ? avgLoss+"%" : "—";
 
-  const filteredEntries = jnlSearch
-    ? journalEntries.filter(e=>e.sym.includes(jnlSearch))
-    : journalEntries;
+  const filteredEntries = journalEntries
+    .filter(e=> jnlModeFilter==="all" ? true :
+                jnlModeFilter==="trade" ? e.entryMode==="trade" :
+                (e.entryMode==="tracking"||!e.entryMode))
+    .filter(e=> jnlSearch ? e.sym.includes(jnlSearch) : true);
 
   if(!journalEntries.length){
     body.innerHTML = `<tr><td colspan="9" class="jnl-empty">
@@ -3427,6 +3083,18 @@ function renderJournal(){
       <td>
         <span class="jnl-sym" style="cursor:pointer" onclick="window.open('https://www.tradingview.com/chart/?symbol=${e.sym}','_blank')">${e.sym}</span>
         ${e.greenArrow?'<span class="badge jax" style="font-size:7px;padding:1px 4px;margin-left:4px">🟢</span>':''}
+        <span style="font-size:7px;padding:1px 5px;border-radius:1px;margin-left:3px;
+          background:${e.entryMode==="trade"?"rgba(0,200,83,0.15)":"rgba(100,100,100,0.15)"};
+          color:${e.entryMode==="trade"?"var(--green2)":"var(--muted2)"};
+          border:1px solid ${e.entryMode==="trade"?"rgba(0,200,83,0.3)":"rgba(100,100,100,0.2)"}">
+          ${e.entryMode==="trade"?"💰 TRADE":"📊 TRACK"}
+        </span>
+        <select onchange="updateField(${e.id},'entryMode',this.value);renderJournal()" 
+          style="font-size:7px;background:transparent;border:none;color:var(--muted);cursor:pointer">
+          <option value="">▾</option>
+          <option value="tracking">📊 Tracking</option>
+          <option value="trade">💰 Real Trade</option>
+        </select>
       </td>
       <td>
         ${e.tradeType?`<span style="font-size:8px;padding:1px 6px;border-radius:1px;background:${typeBg};color:${typeColor}">${e.tradeType}</span>`:"<span style='color:var(--muted);font-size:8px'>—</span>"}
@@ -3736,13 +3404,14 @@ function setJAXFilter(v, btn){
 
 function logRecoveryStock(sym, price, score, greenArrow){
   logToJournal({sym, price, score, source:'recovery',
-    session:getMarketSession(), greenArrow:!!greenArrow, tradeType:'Swing'});
+    session:getMarketSession(), greenArrow:!!greenArrow,
+    tradeType:'Swing', entryMode:'tracking'});
 }
 
 function logCatalystStock(sym, price, score, greenArrow, heat){
   logToJournal({sym, price, score, source:'catalyst',
     session:getMarketSession(), greenArrow:!!greenArrow,
-    heat, tradeType:'Catalyst'});
+    heat, tradeType:'Catalyst', entryMode:'tracking'});
 }
 
 function logJAXStock(sym, price, bullScore){
@@ -3753,7 +3422,8 @@ function logJAXStock(sym, price, bullScore){
     source:     'jax',
     session:    getMarketSession(),
     greenArrow: true,
-    tradeType:  'Swing'
+    tradeType:  'Swing',
+    entryMode:  'tracking'
   });
 }
 
