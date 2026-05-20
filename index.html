@@ -10,6 +10,18 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script>
+// ── API Keys ──────────────────────────────────────────────────────────────────
+const TD_KEYS = [
+  "fceed7ef4b7847d38e1ecd0bddcad5eb",
+  "c05d8242562f496e8709d5c9e0ce4109",
+  "9802166cf9694f42a64738bd776c22b9",
+  "5a13fcf43f1347c6b2b4459a0076ba51",
+  "257f261bbb394e8bad0c871eb5d9218d"
+];
+const FH_KEY    = "d819lthr01qler4hgk4gd819lthr01qler4hgk50";
+const PROXY_URL = ""; // unused — calling APIs directly
+
+
 function initFirebase(){
   if(typeof firebase === "undefined"){
     setTimeout(initFirebase, 100); // wait for compat scripts to load
@@ -1387,29 +1399,51 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
 <script>
 
 // ── API Keys ────────────────────────────────────────────────
-const PROXY_URL = "https://yellow-hall-2317confluence-proxy.kevonjones26.workers.dev";
-const TD_KEYS   = ["proxy"];
-const FH_KEY    = "proxy";
+// ── Market session detection ──────────────────────────────────────────────────
+function getMarketSession(){
+  const now  = new Date();
+  const et   = new Date(now.toLocaleString("en-US", {timeZone:"America/New_York"}));
+  const day  = et.getDay(); // 0=Sun, 6=Sat
+  const h    = et.getHours();
+  const m    = et.getMinutes();
+  const mins = h*60 + m;
+  if(day===0 || day===6) return "weekend";
+  if(mins < 4*60)        return "closed";      // before 4am
+  if(mins < 9*60+30)     return "premarket";   // 4am-9:30am
+  if(mins < 16*60)       return "open";        // 9:30am-4pm
+  if(mins < 20*60)       return "afterhours";  // 4pm-8pm
+  return "closed";
+}
+
+// ── Key status indicator ──────────────────────────────────────────────────────
+function updateKeyStatus(activeKeys){
+  const els = document.querySelectorAll("[id^='ks']");
+  els.forEach((el, i) => {
+    const isActive = activeKeys ? activeKeys.includes(i) : false;
+    el.className = "ks" + (isActive ? " active" : "");
+  });
+}
 
 // Cache earnings dates to avoid repeated API calls
 const earningsCache = {};
 
 async function fetchEarningsDate(sym){
   try{
-    const url  = PROXY_URL+"/api/earnings?sym="+sym;
-    const r    = await fetch(url);
-    const d    = await r.json();
-    const list = d.earningsCalendar||[];
+    const today  = new Date().toISOString().split("T")[0];
+    const future = new Date(Date.now()+30*24*60*60*1000).toISOString().split("T")[0];
+    const url    = "https://finnhub.io/api/v1/calendar/earnings?from="+today+"&to="+future+"&symbol="+sym+"&token="+FH_KEY;
+    const r      = await fetch(url);
+    const d      = await r.json();
+    const list   = d.earningsCalendar||[];
     if(!list.length) return null;
     const days = Math.round((new Date(list[0].date)-new Date())/(1000*60*60*24));
     return {date:list[0].date, daysUntil:Math.max(0,days)};
   }catch(e){ return null; }
 }
 
-
 async function fetchLiveQuote(sym){
   try{
-    const url = PROXY_URL+"/api/quote?sym="+sym;
+    const url = "https://finnhub.io/api/v1/quote?symbol="+sym+"&token="+FH_KEY;
     const r   = await fetch(url);
     const d   = await r.json();
     if(!d||!d.c||d.c===0) return null;
@@ -1426,9 +1460,6 @@ async function fetchLiveQuote(sym){
   }catch(e){ return null; }
 }
 
-
-
-// ── fetchCandles: single-stock wrapper for debug ─────────────────────────────
 async function fetchCandles(sym){ return fetchCandlesWithKey(sym, 0); }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1627,14 +1658,17 @@ function scoreRecovery(sym, closes, highs, lows){
   };
 }
 
-async function fetchCandlesWithKey(sym, keyIndex=0, retries=2){
+async function fetchCandlesWithKey(sym, keyIndex, retries=3){
   for(let attempt=0; attempt<retries; attempt++){
+    const key = TD_KEYS[keyIndex % TD_KEYS.length];
+    const url = "https://api.twelvedata.com/time_series?symbol="+sym+"&interval=1day&outputsize=260&apikey="+key;
     try{
-      const url = PROXY_URL+"/api/candles?sym="+sym+"&keyIndex="+keyIndex+"&outputsize=260";
-      const r   = await fetch(url);
-      const d   = await r.json();
-      if(d.status==="error") throw new Error("SKIP:"+d.message);
-      if(d.error) throw new Error("SKIP:"+d.error);
+      const r = await fetch(url);
+      const d = await r.json();
+      if(d.status==="error"){
+        if(d.message&&d.message.includes("API credits")){ await sleep(2000); continue; }
+        throw new Error("SKIP:"+d.message);
+      }
       const vals = [...(d.values||[])].reverse();
       if(vals.length < 30) throw new Error("SKIP:not enough bars");
       return {
@@ -1642,15 +1676,16 @@ async function fetchCandlesWithKey(sym, keyIndex=0, retries=2){
         highs:   vals.map(v=>parseFloat(v.high)),
         lows:    vals.map(v=>parseFloat(v.low)),
         volumes: vals.map(v=>parseFloat(v.volume||0)),
-        dates:   vals.map(v=>v.datetime)
+        dates:   vals.map(v=>v.datetime),
+        bars:    vals.length
       };
     }catch(e){
+      if(e.message&&e.message.startsWith("SKIP:")) throw e;
       if(attempt===retries-1) throw e;
       await sleep(2000);
     }
   }
 }
-
 
 async function runWorker(keyIndex, tickers, minScore, isCatalyst, maxPrice, minVolSpike, onResult, onProgress){
   const DELAY = 8500; // 8.5s between calls = 7 calls/min per key (safe under 8 limit)
@@ -2077,14 +2112,15 @@ async function fetchCandles(sym){ return fetchCandlesWithKey(sym, 0); }
 // ── Fetch 15-minute intraday candles from Finnhub ────────────────────────────
 async function fetch15mCandles(sym){
   try{
-    const url = PROXY_URL+"/api/candles15m?sym="+sym;
-    const r   = await fetch(url);
-    const d   = await r.json();
+    const now  = Math.floor(Date.now()/1000);
+    const from = now - 11*24*60*60;
+    const url  = "https://finnhub.io/api/v1/stock/candle?symbol="+sym+"&resolution=15&from="+from+"&to="+now+"&token="+FH_KEY;
+    const r    = await fetch(url);
+    const d    = await r.json();
     if(!d||d.s==="no_data"||!d.c) return null;
     return d;
   }catch(e){ return null; }
 }
-
 
 async function startRecoveryScan(){
   if(isRunning) return;
@@ -2280,7 +2316,8 @@ async function debugRecovery(sym){
   const out=document.getElementById("r-dout");
   out.style.color="#00b0ff"; out.textContent="Fetching "+sym+"...";
   try{
-    const {closes,highs,lows,bars}=await fetchCandles(sym);
+    const {closes,highs,lows,volumes,dates}=await fetchCandles(sym);
+    const bars=closes.length;
     const s=scoreRecovery(sym,closes,highs,lows);
     // Get live quote
     const lq=await fetchLiveQuote(sym);
@@ -2647,7 +2684,8 @@ async function debugCatalyst(sym){
   try{
     const maxPrice=parseFloat(document.getElementById("catMaxPrice").value)||50;
     const minVolSpike=parseFloat(document.getElementById("catVolSpike").value)||2;
-    const {closes,highs,lows,volumes,bars}=await fetchCandles(sym);
+    const {closes,highs,lows,volumes,dates}=await fetchCandles(sym);
+    const bars=closes.length;
     const earnings=await fetchEarningsDate(sym);
     const s=scoreCatalyst(sym,closes,highs,lows,volumes,maxPrice,minVolSpike,earnings);
     const p=(pass,lbl,val)=>(pass?"✅":"❌")+" "+lbl+": "+val;
