@@ -2934,15 +2934,6 @@ async function runMorningAlerts(){
       const changePct = q.changePct||0;
       const absChange = Math.abs(changePct);
 
-      // Get average volume from Twelve Data (use key 0, cached if possible)
-      let volSpike = 0;
-      try{
-        const cd = await fetchCandlesWithKey(sym, i%TD_KEYS.length);
-        const avgV = cd.volumes.slice(-21,-1).reduce((a,b)=>a+b,0)/20;
-        // Estimate today's vol from Finnhub (not directly available, use price move as proxy)
-        volSpike = avgV > 0 ? Math.abs(changePct)/2 : 0; // rough proxy
-      }catch(e){}
-
       // Get earnings date
       const earnings = await fetchEarningsDate(sym);
       if(earnings) calData[sym] = earnings;
@@ -2975,7 +2966,7 @@ async function runMorningAlerts(){
       }
     }catch(e){ log("✗ "+sym+": "+e.message,"err","a"); }
 
-    await sleep(300); // Finnhub free = light usage here
+    await sleep(100); // Finnhub free tier — 100ms sufficient for quote-only calls
   }
 
     // Save to session slot for comparison
