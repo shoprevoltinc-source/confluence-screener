@@ -1017,7 +1017,7 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
   <button class="btn-clear" onclick="clearSaved('catalyst')">🗑</button>
   <span class="ctrl-label">SECTOR</span>
   <select id="catSector">
-    <option value="all">All $2-$150</option>
+    <option value="all">All Universe (202)</option>
     <option value="Quantum/AI">⚛ Quantum/AI</option>
     <option value="Defense/Gov">🛡 Defense</option>
     <option value="Biotech">🧬 Biotech</option>
@@ -1032,7 +1032,7 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
     <option value="Fiber/Optical">🔆 Fiber/Optical</option>
   </select>
   <span class="ctrl-label">MAX $</span>
-  <input type="number" class="ctrl-input" id="catMaxPrice" value="150" min="1" max="500" style="width:60px">
+  <input type="number" class="ctrl-input" id="catMaxPrice" value="250" min="1" max="500" style="width:60px">
   <span class="ctrl-label">VOL</span>
   <select id="catVolSpike">
     <option value="2" selected>2x</option>
@@ -1048,7 +1048,7 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
 
 <div class="cond-bar">
   <span style="font-size:8px;color:var(--orange);font-weight:700;letter-spacing:2px;margin-right:4px">CONDITIONS:</span>
-  <span class="cond-tag">C1: Price range</span>
+  <span class="cond-tag">C1: Price &gt; $1</span>
   <span class="cond-tag">C2: 🔄 ATR coiling</span>
   <span class="cond-tag">C3: 🔇 Vol dry-up / spike</span>
   <span class="cond-tag">C4: 📅 Earnings &lt;14d / breakout</span>
@@ -1846,30 +1846,31 @@ const SECTORS = {
   "Fiber/Optical":  ["LITE","AAOI","VIAV","CIEN","INFN","CRDO","POET","ANGO","IIVI","COHU","FORM","ADTN","CASA","DZSI","FYBR","CALX","NTGR","COMM"]
 };
 
-// Combined flat list — Small Cap ($2-$25) + Mid Cap ($25-$75) = full catalyst universe
+// Full catalyst + mid-cap universe — $2-$250
+// Merged: small-cap catalysts + mid-cap momentum + all sectors
 const SMALLCAP = [...new Set([
-  // Small Cap — explosive catalyst plays
-  "MRAM","KTOS","AVAV","RCAT","ACHR","JOBY","ASTS","LUNR","RDW","SPIR",
-  "BBAI","CDRE","QUBT","IONQ","RGTI","SOUN","ARQQ","QBTS","VRNT",
-  "MGNX","RXRX","DNLI","BEAM","EDIT","CRSP","NTLA","VERV","NUVL","ALLO",
-  "HIMS","OCGN","NVAX","VXRT","INO","PSNL","BLUE","ARVN","PRTA","IMVT",
-  "KYMR","PTGX","RCKT","SAGE","TGTX","IOVA","APLS","FOLD","DAWN","YMAB",
-  "NVTS","AMPX","SMTC","AAOI","COHU","FORM","ONTO","ACMR","PLAB","DIOD",
-  "VIAV","POWI","AEVA","LAZR","MVIS","OUST","WOLF","AMBA","SLAB",
-  "BLNK","CHPT","EVGO","STEM","ARRY","NOVA","SHLS","FLNC","BLDP","FCEL",
-  "PLUG","RUN","CSIQ","DQ","JKS","BE","CWEN","GPRE","AMRC","VNET","CLSK","IREN","HUT","MARA",
-  "SOFI","HOOD","AFRM","UPST","DAVE","MQ","LMND","ROOT","DKNG","PENN",
-  "RBLX","MSTR","IREN","CIFR","RIOT","MARA","HUT","FOUR","RELY",
-  // Mid Cap ($25-$75) — momentum plays with catalyst history
-  "CRWD","DDOG","ZS","GTLB","BILL","DOCS","BRZE","CFLT","ASAN","SMAR",
-  "WEAV","ALKT","JAMF","TASK","SPSC","TDOC","ACCD","PRVA","GDRX","PGNY",
-  "TMDX","NVCR","MRCY","GEVO","CLNE","REGI","AXON","SITM","NXPI","AMKR",
-  "HIMS","NVRO","FATE","CWEN","ARRY","NOVA","SHLS","STEM","FLNC","ONTO",
-  // Comm Services
-  "DISH","LUMN","VSAT","IRDM","GSAT","SHEN","IDT","OOMA","GOGO","AVNW","CLFD",// Fiber/Optical — AI infrastructure buildout
-  "LITE","AAOI","VIAV","CIEN","INFN","CRDO","POET","ANGO","ADTN","CASA","DZSI","FYBR","CALX","COMM",
-  "IIVI","NTGR",// Comm Services additions
-  "TMUS","SATS","SPOK"])];
+  "MRAM", "KTOS", "AVAV", "RCAT", "ACHR", "JOBY", "ASTS", "LUNR", "RDW", "SPIR",
+  "BBAI", "CDRE", "QUBT", "IONQ", "RGTI", "SOUN", "ARQQ", "QBTS", "VRNT", "MGNX",
+  "RXRX", "DNLI", "BEAM", "EDIT", "CRSP", "NTLA", "VERV", "NUVL", "ALLO", "HIMS",
+  "OCGN", "NVAX", "VXRT", "INO", "PSNL", "BLUE", "ARVN", "PRTA", "IMVT", "KYMR",
+  "PTGX", "RCKT", "SAGE", "TGTX", "IOVA", "APLS", "FOLD", "DAWN", "YMAB", "NVTS",
+  "AMPX", "SMTC", "AAOI", "COHU", "FORM", "ONTO", "ACMR", "PLAB", "DIOD", "VIAV",
+  "POWI", "AEVA", "LAZR", "MVIS", "OUST", "WOLF", "AMBA", "SLAB", "BLNK", "CHPT",
+  "EVGO", "STEM", "ARRY", "NOVA", "SHLS", "FLNC", "BLDP", "FCEL", "PLUG", "RUN",
+  "CSIQ", "DQ", "JKS", "BE", "CWEN", "GPRE", "AMRC", "VNET", "CLSK", "IREN",
+  "HUT", "MARA", "SOFI", "HOOD", "AFRM", "UPST", "DAVE", "MQ", "LMND", "ROOT",
+  "DKNG", "PENN", "RBLX", "MSTR", "CIFR", "RIOT", "FOUR", "RELY", "CRWD", "DDOG",
+  "ZS", "GTLB", "BILL", "DOCS", "BRZE", "CFLT", "ASAN", "SMAR", "WEAV", "ALKT",
+  "JAMF", "TASK", "SPSC", "TDOC", "ACCD", "PRVA", "GDRX", "PGNY", "TMDX", "NVCR",
+  "MRCY", "GEVO", "CLNE", "REGI", "AXON", "SITM", "NXPI", "AMKR", "NVRO", "FATE",
+  "DISH", "LUMN", "VSAT", "IRDM", "GSAT", "SHEN", "IDT", "OOMA", "GOGO", "AVNW",
+  "CLFD", "LITE", "CIEN", "INFN", "CRDO", "POET", "ANGO", "ADTN", "CASA", "DZSI",
+  "FYBR", "CALX", "COMM", "IIVI", "NTGR", "TMUS", "SATS", "SPOK", "LPSN", "MTTR",
+  "CEVA", "DRS", "CACI", "SAIC", "BWXT", "HWM", "TDG", "LILM", "SEMR", "ONEM",
+  "CANO", "TALK", "ALHC", "CERT", "XERS", "INVA", "LUNG", "LDOS", "PANW", "SNOW",
+  "MDB", "NET", "TEAM", "HUBS", "ZI", "INSP", "IRTC", "OMCL", "NTRA", "RGEN",
+  "PAYC", "PAYO"
+])];
 
 // ── State ───────────────────────────────────────────────────
 let rResults=[], cResults=[], stopReq=false, isRunning=false;
@@ -1891,7 +1892,7 @@ function switchTab(tab){
     updateHdr(rResults);
     if(rResults.length){ renderRecovery(); document.getElementById("r-filterBar").style.display="flex"; document.getElementById("statsRow").style.display="flex"; }
   } else if(tab==="catalyst"){
-    document.getElementById("mainSubtitle").textContent="⚡ CATALYST SCANNER · SMALL CAP · MRAM-TYPE SETUPS";
+    document.getElementById("mainSubtitle").textContent="⚡ CATALYST SCANNER · FULL UNIVERSE · 202 STOCKS";
     updateHdr(cResults);
     if(cResults.length){ renderCatalyst(); document.getElementById("c-filterBar").style.display="flex"; }
   } else if(tab==="jax"){
@@ -2430,7 +2431,7 @@ function scoreCatalyst(sym, closes, highs, lows, volumes, maxPrice, minVolSpike,
   // ══════════════════════════════════════════════════════════
   // 6 CONDITIONS — ATR + 15m RVOL upgraded system
   // ══════════════════════════════════════════════════════════
-  const c1 = price >= 2 && price <= maxPrice;                    // Price in range (min $2)
+  const c1 = price >= 1;                                         // Exclude sub-$1 penny stocks only
   const c2 = atrCoiling || (isTight && flatDaysCount >= 8);      // ATR coiling OR price tight
   const c3 = isIgniting || dailySpike >= minVolSpike || volDryUp; // 15m ignition OR daily spike OR dry-up
   const c4 = hasEarnings || breakout || change > 8;              // Catalyst present
@@ -2608,7 +2609,7 @@ function renderCatalyst(){
   document.getElementById("c-resCount").textContent=f.length+" shown";
   const grid=document.getElementById("c-results");
   if(!f.length){grid.innerHTML='<div class="empty">No catalyst setups found yet.</div>';return;}
-  const CAT_LABELS=["$3-$25 range","Vol spike "+document.getElementById("catVolSpike")?.value+"x+","Flat 10+ days","Breaking out","Low float signal"];
+  const CAT_LABELS=["Price &gt; $1","Vol spike "+document.getElementById("catVolSpike")?.value+"x+","Flat 10+ days","Breaking out","Low float signal"];
   grid.innerHTML=f.map((s,i)=>{
     const heatBg=s.heat>=8?"var(--red)":s.heat>=6?"var(--orange)":s.score>=4?"#FF9100":"var(--yellow)";
     const heat=s.greenArrow&&s.isIgniting?"🚀🟢 IGNITION+JAX":s.greenArrow?"🟢 JAX":s.heat>=8?"🔥🔥🔥 FIRE":s.heat>=6?"🔥🔥 HOT":s.score>=4?"🔥 WARM":"📡 WATCH";
