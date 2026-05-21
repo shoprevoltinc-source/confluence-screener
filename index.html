@@ -3434,6 +3434,7 @@ async function runBacktest(){
 
   // Save to localStorage
   try{ localStorage.setItem("cs_backtest", JSON.stringify(btResults.slice(0,500))); }catch(e){}
+  if(window.firebaseReady) window.fbSave("backtest", btResults.slice(0,500));
 }
 
 function stopBacktest(){ btStopReq = true; }
@@ -3520,9 +3521,36 @@ function loadBacktest(){
       if(btResults.length){
         updateBTSummary();
         renderBTResults();
+        document.getElementById("bt-summary").style.display = "grid";
       }
     }
   }catch(e){ btResults=[]; }
+
+  document.addEventListener("firebaseReady", async()=>{
+    try{
+      const fb = await window.fbLoad("backtest");
+      if(fb && fb.data && fb.data.length > 0){
+        // Use Firebase if it has more results than localStorage
+        if(fb.data.length >= btResults.length){
+          btResults = fb.data;
+          localStorage.setItem("cs_backtest", JSON.stringify(btResults));
+          updateBTSummary();
+          renderBTResults();
+          document.getElementById("bt-summary").style.display = "grid";
+          logBT("☁️ Loaded "+btResults.length+" signals from Firebase · "+new Date(fb.savedAt).toLocaleString(),"info");
+        }
+      }
+      window.fbListen("backtest", (fb)=>{
+        if(fb.data && fb.data.length > 0 && fb.data.length >= btResults.length){
+          btResults = fb.data;
+          localStorage.setItem("cs_backtest", JSON.stringify(btResults));
+          updateBTSummary();
+          renderBTResults();
+          document.getElementById("bt-summary").style.display = "grid";
+        }
+      });
+    }catch(e){}
+  });
 }
 
 
