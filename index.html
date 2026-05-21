@@ -1746,8 +1746,8 @@ function _doSwitchTab(tab){
 
 <div class="conf-header">
   <div>
-    <div class="conf-title">🔔 Morning Alerts</div>
-    <div class="conf-sub" id="alert-sub">PREMARKET MOVERS · FINNHUB LIVE · 202 STOCKS · SESSION COMPARISON</div>
+    <div class="conf-title">🔔 Pulse</div>
+    <div class="conf-sub" id="alert-sub">INTRADAY MOVERS · FINNHUB LIVE · ZERO CREDITS · CROSS-REFS WEEKLY SIGNALS</div>
   </div>
   <div style="margin-left:auto;font-family:var(--mono);font-size:8px;color:var(--muted2)" id="alertTime"></div>
 </div>
@@ -1755,99 +1755,77 @@ function _doSwitchTab(tab){
 <div class="wm-stats">
   <div class="wm-stat"><div class="wm-stat-v" id="alert-scanned" style="color:var(--blue)">0</div><div class="wm-stat-l">Scanned</div></div>
   <div class="wm-stat"><div class="wm-stat-v" id="alert-movers" style="color:#E040FB">0</div><div class="wm-stat-l">Movers</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="alert-weekly" style="color:var(--green2)">0</div><div class="wm-stat-l">🟣 Weekly+Move</div></div>
   <div class="wm-stat"><div class="wm-stat-v" id="alert-fire" style="color:var(--red)">0</div><div class="wm-stat-l">🚀 10%+</div></div>
   <div class="wm-stat"><div class="wm-stat-v" id="alert-hot" style="color:var(--orange)">0</div><div class="wm-stat-l">🔥 5%+</div></div>
   <div class="wm-stat"><div class="wm-stat-v" id="alert-earn" style="color:var(--yellow)">0</div><div class="wm-stat-l">📅 Earnings</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="alert-upgrade" style="color:var(--blue)">0</div><div class="wm-stat-l">📊 Upgrades</div></div>
 </div>
 
-<div class="controls">
-  <button class="btn-scan alert" id="alertRunBtn" onclick="runMorningAlerts()">🔔 RUN ALERTS</button>
-  <button class="btn-stop" id="alertStopBtn" onclick="stopScan()" disabled>■ STOP</button>
-  <span class="auto-status auto-off" id="autoStatus" style="font-size:8px;padding:2px 8px;border-radius:2px;border:1px solid var(--border2);color:var(--muted);letter-spacing:1px">⏰ BROWSER AUTO: OFF</span>
-  <button onclick="toggleAutoAlert()" class="btn-clear">TOGGLE AUTO</button>
-  <span style="font-size:8px;padding:2px 8px;border-radius:2px;border:1px solid rgba(0,200,83,0.3);color:var(--green2);letter-spacing:1px">⚙️ GITHUB ACTIONS: ACTIVE</span>
-  <span class="ctrl-label">SESSION</span>
-  <select id="alertSession">
-    <option value="premarket">🌅 6AM Pre-Market</option>
-    <option value="open">🟢 9:45AM Market Open</option>
-    <option value="midday">☀️ 12PM Midday</option>
-    <option value="afternoon">🕑 2PM Afternoon</option>
-    <option value="preclose">🔔 3:30PM Pre-Close</option>
-    <option value="manual">📊 Manual</option>
+<div class="conf-controls">
+  <button class="btn-scan" id="alertRunBtn" onclick="runPulseScan()"
+    style="background:linear-gradient(135deg,#6A1B9A,#AB47BC);box-shadow:0 0 16px rgba(106,27,154,0.4)">
+    🔔 PULSE SCAN
+  </button>
+  <button class="btn-stop" id="alertStopBtn" onclick="stopPulseScan()" disabled>■ STOP</button>
+  <button class="btn-clear" onclick="clearPulse()">🗑</button>
+  <span class="ctrl-label">LIST</span>
+  <select id="alertList">
+    <option value="both" selected>Both (658)</option>
+    <option value="catalyst">Catalyst Universe</option>
+    <option value="sp500">S&P 500</option>
+    <option value="watchlist">My Watchlist</option>
   </select>
   <span class="ctrl-label">MIN MOVE</span>
   <select id="alertMinMove">
+    <option value="1" selected>1%+</option>
+    <option value="2">2%+</option>
     <option value="3">3%+</option>
-    <option value="5" selected>5%+</option>
-    <option value="8">8%+</option>
-    <option value="10">10%+</option>
+    <option value="5">5%+</option>
   </select>
-  <span class="ctrl-label">VOL</span>
-  <select id="alertMinVol">
-    <option value="1.5">1.5x+</option>
-    <option value="2" selected>2x+</option>
-    <option value="3">3x+</option>
-  </select>
-  <span class="ctrl-label">LIST</span>
-  <select id="alertList">
-    <option value="catalyst" selected>Catalyst Universe</option>
-    <option value="watchlist">My Watchlist</option>
-    <option value="sp500">S&P 500</option>
-  </select>
+  <input type="text" id="alert-search" placeholder="🔍 filter ticker..."
+    style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:5px 8px;font-family:var(--mono);font-size:9px;border-radius:2px;width:120px"
+    oninput="filterPulseResults()">
 </div>
 
-<div class="prog-wrap" id="a-prog">
-  <div class="prog-row"><span class="prog-msg" id="a-progMsg">Checking pre-market...</span><span class="prog-pct" id="a-progPct">0%</span></div>
-  <div class="prog-track"><div class="prog-fill alert" id="a-progFill"></div></div>
-</div>
-
-<div class="alerts-grid">
-  <!-- LEFT: Movers -->
-  <div class="alerts-col">
-    <div class="col-hdr">
-      <span class="col-title">🔔 MOVERS</span>
-
-      <input type="text" id="alert-search" placeholder="🔍 ticker..."
-        style="width:90px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:2px 6px;font-family:var(--mono);font-size:8px;border-radius:2px"
-        oninput="renderAlerts(sessionAlerts[activeSession]?.alerts||[])">
-      <button class="btn-compare" onclick="showComparison()">📊 COMPARE</button>
-    </div>
-    <div class="session-tabs">
-      <button class="stab on" id="ses-tab-pm" onclick="showSession('premarket',this)">🌅 6AM</button>
-      <button class="stab" id="ses-tab-open" onclick="showSession('open',this)">🟢 9:45</button>
-      <button class="stab" id="ses-tab-mid" onclick="showSession('midday',this)">☀️ 12PM</button>
-      <button class="stab" id="ses-tab-aft" onclick="showSession('afternoon',this)">🕑 2PM</button>
-      <button class="stab" id="ses-tab-pre" onclick="showSession('preclose',this)">🔔 3:30</button>
-    </div>
-    <div id="alertResults">
-      <div style="font-size:9px;color:var(--muted);padding:20px 0;text-align:center;letter-spacing:1px">
-        Select session → Run Alerts<br><br>
-        <span style="font-size:8px;color:var(--muted)">
-          6AM → pre-market movers<br>
-          9:45AM → confirms which ones followed through
-        </span>
-      </div>
-    </div>
-    <div id="comparisonView" style="display:none"></div>
+<div class="wm-prog" id="a-prog" style="display:none">
+  <div class="wm-prog-row">
+    <span class="wm-prog-msg" id="a-progMsg">Scanning...</span>
+    <span class="wm-prog-pct" id="a-progPct">0%</span>
   </div>
+  <div class="wm-prog-track"><div class="wm-prog-fill" id="a-progFill" style="background:linear-gradient(90deg,#6A1B9A,#AB47BC)"></div></div>
+</div>
 
-  <!-- RIGHT: Calendar -->
-  <div class="alerts-col">
-    <div class="col-hdr">
-      <span class="cal-title">📅 EARNINGS CALENDAR</span>
-      <button class="cal-refresh" onclick="loadCalendar()">REFRESH</button>
-    </div>
-    <div id="calendarResults">
-      <div style="font-size:9px;color:var(--muted);padding:10px 0;text-align:center;letter-spacing:1px">
-        Click REFRESH to load upcoming earnings
-      </div>
-    </div>
+<div class="banner green" id="pulse-savedBanner" style="display:none"></div>
+
+<div class="filter-bar" id="pulse-filterBar" style="display:none">
+  <span class="filter-label">SHOW</span>
+  <button class="chip on" onclick="setPulseFilter('all',this)">ALL</button>
+  <button class="chip" onclick="setPulseFilter('weekly',this)">🟣 WEEKLY+MOVE</button>
+  <button class="chip" onclick="setPulseFilter('fire',this)">🚀 10%+</button>
+  <button class="chip" onclick="setPulseFilter('hot',this)">🔥 5%+</button>
+  <button class="chip" onclick="setPulseFilter('upgrade',this)">📊 Upgrades</button>
+  <select class="sort-select" id="pulse-sortSel" onchange="renderPulseResults()">
+    <option value="priority">Priority (Weekly > Move%)</option>
+    <option value="move">Biggest Move</option>
+    <option value="alpha">A→Z</option>
+  </select>
+  <span class="res-count" id="pulse-resCount"></span>
+</div>
+
+<div id="pulse-results">
+  <div class="conf-empty">
+    <span class="conf-empty-icon">🔔</span>
+    PULSE SCAN<br>
+    <span style="font-size:9px;color:var(--muted2)">Checks 658 stocks via Finnhub — zero API credits used</span><br>
+    <span style="font-size:9px;color:var(--muted2)">Cross-references movers against your Weekly Monitor signals</span><br><br>
+    <span style="font-size:8px;color:var(--muted)">🟣 WEEKLY+MOVE = weekly trail flip + moving today = enter now</span>
   </div>
 </div>
 
-<div class="accordion" style="margin-top:0">
+<div class="accordion">
   <div class="accordion-hdr" onclick="toggleAccordion('a-log-body','a-log-arrow')">
-    <span>▸ ACTIVITY LOG</span><span class="accordion-arrow" id="a-log-arrow">▾</span>
+    <span>▸ SCAN LOG</span><span class="accordion-arrow" id="a-log-arrow">▾</span>
   </div>
   <div class="accordion-body" id="a-log-body">
     <div class="log-panel" id="a-log"></div>
@@ -2181,6 +2159,52 @@ async function fetchEarningsDate(sym){
     const days = Math.round((new Date(list[0].date)-new Date())/(1000*60*60*24));
     return {date:list[0].date, daysUntil:Math.max(0,days)};
   }catch(e){ return null; }
+}
+
+
+// ── Fetch analyst upgrades/downgrades — last 7 days ──────────────────────
+const upgradeCache = {};
+async function fetchUpgrades(sym){
+  if(upgradeCache[sym] !== undefined) return upgradeCache[sym];
+  try{
+    const url = "https://finnhub.io/api/v1/stock/upgrade-downgrade?symbol="+sym+"&token="+FH_KEY;
+    const r = await fetch(url);
+    if(!r.ok){ upgradeCache[sym]=null; return null; }
+    const data = await r.json();
+    if(!data || !data.length){ upgradeCache[sym]=null; return null; }
+    // Filter to last 7 days
+    const cutoff = Date.now() - 7*24*60*60*1000;
+    const recent = data.filter(d=>{
+      const dt = new Date(d.gradeDate).getTime();
+      return dt >= cutoff;
+    });
+    if(!recent.length){ upgradeCache[sym]=null; return null; }
+    // Sort by date desc, get most recent
+    recent.sort((a,b)=>new Date(b.gradeDate)-new Date(a.gradeDate));
+    const top = recent[0];
+    // Determine if bullish
+    const bullishGrades = ["buy","strong buy","outperform","overweight","positive","accumulate","add"];
+    const toGrade = (top.toGrade||"").toLowerCase();
+    const fromGrade = (top.fromGrade||"").toLowerCase();
+    const isBullish = bullishGrades.some(g=>toGrade.includes(g));
+    const isBearish = toGrade.includes("sell") || toGrade.includes("underperform") || toGrade.includes("underweight");
+    const isUpgrade = top.action === "upgrade" || (isBullish && !bullishGrades.some(g=>fromGrade.includes(g)));
+    const isDowngrade = top.action === "downgrade" || (isBearish && !fromGrade.includes("sell"));
+    const result = {
+      company:    top.company||"Analyst",
+      action:     top.action||"reiterated",
+      fromGrade:  top.fromGrade||"",
+      toGrade:    top.toGrade||"",
+      date:       top.gradeDate,
+      isBullish,
+      isBearish,
+      isUpgrade,
+      isDowngrade,
+      daysAgo:    Math.floor((Date.now()-new Date(top.gradeDate).getTime())/86400000)
+    };
+    upgradeCache[sym] = result;
+    return result;
+  }catch(e){ upgradeCache[sym]=null; return null; }
 }
 
 async function fetchLiveQuote(sym){
@@ -2650,8 +2674,9 @@ function switchTab(tab){
   } else if(tab==="alerts"){
     const sess=getMarketSession();
     const sessLabel={"premarket":"🌅 PRE-MARKET","open":"🟢 MARKET OPEN","afterhours":"🌙 AFTER HOURS","closed":"⚪ MARKET CLOSED","weekend":"⚪ WEEKEND"}[sess]||"";
-    document.getElementById("mainSubtitle").textContent="🔔 MORNING ALERTS · "+sessLabel;
-    const atEl = document.getElementById("alertTime"); if(atEl) atEl.textContent=new Date().toLocaleTimeString();
+    document.getElementById("mainSubtitle").textContent="🔔 PULSE · INTRADAY MOVERS · CROSS-REFS WEEKLY SIGNALS";
+    const atEl = document.getElementById("alertTime"); if(atEl) atEl.textContent=sessLabel+" · "+new Date().toLocaleTimeString();
+    renderPulseResults();
   } else if(tab==="journal"){
     document.getElementById("mainSubtitle").textContent="📓 TRADE JOURNAL · TRACK EVERY FLAGGED STOCK";
     renderJournal();
@@ -3526,31 +3551,37 @@ function loadBacktest(){
     }
   }catch(e){ btResults=[]; }
 
-  document.addEventListener("firebaseReady", async()=>{
+  // Handle race condition — Firebase may already be ready
+  const _doBTFirebase = async()=>{
     try{
       const fb = await window.fbLoad("backtest");
       if(fb && fb.data && fb.data.length > 0){
-        // Use Firebase if it has more results than localStorage
         if(fb.data.length >= btResults.length){
           btResults = fb.data;
           localStorage.setItem("cs_backtest", JSON.stringify(btResults));
           updateBTSummary();
           renderBTResults();
-          document.getElementById("bt-summary").style.display = "grid";
-          logBT("☁️ Loaded "+btResults.length+" signals from Firebase · "+new Date(fb.savedAt).toLocaleString(),"info");
+          const sumEl = document.getElementById("bt-summary");
+          if(sumEl) sumEl.style.display = "grid";
+          try{ logBT("☁️ Loaded "+btResults.length+" signals from Firebase · "+new Date(fb.savedAt).toLocaleString(),"info"); }catch(e){}
         }
       }
       window.fbListen("backtest", (fb)=>{
-        if(fb.data && fb.data.length > 0 && fb.data.length >= btResults.length){
-          btResults = fb.data;
-          localStorage.setItem("cs_backtest", JSON.stringify(btResults));
-          updateBTSummary();
-          renderBTResults();
-          document.getElementById("bt-summary").style.display = "grid";
-        }
+        try{
+          if(fb.data && fb.data.length > 0 && fb.data.length >= btResults.length){
+            btResults = fb.data;
+            localStorage.setItem("cs_backtest", JSON.stringify(btResults));
+            updateBTSummary();
+            renderBTResults();
+            const sumEl = document.getElementById("bt-summary");
+            if(sumEl) sumEl.style.display = "grid";
+          }
+        }catch(e){}
       });
-    }catch(e){}
-  });
+    }catch(e){ console.warn("Backtest Firebase load error:", e); }
+  };
+  if(window.firebaseReady){ _doBTFirebase(); }
+  else { document.addEventListener("firebaseReady", _doBTFirebase, {once:true}); }
 }
 
 
@@ -3889,7 +3920,7 @@ function loadWeeklyMonitor(){
     }
   }catch(e){ wmResults=[]; }
 
-  document.addEventListener("firebaseReady", async()=>{
+  const _doWMFirebase = async()=>{
     try{
       const fb = await window.fbLoad("weekly_monitor");
       if(fb && fb.data && fb.data.length > 0){
@@ -3911,7 +3942,9 @@ function loadWeeklyMonitor(){
         }
       });
     }catch(e){}
-  });
+  };
+  if(window.firebaseReady){ _doWMFirebase(); }
+  else { document.addEventListener("firebaseReady", _doWMFirebase, {once:true}); }
 }
 
 async function loadSaved(){
@@ -4756,10 +4789,19 @@ async function countdown(secs,panel){
 // MORNING ALERTS SYSTEM
 // ══════════════════════════════════════════════════════════
 
-let autoAlertTimer = null;
-let alertRunning = false;
+// ══════════════════════════════════════════════════════════
+// PULSE SCAN
+// Intraday movers — Finnhub only, zero TD credits
+// Cross-references against Weekly Monitor signals
+// 🟣 WEEKLY+MOVE = your entry signal
+// ══════════════════════════════════════════════════════════
 
-// ── Request browser notifications permission ──────────────
+let pulseResults  = [];
+let pulseRunning  = false;
+let pulseStopReq  = false;
+let pulseFilter   = "all";
+
+// Keep sendNotification and requestNotifPermission
 async function requestNotifPermission(){
   if(!("Notification" in window)) return false;
   if(Notification.permission==="granted") return true;
@@ -4776,304 +4818,318 @@ function sendNotification(title, body, sym){
   n.onclick = () => window.open("https://www.tradingview.com/chart/?symbol="+sym,"_blank");
 }
 
-// Session storage for comparison
-let sessionAlerts = {
-  premarket:  { alerts:[], time:null, label:"6AM Pre-Market" },
-  open:       { alerts:[], time:null, label:"9:45AM Market Open" },
-  midday:     { alerts:[], time:null, label:"12PM Midday" },
-  afternoon:  { alerts:[], time:null, label:"2PM Afternoon" },
-  preclose:   { alerts:[], time:null, label:"3:30PM Pre-Close" }
-};
-let activeSession = "premarket";
-
-function showSession(sess, btn){
-  activeSession = sess;
-  document.querySelectorAll("#ses-tab-pm, #ses-tab-open").forEach(b=>b.classList.remove("on"));
+function setPulseFilter(v, btn){
+  pulseFilter = v;
+  document.querySelectorAll("#pulse-filterBar .chip").forEach(b=>b.classList.remove("on"));
   btn.classList.add("on");
-  renderAlerts(sessionAlerts[sess].alerts);
-  const t = sessionAlerts[sess].time;
-  document.getElementById("alertTime").textContent = t ? "Last run: "+t : "Not run yet";
+  renderPulseResults();
 }
 
-function showComparison(){
-  const pmAlerts  = sessionAlerts.premarket.alerts;
-  const opAlerts  = sessionAlerts.open.alerts;
-  const cv = document.getElementById("comparisonView");
-  const ar = document.getElementById("alertResults");
-
-  if(!pmAlerts.length && !opAlerts.length){
-    log("Run both sessions first to compare","warn","a"); return;
-  }
-
-  cv.style.display = cv.style.display==="none" ? "block" : "none";
-  ar.style.display = ar.style.display==="none" ? "block" : "none";
-
-  if(cv.style.display==="none") return;
-
-  // Build comparison table
-  const allSyms = [...new Set([...pmAlerts.map(a=>a.sym), ...opAlerts.map(a=>a.sym)])];
-  const pmMap   = Object.fromEntries(pmAlerts.map(a=>[a.sym,a]));
-  const opMap   = Object.fromEntries(opAlerts.map(a=>[a.sym,a]));
-
-  cv.innerHTML = `
-    <div style="font-size:10px;font-weight:700;color:#1976D2;margin-bottom:8px">📊 SESSION COMPARISON</div>
-    <div style="font-size:8px;color:#546E7A;margin-bottom:8px">
-      Green = appeared in both sessions (strongest setups) · 
-      Blue = pre-market only · Orange = open only
-    </div>
-    ${allSyms.sort((a,b)=>{
-      const inBoth = (pmMap[a]&&opMap[a]?1:0) - (pmMap[b]&&opMap[b]?1:0);
-      return -inBoth;
-    }).map(sym=>{
-      const pm = pmMap[sym], op = opMap[sym];
-      const inBoth = pm && op;
-      const bg = inBoth?"#00C85315":pm?"#1565C015":"#FF910015";
-      const bc = inBoth?"#00C85344":pm?"#1565C044":"#FF910044";
-      const label = inBoth?"✅ BOTH SESSIONS":pm?"🌅 PRE-MKT ONLY":"🟢 OPEN ONLY";
-      const labelC = inBoth?"#00C853":pm?"#90CAF9":"#FF9100";
-      return `<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:${bg};border:1px solid ${bc};border-radius:5px;margin-bottom:4px;cursor:pointer"
-              onclick="window.open('https://www.tradingview.com/chart/?symbol=${sym}','_blank')">
-        <span style="font-size:13px;font-weight:700;color:#fff;min-width:50px">${sym}</span>
-        <span style="font-size:8px;color:${labelC};min-width:100px">${label}</span>
-        ${pm?`<span style="font-size:8px;color:#90CAF9">6am: $${pm.price.toFixed(2)} ${pm.changePct>=0?"▲":"▼"}${Math.abs(pm.changePct).toFixed(1)}%</span>`:""}
-        ${op?`<span style="font-size:8px;color:#00C853">9:45: $${op.price.toFixed(2)} ${op.changePct>=0?"▲":"▼"}${Math.abs(op.changePct).toFixed(1)}%</span>`:""}
-        ${pm&&op?`<span style="font-size:8px;color:#FFD600">move: ${((op.price-pm.price)/pm.price*100).toFixed(1)}%</span>`:""}
-        <span style="font-size:8px;color:#546E7A;margin-left:auto">📈 TradingView</span>
-      </div>`;
-    }).join("")}`;
+function filterPulseResults(){
+  renderPulseResults();
 }
 
-// ── Toggle auto alert ─────────────────────────────────────
-function toggleAutoAlert(){
-  if(autoAlertTimer){
-    clearInterval(autoAlertTimer);
-    autoAlertTimer = null;
-    document.getElementById("autoStatus").className="auto-status auto-off";
-    document.getElementById("autoStatus").textContent="⏰ AUTO: OFF";
-    log("Auto-alert disabled","warn","a");
-  } else {
-    autoAlertTimer = setInterval(()=>{
-      const et = new Date(new Date().toLocaleString("en-US",{timeZone:"America/New_York"}));
-      const h=et.getHours(), m=et.getMinutes();
-      // Auto-run at 6:00 AM ET (pre-market)
-      if(h===6 && m===0){
-        document.getElementById("alertSession").value="premarket";
-        log("⏰ 6:00 AM ET — running pre-market alerts...","info","a");
-        runMorningAlerts();
-      }
-      // Auto-run at 9:45 AM ET (market open)
-      if(h===9 && m===45){
-        document.getElementById("alertSession").value="open";
-        log("⏰ 9:45 AM ET — running market open alerts...","info","a");
-        runMorningAlerts();
-      }
-    }, 60000);
-    document.getElementById("autoStatus").className="auto-status auto-on";
-    document.getElementById("autoStatus").textContent="⏰ AUTO: ON (6AM + 9:45AM)";
-    log("Auto-alert ON — runs at 6:00 AM + 9:45 AM ET daily","ok","a");
-    requestNotifPermission();
-  }
+function stopPulseScan(){ pulseStopReq = true; }
+
+function clearPulse(){
+  pulseResults = [];
+  document.getElementById("pulse-savedBanner").style.display = "none";
+  document.getElementById("pulse-filterBar").style.display = "none";
+  document.getElementById("pulse-results").innerHTML = '<div class="conf-empty"><span class="conf-empty-icon">🔔</span>Cleared.</div>';
+  ["alert-scanned","alert-movers","alert-weekly","alert-fire","alert-hot","alert-earn"].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.textContent="0";
+  });
+  try{ localStorage.removeItem("cs_pulse"); }catch(e){}
 }
 
-// ── Main morning alert scan ──────────────────────────────
-async function runMorningAlerts(){
-  if(alertRunning) return;
-  alertRunning=true;
-  document.getElementById("alertRunBtn").disabled=true;
-  document.getElementById("alertStopBtn").disabled=false;
-  document.getElementById("a-prog").style.display="block";
-  document.getElementById("a-log").innerHTML="";
-  document.getElementById("alertResults").innerHTML="";
-  document.getElementById("alertTime").textContent=new Date().toLocaleTimeString();
+async function runPulseScan(){
+  if(pulseRunning) return;
+  pulseRunning = true; pulseStopReq = false; pulseResults = [];
 
-  const listVal   = document.getElementById("alertList").value;
-  const minMove   = parseFloat(document.getElementById("alertMinMove").value)||5;
-  const minVol    = parseFloat(document.getElementById("alertMinVol").value)||2;
-  const tickers   = listVal==="sp500"?[...SP500]:listVal==="catalyst"?[...SMALLCAP]:[...WATCHLIST];
+  const listVal  = document.getElementById("alertList").value;
+  const minMove  = parseFloat(document.getElementById("alertMinMove").value)||1;
 
-  const sess = getMarketSession();
-  const sessionKey = document.getElementById("alertSession")?.value||"manual";
-  const sessionLabel = sessionKey==="premarket"?"🌅 6AM PRE-MARKET":sessionKey==="open"?"🟢 9:45AM OPEN":"📊 MANUAL";
-  log("🔔 "+sessionLabel+" scan: "+tickers.length+" stocks · min move "+minMove+"%","info","a");
-  log("Market: "+sess.toUpperCase()+" · "+new Date().toLocaleTimeString(),"info","a");
+  let tickers;
+  if(listVal==="sp500")        tickers = [...SP500];
+  else if(listVal==="watchlist") tickers = [...WATCHLIST];
+  else if(listVal==="catalyst") tickers = [...SMALLCAP];
+  else                          tickers = [...new Set([...SP500,...SMALLCAP])]; // both
 
-  const alerts = [];
-  const calData = {};
+  document.getElementById("alertRunBtn").disabled  = true;
+  document.getElementById("alertStopBtn").disabled = false;
+  document.getElementById("a-prog").style.display  = "block";
+  document.getElementById("pulse-savedBanner").style.display = "none";
+  document.getElementById("pulse-filterBar").style.display   = "none";
+  document.getElementById("pulse-results").innerHTML = "";
+  document.getElementById("a-log").innerHTML = "";
 
-  for(let i=0;i<tickers.length;i++){
-    if(stopReq) break;
+  const sess    = getMarketSession();
+  const sessLbl = {"premarket":"🌅 PRE-MARKET","open":"🟢 MARKET OPEN","afterhours":"🌙 AFTER HOURS","closed":"⚪ CLOSED","weekend":"⚪ WEEKEND"}[sess]||"";
+  document.getElementById("alertTime").textContent = sessLbl+" · "+new Date().toLocaleTimeString();
+  document.getElementById("alert-sub").textContent = sessLbl+" · "+tickers.length+" STOCKS · MIN "+minMove+"% · ZERO CREDITS";
+
+  // Build weekly monitor lookup for cross-reference
+  const weeklySyms = new Set((wmResults||[]).map(r=>r.sym));
+
+  log("🔔 Pulse scan: "+tickers.length+" stocks · "+sessLbl+" · min move "+minMove+"%","info","a");
+  log("Weekly monitor has "+weeklySyms.size+" signals to cross-reference","info","a");
+
+  let done = 0, movers = 0;
+
+  for(let i=0; i<tickers.length; i++){
+    if(pulseStopReq) break;
     const sym = tickers[i];
+
+    // Update progress
     const pct = Math.round(i/tickers.length*100);
-    document.getElementById("a-progMsg").textContent="Checking "+sym+" ("+(i+1)+"/"+tickers.length+")";
-    document.getElementById("a-progPct").textContent=pct+"%";
-    document.getElementById("a-progFill").style.width=pct+"%";
+    document.getElementById("a-progMsg").textContent = "Checking "+sym+" · "+(i+1)+"/"+tickers.length+" · "+movers+" movers";
+    document.getElementById("a-progPct").textContent = pct+"%";
+    document.getElementById("a-progFill").style.width = pct+"%";
+    document.getElementById("alert-scanned").textContent = i+1;
 
     try{
-      // Get live quote from Finnhub (pre-market aware)
       const q = await fetchLiveQuote(sym);
-      if(!q||!q.price) continue;
+      if(!q || !q.price || q.price < 3){ await sleep(80); continue; }
 
-      const changePct = q.changePct||0;
+      const changePct = q.changePct || 0;
       const absChange = Math.abs(changePct);
 
-      // Get earnings date
-      const earnings = await fetchEarningsDate(sym);
-      if(earnings) calData[sym] = earnings;
+      if(absChange >= minMove){
+        movers++;
 
-      // Flag if moving enough
-      const isAlert = absChange >= minMove;
-      const hasEarningsSoon = earnings && earnings.daysUntil <= 3;
+        // Cross-reference with weekly monitor
+        const weeklyMatch = weeklySyms.has(sym);
+        const wmData      = weeklyMatch ? wmResults.find(r=>r.sym===sym) : null;
 
-      if(isAlert || hasEarningsSoon){
-        const alert = {
-          sym, price:q.price, changePct, absChange,
-          prev:q.prev, high:q.high, low:q.low,
-          earnings, hasEarningsSoon, sess
+        // Get earnings
+        let earnings = null;
+        try{ earnings = await fetchEarningsDate(sym); }catch(e){}
+        const hasEarnings = earnings && earnings.daysUntil >= 0 && earnings.daysUntil <= 7;
+
+        // Get analyst upgrades/downgrades — last 7 days
+        let upgrade = null;
+        try{ upgrade = await fetchUpgrades(sym); }catch(e){}
+        const hasUpgrade   = upgrade && upgrade.isUpgrade;
+        const hasDowngrade = upgrade && upgrade.isDowngrade;
+
+        const result = {
+          sym,
+          price:      q.price,
+          changePct,
+          absChange,
+          prev:       q.prev,
+          high:       q.high,
+          low:        q.low,
+          sess,
+          weeklyMatch,
+          wmData,
+          hasEarnings,
+          earnings,
+          upgrade,
+          hasUpgrade,
+          hasDowngrade,
+          scannedAt: new Date().toISOString()
         };
-        alerts.push(alert);
-        renderAlerts(alerts);
 
-        // Send browser notification for big moves
-        if(absChange>=minMove){
-          // Update alert stat bar
-          const allAlerts = alerts.length + 1;
-          document.getElementById("alert-scanned").textContent = i+1;
-          document.getElementById("alert-movers").textContent  = allAlerts;
-          document.getElementById("alert-fire").textContent    = alerts.filter(a=>a.absChange>=10).length + (absChange>=10?1:0);
-          document.getElementById("alert-hot").textContent     = alerts.filter(a=>a.absChange>=5).length + (absChange>=5?1:0);
-          const dir = changePct>=0?"📈 UP":"📉 DOWN";
-          sendNotification(
-            "🔔 "+sym+" "+dir+" "+changePct.toFixed(1)+"% — CHECK NOW",
-            "$"+q.price.toFixed(2)+" · prev $"+q.prev.toFixed(2)+" · Click to open TradingView",
-            sym
-          );
-          log("🔔 ALERT: "+sym+" "+dir+" "+changePct.toFixed(1)+"% | $"+q.price.toFixed(2)+(hasEarningsSoon?" | 📅 EARNINGS IN "+earnings.daysUntil+"d":""),"ok","a");
+        pulseResults.push(result);
+
+        // Update stat bar
+        document.getElementById("alert-movers").textContent  = movers;
+        document.getElementById("alert-weekly").textContent  = pulseResults.filter(r=>r.weeklyMatch).length;
+        document.getElementById("alert-fire").textContent    = pulseResults.filter(r=>r.absChange>=10).length;
+        document.getElementById("alert-hot").textContent     = pulseResults.filter(r=>r.absChange>=5&&r.absChange<10).length;
+        document.getElementById("alert-earn").textContent    = pulseResults.filter(r=>r.hasEarnings).length;
+        document.getElementById("alert-upgrade").textContent  = pulseResults.filter(r=>r.hasUpgrade).length;
+
+        renderPulseResults();
+        document.getElementById("pulse-filterBar").style.display = "flex";
+
+        // Log
+        const wkStr  = weeklyMatch ? " | 🟣 WEEKLY" : "";
+        const earnStr= hasEarnings ? " | 📅 "+earnings.daysUntil+"d" : "";
+        const upgStr = hasUpgrade  ? " | 📊 "+upgrade.company+" UPGRADE→"+upgrade.toGrade : hasDowngrade ? " | 📉 DOWNGRADE" : "";
+        log((absChange>=10?"🚀":absChange>=5?"🔥":"📈")+" "+sym+" "+(changePct>=0?"▲":"▼")+absChange.toFixed(1)+"% $"+q.price.toFixed(2)+wkStr+earnStr+upgStr,
+          weeklyMatch||hasUpgrade?"ok":"");
+
+        // Notification for weekly+move
+        if(weeklyMatch || hasUpgrade){
+          const notifTitle = weeklyMatch && hasUpgrade
+            ? "🟣📊 "+sym+" WEEKLY + UPGRADE + MOVING"
+            : weeklyMatch
+            ? "🟣 "+sym+" WEEKLY + MOVING "+(changePct>=0?"▲":"▼")+absChange.toFixed(1)+"%"
+            : "📊 "+sym+" UPGRADED + MOVING "+(changePct>=0?"▲":"▼")+absChange.toFixed(1)+"%";
+          const notifBody = [
+            "$"+q.price.toFixed(2),
+            weeklyMatch&&wmData?"Weekly flip "+(wmData.weeksAgo===0?"this wk":wmData.weeksAgo+"wk ago")+" at $"+wmData.weeklyFlipPrice.toFixed(2):"",
+            hasUpgrade?upgrade.company+" → "+upgrade.toGrade+(upgrade.daysAgo===0?" today":upgrade.daysAgo+"d ago"):""
+          ].filter(Boolean).join(" · ");
+          sendNotification(notifTitle, notifBody, sym);
         }
-      } else {
-        log("  "+sym.padEnd(6)+" "+changePct.toFixed(1)+"% | $"+q.price.toFixed(2));
       }
     }catch(e){ log("✗ "+sym+": "+e.message,"err","a"); }
 
-    await sleep(100); // Finnhub free tier — 100ms sufficient for quote-only calls
+    await sleep(80);
   }
 
-    // Save to session slot for comparison
-  const sk = document.getElementById("alertSession")?.value||"manual";
-  const sessionLabel2 = sk==="premarket"?"🌅 6AM PRE-MARKET":
-    sk==="open"?"🟢 9:45AM OPEN":
-    sk==="midday"?"☀️ 12PM MIDDAY":
-    sk==="afternoon"?"🕑 2PM AFTERNOON":
-    sk==="preclose"?"🔔 3:30PM PRE-CLOSE":"📊 MANUAL";
-  const validSessions = ["premarket","open","midday","afternoon","preclose"];
-  if(validSessions.includes(sk)){
-    if(!sessionAlerts[sk]) sessionAlerts[sk] = {alerts:[], time:null, label:sk};
-    sessionAlerts[sk].alerts = [...alerts];
-    sessionAlerts[sk].time = new Date().toLocaleTimeString();
-    // Save to localStorage (this device)
-    try{ localStorage.setItem("cs_alerts_"+sk, JSON.stringify({alerts, time:new Date().toISOString()})); }catch(e){}
-    // Save to Firebase (all devices)
-    if(window.firebaseReady){
-      window.fbSave("alerts_"+sk, {alerts, time:new Date().toISOString()});
-      log("☁️ Alerts synced to Firebase ("+sk+")","info","a");
-    }
+  document.getElementById("a-progMsg").textContent = "Done — "+tickers.length+" scanned · "+movers+" movers";
+  document.getElementById("a-progPct").textContent = "100%";
+  document.getElementById("a-progFill").style.width = "100%";
+  document.getElementById("alertRunBtn").disabled  = false;
+  document.getElementById("alertStopBtn").disabled = true;
+  pulseRunning = false;
+
+  if(pulseResults.length){
+    const banner = document.getElementById("pulse-savedBanner");
+    banner.style.display = "block";
+    const wkCount = pulseResults.filter(r=>r.weeklyMatch).length;
+    banner.textContent = "🔔 "+movers+" movers · "+wkCount+" weekly+move · "+sessLbl+" · "+new Date().toLocaleTimeString();
+    // Save to Firebase
+    if(window.firebaseReady) window.fbSave("pulse", pulseResults);
+    try{ localStorage.setItem("cs_pulse", JSON.stringify(pulseResults)); }catch(e){}
   }
 
-  document.getElementById("a-progMsg").textContent="Done — "+alerts.length+" alerts · "+sessionLabel2;
-  document.getElementById("a-progPct").textContent="100%";
-  document.getElementById("alertRunBtn").disabled=false;
-  document.getElementById("alertStopBtn").disabled=true;
-  alertRunning=false;
-
-  renderCalendar(calData);
-  log("✅ "+sessionLabel2+" complete. "+alerts.length+" movers found.","info","a");
+  renderPulseResults();
+  log("✅ Pulse scan complete · "+movers+" movers · "+pulseResults.filter(r=>r.weeklyMatch).length+" weekly+move","ok","a");
 }
 
-function renderAlerts(alerts){
-  const el = document.getElementById("alertResults");
-  const alertSearch = (document.getElementById("alert-search")?.value||"").toUpperCase().trim();
-  if(alertSearch) alerts = alerts.filter(a=>a.sym.includes(alertSearch));
-  if(!alerts.length){
-    el.innerHTML='<div style="font-size:10px;color:#546E7A;padding:20px 0;text-align:center">No movers above threshold yet...</div>';
+function renderPulseResults(){
+  const sort   = document.getElementById("pulse-sortSel")?.value||"priority";
+  const search = (document.getElementById("alert-search")?.value||"").toUpperCase().trim();
+
+  let f = [...pulseResults];
+  if(pulseFilter==="weekly")  f = f.filter(r=>r.weeklyMatch);
+  else if(pulseFilter==="fire")    f = f.filter(r=>r.absChange>=10);
+  else if(pulseFilter==="hot")     f = f.filter(r=>r.absChange>=5);
+  else if(pulseFilter==="upgrade") f = f.filter(r=>r.hasUpgrade);
+  if(search) f = f.filter(r=>r.sym.includes(search));
+
+  f.sort((a,b)=>{
+    if(sort==="move")  return b.absChange-a.absChange;
+    if(sort==="alpha") return a.sym.localeCompare(b.sym);
+    // Priority: weekly+move first, then by absChange
+    const aScore = (a.weeklyMatch&&a.hasUpgrade?3000:a.weeklyMatch?2000:a.hasUpgrade?1000:0)+a.absChange;
+    const bScore = (b.weeklyMatch&&b.hasUpgrade?3000:b.weeklyMatch?2000:b.hasUpgrade?1000:0)+b.absChange;
+    return bScore-aScore;
+  });
+
+  document.getElementById("pulse-resCount").textContent = f.length+" shown";
+  const el = document.getElementById("pulse-results");
+
+  if(!f.length){
+    el.innerHTML = pulseResults.length
+      ? '<div class="conf-empty"><span class="conf-empty-icon">🔍</span>No results match filter.</div>'
+      : '<div class="conf-empty"><span class="conf-empty-icon">🔔</span>Run Pulse Scan to see movers.</div>';
     return;
   }
-  const sorted = [...alerts].sort((a,b)=>b.absChange-a.absChange);
-  el.innerHTML = sorted.map(a=>{
-    const up = a.changePct>=0;
-    const heat = a.absChange>=10?"fire":a.absChange>=5?"hot":"warm";
-    const icon = a.absChange>=10?"🚀":a.absChange>=5?"🔥":"📡";
-    const reasons = [];
-    if(a.absChange>=2) reasons.push((up?"▲":"▼")+Math.abs(a.changePct).toFixed(1)+"% "+(a.sess==="premarket"?"pre-mkt":"today"));
-    if(a.hasEarningsSoon) reasons.push("📅 earnings in "+a.earnings.daysUntil+"d");
-    return `<div class="alert-card ${heat}" onclick="window.open('https://www.tradingview.com/chart/?symbol=${a.sym}','_blank')">
+
+  el.innerHTML = f.map((a,i)=>{
+    const up      = a.changePct >= 0;
+    const heat    = a.weeklyMatch?"fire":a.absChange>=10?"fire":a.absChange>=5?"hot":"warm";
+    const icon    = a.weeklyMatch?"🟣":a.absChange>=10?"🚀":a.absChange>=5?"🔥":"📡";
+    const cardBdr = a.weeklyMatch && a.hasUpgrade
+      ? "border-color:rgba(0,230,118,0.5);box-shadow:0 4px 24px rgba(0,230,118,0.15)"
+      : a.weeklyMatch
+      ? "border-color:rgba(156,39,176,0.5);box-shadow:0 4px 20px rgba(156,39,176,0.12)"
+      : a.hasUpgrade?"border-color:rgba(0,176,255,0.4);box-shadow:0 4px 16px rgba(0,176,255,0.1)"
+      : a.absChange>=10?"border-color:rgba(255,23,68,0.25)"
+      : a.absChange>=5?"border-color:rgba(255,109,0,0.2)":"";
+    const topBar  = a.weeklyMatch && a.hasUpgrade
+      ? "background:linear-gradient(90deg,#6A1B9A,#00e676)"
+      : a.weeklyMatch
+      ? "background:linear-gradient(90deg,#6A1B9A,#E040FB)"
+      : a.hasUpgrade?"background:linear-gradient(90deg,#0d47a1,#00b0ff)"
+      : a.absChange>=10?"background:var(--red)"
+      : a.absChange>=5?"background:var(--orange)":"background:var(--border2)";
+
+    return `<div class="alert-card ${heat}" style="${cardBdr};position:relative;overflow:hidden"
+        onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${a.sym}'),'_blank')">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;${topBar}"></div>
       <div class="alert-icon">${icon}</div>
       <div class="alert-body">
-        <div class="alert-sym">${a.sym}</div>
-        <div class="alert-reason">${reasons.join(" · ")}</div>
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+          <span class="alert-sym">${a.sym}</span>
+          ${a.weeklyMatch?`<span style="font-size:8px;padding:1px 6px;border-radius:1px;background:rgba(156,39,176,0.15);color:#E040FB;border:1px solid rgba(156,39,176,0.3);font-family:var(--mono)">🟣 WEEKLY</span>`:""}
+          ${a.hasUpgrade?`<span style="font-size:8px;padding:1px 6px;border-radius:1px;background:rgba(0,176,255,0.12);color:var(--blue);border:1px solid rgba(0,176,255,0.3);font-family:var(--mono)">📊 UPGRADE</span>`:""}
+          ${a.hasDowngrade?`<span style="font-size:8px;padding:1px 6px;border-radius:1px;background:rgba(255,23,68,0.1);color:var(--red);border:1px solid rgba(255,23,68,0.2);font-family:var(--mono)">📉 DOWNGRADE</span>`:""}
+          ${a.hasEarnings?`<span style="font-size:8px;padding:1px 6px;border-radius:1px;background:rgba(255,214,0,0.1);color:var(--yellow);border:1px solid rgba(255,214,0,0.2);font-family:var(--mono)">📅 ${a.earnings.daysUntil}d</span>`:""}
+        </div>
+        <div class="alert-reason">
+          ${up?"▲":"▼"}${a.absChange.toFixed(1)}% ${a.sess==="premarket"?"pre-mkt":a.sess==="afterhours"?"after-hrs":"today"}
+          ${a.weeklyMatch&&a.wmData?` · flip ${a.wmData.weeksAgo===0?"this wk":a.wmData.weeksAgo+"wk ago"} at $${a.wmData.weeklyFlipPrice.toFixed(2)}`:""}
+          ${a.hasUpgrade&&a.upgrade?` · ${a.upgrade.company} → ${a.upgrade.toGrade}${a.upgrade.daysAgo===0?" today":" "+a.upgrade.daysAgo+"d ago"}`:""}
+        </div>
         <div class="alert-meta">
           <span>prev $${(a.prev||0).toFixed(2)}</span>
-          ${a.high?'<span>hi $'+(a.high||0).toFixed(2)+'</span>':''}
-          ${a.low?'<span>lo $'+(a.low||0).toFixed(2)+'</span>':''}
-          <span style="color:var(--blue)">📈 TradingView</span>
+          ${a.high?`<span>hi $${(a.high||0).toFixed(2)}</span>`:""}
+          ${a.low?`<span>lo $${(a.low||0).toFixed(2)}</span>`:""}
+          <span style="color:var(--blue)">📈 TradingView →</span>
         </div>
       </div>
-      <div class="alert-price">
+      <div class="alert-price-col">
         <div class="alert-p">$${a.price.toFixed(2)}</div>
-        <div class="alert-pct" style="color:${up?'#00C853':'#FF1744'};font-weight:700">${up?"▲":"▼"}${Math.abs(a.changePct).toFixed(2)}%</div>
+        <div class="alert-pct" style="color:${up?"var(--green2)":"var(--red)"};font-weight:700">${up?"▲":"▼"}${a.absChange.toFixed(2)}%</div>
       </div>
     </div>`;
   }).join("");
 }
 
-// ── Earnings Calendar ────────────────────────────────────
-async function loadCalendar(){
-  document.getElementById("calendarResults").innerHTML='<div style="font-size:10px;color:#00b0ff;padding:10px 0">Loading earnings dates...</div>';
-  const tickers = [...WATCHLIST];
-  const calData = {};
-  for(const sym of tickers){
+// Load pulse results from Firebase
+function loadPulseAlerts(){
+  try{
+    const saved = localStorage.getItem("cs_pulse");
+    if(saved){
+      pulseResults = JSON.parse(saved);
+      if(pulseResults.length){
+        document.getElementById("pulse-filterBar").style.display = "flex";
+        document.getElementById("pulse-savedBanner").style.display = "block";
+        document.getElementById("pulse-savedBanner").textContent = "💾 "+pulseResults.length+" movers · last scan";
+        document.getElementById("alert-movers").textContent  = pulseResults.length;
+        document.getElementById("alert-weekly").textContent  = pulseResults.filter(r=>r.weeklyMatch).length;
+        document.getElementById("alert-fire").textContent    = pulseResults.filter(r=>r.absChange>=10).length;
+        document.getElementById("alert-hot").textContent     = pulseResults.filter(r=>r.absChange>=5&&r.absChange<10).length;
+        renderPulseResults();
+      }
+    }
+  }catch(e){ pulseResults=[]; }
+
+  const _doPulseFirebase = async()=>{
     try{
-      const e = await fetchEarningsDate(sym);
-      if(e) calData[sym] = e;
-    }catch(err){}
-    await sleep(200);
-  }
-  renderCalendar(calData);
+      const fb = await window.fbLoad("pulse");
+      if(fb && fb.data && fb.data.length > 0){
+        pulseResults = fb.data;
+        localStorage.setItem("cs_pulse", JSON.stringify(pulseResults));
+        document.getElementById("pulse-filterBar").style.display = "flex";
+        const banner = document.getElementById("pulse-savedBanner");
+        if(banner){ banner.style.display="block"; banner.textContent="☁️ "+pulseResults.length+" movers · "+new Date(fb.savedAt).toLocaleString(); }
+        document.getElementById("alert-movers").textContent  = pulseResults.length;
+        document.getElementById("alert-weekly").textContent  = pulseResults.filter(r=>r.weeklyMatch).length;
+        document.getElementById("alert-fire").textContent    = pulseResults.filter(r=>r.absChange>=10).length;
+        renderPulseResults();
+      }
+      window.fbListen("pulse", (fb)=>{
+        if(fb.data && fb.data.length > 0){
+          pulseResults = fb.data;
+          localStorage.setItem("cs_pulse", JSON.stringify(pulseResults));
+          renderPulseResults();
+        }
+      });
+    }catch(e){}
+  };
+  if(window.firebaseReady){ _doPulseFirebase(); }
+  else { document.addEventListener("firebaseReady", _doPulseFirebase, {once:true}); }
 }
 
-function renderCalendar(calData){
-  const el = document.getElementById("calendarResults");
-  const entries = Object.entries(calData)
-    .filter(([,e])=>e&&e.daysUntil>=0&&e.daysUntil<=30)
-    .sort((a,b)=>a[1].daysUntil-b[1].daysUntil);
+// Keep log function accessible for alerts tab
+function logAlert(msg, type=""){ log(msg, type, "a"); }
 
-  if(!entries.length){
-    el.innerHTML='<div style="font-size:10px;color:#546E7A;padding:10px 0">No upcoming earnings found in next 30 days</div>';
-    return;
-  }
-
-  // Group by week
-  const thisWeek  = entries.filter(([,e])=>e.daysUntil<=7);
-  const nextWeek  = entries.filter(([,e])=>e.daysUntil>7&&e.daysUntil<=14);
-  const later     = entries.filter(([,e])=>e.daysUntil>14);
-
-  function makeGroup(label, items, cls){
-    if(!items.length) return '';
-    return `<div class="cal-week">
-      <div class="cal-week-hdr">${label} (${items.length})</div>
-      ${items.map(([sym,e])=>`
-        <div class="cal-item" onclick="window.open('https://www.tradingview.com/chart/?symbol=${sym}','_blank')">
-          <div class="cal-date">${e.date}</div>
-          <div class="cal-sym">${sym}</div>
-          <div class="cal-desc">Earnings report</div>
-          <div class="cal-days ${cls}">${e.daysUntil===0?"TODAY":e.daysUntil===1?"TOMORROW":e.daysUntil+"d away"}</div>
-        </div>`).join("")}
-    </div>`;
-  }
-
-  el.innerHTML =
-    makeGroup("🔥 THIS WEEK", thisWeek, "soon") +
-    makeGroup("📅 NEXT WEEK", nextWeek, "week") +
-    makeGroup("🗓 LATER", later, "next");
-}
+// Stub out old functions that may be referenced elsewhere
+function runMorningAlerts(){ runPulseScan(); }
+function renderAlerts(){ renderPulseResults(); }
+function showSession(){}
+function showComparison(){}
+function toggleAutoAlert(){}
+async function loadCalendar(){}
+function renderCalendar(){}
 
 // ── Init ──────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════
@@ -5919,6 +5975,7 @@ loadJAX();
 loadConfluence();
 loadBacktest();
 loadWeeklyMonitor();
+loadPulseAlerts();
 // Auto-load calendar on startup
 setTimeout(()=>{ try{ loadCalendar(); }catch(e){} }, 2000);
 
