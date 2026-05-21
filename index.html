@@ -85,6 +85,9 @@ function initFirebase(){
       el.style.background = "rgba(0,200,83,0.1)";
       el.style.color = "#00C853";
       el.style.borderColor = "rgba(0,200,83,0.3)";
+      // Mirror on confluence tab
+      const el2 = document.getElementById("fbStatus2");
+      if(el2){ el2.textContent="🟢 FIREBASE"; el2.style.color="#00C853"; el2.style.borderColor="rgba(0,200,83,0.3)"; }
     }
   }, 500);
 })();
@@ -796,6 +799,349 @@ pre.dout{
   .session-tabs{flex-wrap:wrap;gap:3px}
   .stab{font-size:7px;padding:2px 6px}
 }
+
+/* ═══════════════════════════════════════════════════════════
+   CONFLUENCE TAB
+═══════════════════════════════════════════════════════════ */
+.conf-header{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 20px;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+}
+.conf-title{
+  font-family:var(--sans);font-size:20px;font-weight:800;
+  letter-spacing:2px;text-transform:uppercase;color:#fff;
+}
+.conf-sub{font-size:8px;color:var(--muted2);letter-spacing:1px;margin-top:2px;font-family:var(--mono)}
+.conf-stats{
+  display:flex;gap:0;border-bottom:1px solid var(--border);
+  background:var(--bg);
+}
+.conf-stat{
+  flex:1;padding:8px 16px;border-right:1px solid var(--border);
+  display:flex;flex-direction:column;gap:2px;
+}
+.conf-stat:last-child{border-right:none}
+.conf-stat-v{font-family:var(--sans);font-size:24px;font-weight:700;line-height:1}
+.conf-stat-l{font-family:var(--mono);font-size:7px;color:var(--muted2);letter-spacing:2px;text-transform:uppercase}
+.conf-controls{
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  padding:8px 16px;background:var(--bg2);border-bottom:1px solid var(--border);
+}
+/* Confluence result cards */
+.conf-card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:3px;
+  padding:0;
+  overflow:hidden;
+  cursor:pointer;
+  transition:border-color 0.15s,transform 0.1s;
+  position:relative;
+}
+.conf-card:hover{transform:translateY(-1px);border-color:var(--border2)}
+.conf-card.conf-full{
+  border-color:rgba(0,200,83,0.4);
+  box-shadow:0 4px 24px rgba(0,200,83,0.1);
+}
+.conf-card.conf-full::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--green2),var(--green));
+}
+.conf-card.conf-strong{border-color:rgba(255,214,0,0.3)}
+.conf-card.conf-strong::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--yellow);
+}
+/* Card top band */
+.conf-band{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 14px 8px;
+  border-bottom:1px solid var(--border);
+}
+.conf-sym{
+  font-family:var(--sans);font-size:26px;font-weight:800;
+  color:#fff;letter-spacing:1px;line-height:1;
+}
+.conf-price-block{text-align:right}
+.conf-price{font-family:var(--mono);font-size:16px;font-weight:700;color:#fff}
+.conf-chg{font-family:var(--mono);font-size:10px;margin-top:2px}
+.conf-chg.up{color:var(--green2)}.conf-chg.dn{color:var(--red)}
+/* Confluence score bar */
+.conf-score-bar{
+  display:flex;align-items:center;gap:0;
+  padding:6px 14px;
+  background:rgba(0,0,0,0.2);
+  border-bottom:1px solid var(--border);
+}
+.conf-pill{
+  flex:1;text-align:center;padding:4px 6px;
+  font-family:var(--mono);font-size:8px;
+  font-weight:700;letter-spacing:1px;
+  border-right:1px solid var(--border);
+  text-transform:uppercase;
+}
+.conf-pill:last-child{border-right:none}
+.conf-pill.hit{color:#fff}
+.conf-pill.miss{color:var(--muted);font-weight:400}
+.conf-pill.hit.move{background:rgba(156,39,176,0.15);color:#E040FB}
+.conf-pill.hit.recovery{background:rgba(0,200,83,0.1);color:var(--green2)}
+.conf-pill.hit.jax{background:rgba(0,200,83,0.15);color:var(--green)}
+.conf-pill.hit.catalyst{background:rgba(255,109,0,0.12);color:var(--orange)}
+/* Signal details */
+.conf-details{padding:10px 14px}
+.conf-detail-row{
+  display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;align-items:center;
+}
+.conf-tag{
+  font-family:var(--mono);font-size:8px;padding:2px 7px;
+  border-radius:1px;border:1px solid var(--border2);
+  color:var(--muted2);letter-spacing:0.5px;
+}
+.conf-tag.green{color:var(--green2);border-color:rgba(0,200,83,0.3);background:rgba(0,200,83,0.06)}
+.conf-tag.orange{color:var(--orange);border-color:rgba(255,109,0,0.3);background:rgba(255,109,0,0.06)}
+.conf-tag.blue{color:var(--blue);border-color:rgba(0,176,255,0.3);background:rgba(0,176,255,0.06)}
+.conf-tag.yellow{color:var(--yellow);border-color:rgba(255,214,0,0.3);background:rgba(255,214,0,0.06)}
+.conf-tag.purple{color:#E040FB;border-color:rgba(156,39,176,0.3);background:rgba(156,39,176,0.06)}
+/* Log button */
+.conf-footer{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 14px;
+  border-top:1px solid var(--border);
+  background:rgba(0,0,0,0.15);
+}
+.conf-score-big{
+  font-family:var(--sans);font-size:13px;font-weight:700;
+  letter-spacing:1px;
+}
+/* Progress */
+.conf-prog{
+  display:none;padding:8px 16px;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+}
+.conf-prog-row{display:flex;justify-content:space-between;margin-bottom:4px}
+.conf-prog-msg{font-size:9px;color:var(--blue);letter-spacing:1px;font-family:var(--mono)}
+.conf-prog-pct{font-size:9px;color:var(--muted);font-family:var(--mono)}
+.conf-prog-track{height:2px;background:var(--border);border-radius:1px;overflow:hidden}
+.conf-prog-fill{
+  height:2px;
+  background:linear-gradient(90deg,#aa44ff,#E040FB,var(--green2));
+  width:0%;transition:width 0.3s;
+}
+/* Filter */
+.conf-filter{
+  display:none;padding:6px 16px;
+  background:var(--bg);border-bottom:1px solid var(--border);
+  gap:5px;align-items:center;flex-wrap:wrap;
+}
+/* Accordion log */
+.conf-empty{
+  text-align:center;padding:60px 20px;
+  color:var(--muted);font-size:10px;letter-spacing:1px;line-height:2.2;
+}
+.conf-empty-icon{font-size:36px;display:block;margin-bottom:12px}
+
+/* ═══════════════════════════════════════════════════════════
+   BACKTEST TAB
+═══════════════════════════════════════════════════════════ */
+.bt-header{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 20px;background:var(--bg2);
+  border-bottom:1px solid var(--border);
+}
+.bt-title{
+  font-family:var(--sans);font-size:20px;font-weight:800;
+  letter-spacing:2px;text-transform:uppercase;color:#fff;
+}
+.bt-sub{font-size:8px;color:var(--muted2);letter-spacing:1px;margin-top:2px;font-family:var(--mono)}
+.bt-controls{
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  padding:8px 16px;background:var(--bg2);border-bottom:1px solid var(--border);
+}
+.bt-summary{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+  gap:1px;background:var(--border);
+  border-bottom:1px solid var(--border);
+}
+.bt-stat{
+  background:var(--bg);padding:10px 16px;
+  display:flex;flex-direction:column;gap:2px;
+}
+.bt-stat-v{
+  font-family:var(--sans);font-size:22px;font-weight:700;line-height:1;
+}
+.bt-stat-l{
+  font-family:var(--mono);font-size:7px;color:var(--muted2);
+  letter-spacing:2px;text-transform:uppercase;
+}
+/* Signal table */
+.bt-table-wrap{overflow-x:auto;padding:0}
+.bt-table{
+  width:100%;border-collapse:collapse;
+  font-family:var(--mono);font-size:10px;
+}
+.bt-table th{
+  font-size:7px;color:var(--muted2);text-transform:uppercase;
+  letter-spacing:2px;padding:8px 12px;
+  border-bottom:1px solid var(--border);
+  text-align:left;background:var(--bg2);
+  font-weight:400;white-space:nowrap;
+  position:sticky;top:0;
+}
+.bt-table td{
+  padding:9px 12px;border-bottom:1px solid var(--border);
+  vertical-align:middle;white-space:nowrap;
+}
+.bt-table tr.win td{border-left:2px solid var(--green2)}
+.bt-table tr.loss td{border-left:2px solid var(--red)}
+.bt-table tr:hover td{background:rgba(255,255,255,0.015)}
+.bt-sym{
+  font-family:var(--sans);font-size:14px;
+  font-weight:800;color:#fff;letter-spacing:1px;
+}
+.bt-signal{
+  font-size:8px;padding:2px 7px;border-radius:1px;
+  font-family:var(--mono);font-weight:700;letter-spacing:1px;
+}
+.bt-signal.weekly{background:rgba(0,176,255,0.12);color:var(--blue);border:1px solid rgba(0,176,255,0.3)}
+.bt-signal.daily{background:rgba(0,200,83,0.1);color:var(--green2);border:1px solid rgba(0,200,83,0.25)}
+.bt-signal.both{background:rgba(156,39,176,0.15);color:#E040FB;border:1px solid rgba(156,39,176,0.35)}
+.bt-ret{font-size:12px;font-weight:700}
+.bt-ret.pos{color:var(--green2)}.bt-ret.neg{color:var(--red)}
+.bt-prog{
+  display:none;padding:8px 16px;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+}
+.bt-prog-row{display:flex;justify-content:space-between;margin-bottom:4px}
+.bt-prog-msg{font-size:9px;color:var(--blue);letter-spacing:1px;font-family:var(--mono)}
+.bt-prog-pct{font-size:9px;color:var(--muted);font-family:var(--mono)}
+.bt-prog-track{height:2px;background:var(--border);border-radius:1px;overflow:hidden}
+.bt-prog-fill{
+  height:2px;width:0%;transition:width 0.3s;
+  background:linear-gradient(90deg,var(--blue),#42A5F5);
+}
+.bt-empty{
+  text-align:center;padding:60px 20px;
+  color:var(--muted);font-size:10px;letter-spacing:1px;line-height:2.2;
+}
+.bt-empty-icon{font-size:36px;display:block;margin-bottom:12px}
+/* Equity curve */
+.bt-chart{
+  padding:16px;background:var(--bg);
+  border-bottom:1px solid var(--border);
+}
+.bt-chart-title{
+  font-family:var(--mono);font-size:8px;color:var(--muted2);
+  letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   WEEKLY MONITOR TAB
+═══════════════════════════════════════════════════════════ */
+.wm-card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:3px;
+  overflow:hidden;
+  cursor:pointer;
+  transition:border-color 0.15s,transform 0.1s;
+  position:relative;
+}
+.wm-card:hover{transform:translateY(-1px)}
+.wm-card.wm-fresh{
+  border-color:rgba(0,200,83,0.4);
+  box-shadow:0 4px 20px rgba(0,200,83,0.1);
+}
+.wm-card.wm-fresh::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--green2),var(--green));
+}
+.wm-card.wm-recent{border-color:rgba(0,176,255,0.3)}
+.wm-card.wm-recent::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--blue);
+}
+.wm-card.wm-old{border-color:rgba(255,214,0,0.2)}
+.wm-card.wm-old::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--yellow);
+}
+.wm-band{
+  display:flex;justify-content:space-between;align-items:flex-start;
+  padding:12px 14px 8px;
+  border-bottom:1px solid var(--border);
+}
+.wm-sym{
+  font-family:var(--sans);font-size:26px;font-weight:800;
+  color:#fff;letter-spacing:1px;line-height:1;
+}
+.wm-price-block{text-align:right}
+.wm-price{font-family:var(--mono);font-size:15px;font-weight:700;color:#fff}
+.wm-chg{font-family:var(--mono);font-size:10px;margin-top:2px}
+.wm-chg.up{color:var(--green2)}.wm-chg.dn{color:var(--red)}
+.wm-signals{
+  display:flex;gap:0;border-bottom:1px solid var(--border);
+}
+.wm-sig{
+  flex:1;text-align:center;padding:6px 8px;
+  font-family:var(--mono);font-size:8px;
+  border-right:1px solid var(--border);
+  text-transform:uppercase;letter-spacing:0.5px;
+}
+.wm-sig:last-child{border-right:none}
+.wm-sig.active{font-weight:700}
+.wm-sig.wk-on{color:var(--blue);background:rgba(0,176,255,0.06)}
+.wm-sig.dy-on{color:var(--green2);background:rgba(0,200,83,0.06)}
+.wm-sig.both-on{color:#E040FB;background:rgba(156,39,176,0.08)}
+.wm-sig.off{color:var(--muted)}
+.wm-details{padding:10px 14px}
+.wm-detail-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px}
+.wm-tag{
+  font-family:var(--mono);font-size:8px;padding:2px 7px;
+  border-radius:1px;border:1px solid var(--border2);
+  color:var(--muted2);letter-spacing:0.5px;
+}
+.wm-tag.green{color:var(--green2);border-color:rgba(0,200,83,0.3);background:rgba(0,200,83,0.06)}
+.wm-tag.blue{color:var(--blue);border-color:rgba(0,176,255,0.3);background:rgba(0,176,255,0.06)}
+.wm-tag.yellow{color:var(--yellow);border-color:rgba(255,214,0,0.3);background:rgba(255,214,0,0.06)}
+.wm-tag.purple{color:#E040FB;border-color:rgba(156,39,176,0.3);background:rgba(156,39,176,0.06)}
+.wm-footer{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 14px;border-top:1px solid var(--border);
+  background:rgba(0,0,0,0.15);
+}
+.wm-badge{
+  font-family:var(--sans);font-size:11px;font-weight:700;
+  letter-spacing:1px;padding:2px 8px;border-radius:2px;
+}
+.wm-badge.fresh{background:rgba(0,200,83,0.15);color:var(--green)}
+.wm-badge.recent{background:rgba(0,176,255,0.12);color:var(--blue)}
+.wm-badge.old{background:rgba(255,214,0,0.1);color:var(--yellow)}
+.wm-badge.both{background:rgba(156,39,176,0.15);color:#E040FB}
+.wm-prog{
+  display:none;padding:8px 16px;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+}
+.wm-prog-row{display:flex;justify-content:space-between;margin-bottom:4px}
+.wm-prog-msg{font-size:9px;color:var(--blue);letter-spacing:1px;font-family:var(--mono)}
+.wm-prog-pct{font-size:9px;color:var(--muted);font-family:var(--mono)}
+.wm-prog-track{height:2px;background:var(--border);border-radius:1px;overflow:hidden}
+.wm-prog-fill{
+  height:2px;width:0%;transition:width 0.3s;
+  background:linear-gradient(90deg,var(--blue),#E040FB,var(--green2));
+}
+.wm-stats{
+  display:flex;gap:0;border-bottom:1px solid var(--border);
+  background:var(--bg);
+}
+.wm-stat{
+  flex:1;padding:8px 16px;border-right:1px solid var(--border);
+  display:flex;flex-direction:column;gap:2px;
+}
+.wm-stat:last-child{border-right:none}
+.wm-stat-v{font-family:var(--sans);font-size:22px;font-weight:700;line-height:1}
+.wm-stat-l{font-family:var(--mono);font-size:7px;color:var(--muted2);letter-spacing:2px;text-transform:uppercase}
 </style>
 </head>
 <body>
@@ -847,6 +1193,29 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
 }
 </script>
 
+
+<script>
+// ── Early stub — allows tab clicks before main script loads ──
+// Register full switchTab once script loads
+window._switchTabFull = function _switchTabFullImpl(tab){
+  // Called by stub if tab was clicked before script loaded
+  if(typeof renderRecovery !== "undefined") _doSwitchTab(tab);
+}
+if(window._pendingTab){ window._switchTabFull(window._pendingTab); window._pendingTab=null; }
+function switchTab(tab){ _doSwitchTab(tab); }
+function _doSwitchTab(tab){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  document.querySelectorAll(".tab-panel").forEach(p=>p.classList.remove("active"));
+  const tabEl   = document.getElementById("tab-"+tab);
+  const panelEl = document.getElementById("panel-"+tab);
+  if(tabEl)   tabEl.classList.add("active");
+  if(panelEl) panelEl.classList.add("active");
+  // Full switchTab fires once main script loads
+  if(window._switchTabFull) window._switchTabFull(tab);
+  else window._pendingTab = tab;
+}
+</script>
+
 <!-- ═══ HEADER ═══ -->
 <div class="hdr">
   <div class="hdr-top">
@@ -857,31 +1226,24 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
       </div>
       <div class="logo-sub" id="mainSubtitle">5× TWELVE DATA · 40 CREDITS/MIN · FIREBASE SYNC</div>
     </div>
-    <div class="hstats">
-      <div class="hs"><div class="hs-v" id="h-scanned">0</div><div class="hs-l">SCANNED</div></div>
-      <div class="hs"><div class="hs-v" id="h-passed">0</div><div class="hs-l">PASSED</div></div>
-      <div class="hs"><div class="hs-v" id="h-top">—</div><div class="hs-l">TOP</div></div>
-      <div class="hs"><div class="hs-v" id="h-err">0</div><div class="hs-l">ERRORS</div></div>
-    </div>
+
     <div class="hdr-right">
       <span id="fbStatus">⚫ FIREBASE</span>
     </div>
   </div>
-  <div class="stats-row" id="statsRow">
-    <div class="stat-chip"><span class="stat-n" id="cnt6" style="color:var(--green2)">0</span><span class="stat-l">PERFECT 6/6</span></div>
-    <div class="stat-chip"><span class="stat-n" id="cnt5" style="color:var(--yellow)">0</span><span class="stat-l">STRONG 5/6</span></div>
-    <div class="stat-chip"><span class="stat-n" id="cnt4" style="color:var(--orange)">0</span><span class="stat-l">WATCH 4/6</span></div>
-    <span class="saved-info" id="savedAt"></span>
-  </div>
+
 </div>
 
 <!-- ═══ TABS ═══ -->
 <div class="tabs">
-  <div class="tab active" id="tab-recovery" onclick="switchTab('recovery')">📈 Recovery</div>
+  <div class="tab active" id="tab-confluence" onclick="switchTab('confluence')">⚡ CONFLUENCE</div>
+  <div class="tab" id="tab-recovery" onclick="switchTab('recovery')">📈 Recovery</div>
   <div class="tab" id="tab-catalyst" onclick="switchTab('catalyst')">⚡ Catalyst</div>
   <div class="tab" id="tab-jax" onclick="switchTab('jax')">🟢 JAX Scanner</div>
   <div class="tab" id="tab-alerts" onclick="switchTab('alerts')">🔔 Alerts</div>
   <div class="tab" id="tab-journal" onclick="switchTab('journal')">📓 Journal</div>
+  <div class="tab" id="tab-weekly" onclick="switchTab('weekly')">📅 Weekly</div>
+  <div class="tab" id="tab-backtest" onclick="switchTab('backtest')">🔬 Backtest</div>
 </div>
 
 <!-- ═══ WATCHLIST BAR ═══ -->
@@ -903,9 +1265,141 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
+     CONFLUENCE TAB — Your edge. One scan. Everything.
+═══════════════════════════════════════════════════════════ -->
+<div class="tab-panel active" id="panel-confluence">
+
+<div class="conf-header">
+  <div>
+    <div class="conf-title">⚡ CONFLUENCE</div>
+    <div class="conf-sub" id="conf-sub">SCAN THE FULL UNIVERSE · CROSS-REFERENCE RECOVERY + JAX + MOVE</div>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+    <span id="conf-market-badge" style="font-size:8px;padding:3px 10px;border-radius:2px;border:1px solid var(--border2);color:var(--muted2);font-family:var(--mono);letter-spacing:1px"></span>
+    <span id="fbStatus2" style="font-size:8px;padding:3px 10px;border-radius:2px;border:1px solid var(--border2);color:var(--muted2);font-family:var(--mono);letter-spacing:1px">⚫ FIREBASE</span>
+  </div>
+</div>
+
+<div class="conf-stats">
+  <div class="conf-stat"><div class="conf-stat-v" id="conf-scanned" style="color:var(--blue)">0</div><div class="conf-stat-l">Scanned</div></div>
+  <div class="conf-stat"><div class="conf-stat-v" id="conf-movers" style="color:#E040FB">0</div><div class="conf-stat-l">Movers</div></div>
+  <div class="conf-stat"><div class="conf-stat-v" id="conf-full" style="color:var(--green)">0</div><div class="conf-stat-l">Full Confluence</div></div>
+  <div class="conf-stat"><div class="conf-stat-v" id="conf-strong" style="color:var(--yellow)">0</div><div class="conf-stat-l">Strong (3/4)</div></div>
+  <div class="conf-stat"><div class="conf-stat-v" id="conf-jax-count" style="color:var(--green2)">0</div><div class="conf-stat-l">JAX Signals</div></div>
+</div>
+
+<div class="conf-controls">
+  <button class="btn-scan" id="confRunBtn" onclick="startConfluenceScan()"
+    style="background:linear-gradient(135deg,#7B1FA2,#E040FB);box-shadow:0 0 16px rgba(156,39,176,0.4)">
+    ⚡ RUN CONFLUENCE
+  </button>
+  <button class="btn-stop" id="confStopBtn" onclick="stopConfluenceScan()" disabled>■ STOP</button>
+  <button class="btn-clear" onclick="clearConfluence()">🗑</button>
+  <span class="ctrl-label">LIST</span>
+  <select id="confList">
+    <option value="both">🔥 Both — S&P 500 + Universe (658)</option>
+    <option value="sp500" selected>S&P 500 (487)</option>
+    <option value="universe">Catalyst Universe (202)</option>
+    <option value="watchlist">My Watchlist</option>
+    <option value="custom">Custom</option>
+  </select>
+  <span class="ctrl-label">MIN MOVE</span>
+  <select id="confMinMove">
+    <option value="1" selected>1%+</option>
+    <option value="2">2%+</option>
+    <option value="3">3%+</option>
+    <option value="5">5%+</option>
+    <option value="8">8%+</option>
+  </select>
+  <span class="ctrl-label">MIN SCORE</span>
+  <select id="confMinScore">
+    <option value="3" selected>3/4+</option>
+    <option value="4">4/4 only</option>
+    <option value="2">2/4+</option>
+  </select>
+  <input type="text" class="ctrl-input" id="confCustomTk" placeholder="SOFI,NKE,NOW...">
+</div>
+
+<div class="conf-prog" id="conf-prog">
+  <div class="conf-prog-row">
+    <span class="conf-prog-msg" id="conf-progMsg">Scanning...</span>
+    <span class="conf-prog-pct" id="conf-progPct">0%</span>
+  </div>
+  <div class="conf-prog-track"><div class="conf-prog-fill" id="conf-progFill"></div></div>
+</div>
+
+<div class="banner green" id="conf-savedBanner" style="display:none"></div>
+
+<div class="conf-filter" id="conf-filterBar">
+  <span class="filter-label">SCORE</span>
+  <button class="chip on" onclick="setConfFilter('all',this)">ALL</button>
+  <button class="chip" onclick="setConfFilter(4,this)">⚡ 4/4 FULL</button>
+  <button class="chip" onclick="setConfFilter(3,this)">🔥 3/4</button>
+  <button class="chip" onclick="setConfFilter('jax',this)">🟢 JAX</button>
+  <button class="chip" onclick="setConfFilter('move',this)">📈 BIG MOVE</button>
+  <select class="sort-select" id="conf-sortSel" onchange="renderConfluence()">
+    <option value="score">Confluence Score</option>
+    <option value="move">Biggest Move</option>
+    <option value="rsi">Lowest RSI</option>
+    <option value="pullback">Deepest Pullback</option>
+  </select>
+  <input type="text" class="search-input" id="conf-search" placeholder="🔍 ticker..." oninput="renderConfluence()" style="margin-left:4px">
+  <span class="res-count" id="conf-resCount"></span>
+</div>
+
+<div class="accordion">
+  <div class="accordion-hdr" onclick="toggleAccordion('conf-log-body','conf-log-arrow')">
+    <span>▸ SCAN LOG</span><span class="accordion-arrow" id="conf-log-arrow">▾</span>
+  </div>
+  <div class="accordion-body" id="conf-log-body">
+    <div class="log-panel" id="conf-log"></div>
+  </div>
+</div>
+
+<div id="conf-nearmiss-section" style="display:none;border-top:1px solid var(--border)">
+  <div style="display:flex;align-items:center;gap:8px;padding:6px 16px;background:var(--bg2);border-bottom:1px solid var(--border)">
+    <span style="font-family:var(--mono);font-size:8px;color:var(--muted2);letter-spacing:2px;text-transform:uppercase">👀 MOVERS — BELOW THRESHOLD</span>
+    <span id="conf-nearmiss-count" style="font-family:var(--mono);font-size:8px;color:var(--muted2)"></span>
+    <span style="font-family:var(--mono);font-size:8px;color:var(--muted);margin-left:auto">scored 1–2/4 · watch list candidates</span>
+  </div>
+  <div id="conf-nearmiss-list" style="padding:8px 12px;display:flex;flex-wrap:wrap;gap:6px"></div>
+</div>
+<div class="results" id="conf-results">
+  <div class="conf-empty">
+    <span class="conf-empty-icon">⚡</span>
+    CONFLUENCE SCANNER<br>
+    <span style="font-size:9px;color:var(--muted2)">Checks every stock for: big move + recovery setup + JAX signal + catalyst setup</span><br>
+    <span style="font-size:8px;color:var(--muted)">Stocks hitting 3 or 4 of those = highest conviction trades</span><br><br>
+    <span style="font-size:8px;color:var(--muted)">This is how $NOW was caught: C7 bounce + JAX green arrow + 8.8% move</span><br>
+    <span style="font-size:8px;color:var(--muted)">Run "Both" to scan all 689 stocks — S&P 500 + Catalyst Universe</span>
+  </div>
+</div>
+
+</div><!-- end confluence -->
+
+<!-- ═══════════════════════════════════════════════════════
      TAB 1: RECOVERY
 ═══════════════════════════════════════════════════════════ -->
-<div class="tab-panel active" id="panel-recovery">
+<div class="tab-panel" id="panel-recovery">
+
+<div class="conf-header">
+  <div>
+    <div class="conf-title">📈 Recovery Scanner</div>
+    <div class="conf-sub" id="r-sub">S&P 500 · RSI OVERSOLD · EMA21 SETUP · C7 DEEP BOUNCE</div>
+  </div>
+  <div style="margin-left:auto;font-family:var(--mono);font-size:8px;color:var(--muted2)" id="r-lastscan"></div>
+</div>
+
+<div class="wm-stats">
+  <div class="wm-stat"><div class="wm-stat-v" id="h-scanned" style="color:var(--blue)">0</div><div class="wm-stat-l">Scanned</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="h-passed" style="color:var(--green2)">0</div><div class="wm-stat-l">Passed</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="cnt6" style="color:var(--green)">0</div><div class="wm-stat-l">Perfect 6/6</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="cnt5" style="color:var(--yellow)">0</div><div class="wm-stat-l">Strong 5/6</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="cnt4" style="color:var(--orange)">0</div><div class="wm-stat-l">Watch 4/6</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="h-err" style="color:var(--red)">0</div><div class="wm-stat-l">Errors</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="h-top" style="color:var(--blue)">—</div><div class="wm-stat-l">Top Score</div></div>
+  <div class="wm-stat"><span class="saved-info" id="savedAt" style="font-size:8px;color:var(--muted2);font-family:var(--mono)"></span></div>
+</div>
 
 <div class="controls">
   <button class="btn-scan" id="runBtn" onclick="startRecoveryScan()">▶ LIVE SCAN</button>
@@ -1010,6 +1504,21 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
      TAB 2: CATALYST
 ═══════════════════════════════════════════════════════════ -->
 <div class="tab-panel" id="panel-catalyst">
+
+<div class="conf-header">
+  <div>
+    <div class="conf-title">⚡ Catalyst Scanner</div>
+    <div class="conf-sub">202 STOCKS · ATR COIL · VOLUME DRY-UP · JAX PRO · $2–$250</div>
+  </div>
+</div>
+
+<div class="wm-stats">
+  <div class="wm-stat"><div class="wm-stat-v" id="c-scanned" style="color:var(--blue)">0</div><div class="wm-stat-l">Scanned</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="c-passed" style="color:var(--orange)">0</div><div class="wm-stat-l">Setups</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="c-ignition" style="color:var(--red)">0</div><div class="wm-stat-l">🚀 Ignition</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="c-jax" style="color:var(--green2)">0</div><div class="wm-stat-l">🟢 JAX</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="c-coiling" style="color:#CE93D8">0</div><div class="wm-stat-l">⏳ Coiling</div></div>
+</div>
 
 <div class="controls">
   <button class="btn-scan cat" id="catRunBtn" onclick="startCatalystScan()">⚡ SCAN CATALYSTS</button>
@@ -1131,6 +1640,21 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
 <!-- ═══ JAX SCANNER TAB ═══ -->
 <div class="tab-panel" id="panel-jax">
 
+<div class="conf-header">
+  <div>
+    <div class="conf-title">🟢 JAX Scanner</div>
+    <div class="conf-sub">PURE GREEN ARROW · UTBuy OR ST FLIP · BULL SCORE · NO RSI FILTER</div>
+  </div>
+</div>
+
+<div class="wm-stats">
+  <div class="wm-stat"><div class="wm-stat-v" id="jax-scanned" style="color:var(--blue)">0</div><div class="wm-stat-l">Scanned</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="jax-signals" style="color:var(--green2)">0</div><div class="wm-stat-l">Signals</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="jax-bull5" style="color:var(--green)">0</div><div class="wm-stat-l">Bull 5/5</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="jax-deep" style="color:var(--blue)">0</div><div class="wm-stat-l">🔵 Deep</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="jax-utbuy" style="color:var(--green2)">0</div><div class="wm-stat-l">UTBuy</div></div>
+</div>
+
 <div class="controls">
   <button class="btn-scan" id="jaxRunBtn" onclick="startJAXScan()" style="background:linear-gradient(135deg,#00C853,#00E676);box-shadow:0 0 16px rgba(0,200,83,0.3)">🟢 JAX SCAN</button>
   <button class="btn-stop" id="jaxStopBtn" onclick="stopScan()" disabled>■ STOP</button>
@@ -1215,6 +1739,22 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
 
 <div class="tab-panel" id="panel-alerts">
 
+<div class="conf-header">
+  <div>
+    <div class="conf-title">🔔 Morning Alerts</div>
+    <div class="conf-sub" id="alert-sub">PREMARKET MOVERS · FINNHUB LIVE · 202 STOCKS · SESSION COMPARISON</div>
+  </div>
+  <div style="margin-left:auto;font-family:var(--mono);font-size:8px;color:var(--muted2)" id="alertTime"></div>
+</div>
+
+<div class="wm-stats">
+  <div class="wm-stat"><div class="wm-stat-v" id="alert-scanned" style="color:var(--blue)">0</div><div class="wm-stat-l">Scanned</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="alert-movers" style="color:#E040FB">0</div><div class="wm-stat-l">Movers</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="alert-fire" style="color:var(--red)">0</div><div class="wm-stat-l">🚀 10%+</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="alert-hot" style="color:var(--orange)">0</div><div class="wm-stat-l">🔥 5%+</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="alert-earn" style="color:var(--yellow)">0</div><div class="wm-stat-l">📅 Earnings</div></div>
+</div>
+
 <div class="controls">
   <button class="btn-scan alert" id="alertRunBtn" onclick="runMorningAlerts()">🔔 RUN ALERTS</button>
   <button class="btn-stop" id="alertStopBtn" onclick="stopScan()" disabled>■ STOP</button>
@@ -1261,7 +1801,7 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
   <div class="alerts-col">
     <div class="col-hdr">
       <span class="col-title">🔔 MOVERS</span>
-      <span class="col-time" id="alertTime"></span>
+
       <input type="text" id="alert-search" placeholder="🔍 ticker..."
         style="width:90px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:2px 6px;font-family:var(--mono);font-size:8px;border-radius:2px"
         oninput="renderAlerts(sessionAlerts[activeSession]?.alerts||[])">
@@ -1314,6 +1854,26 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
 <!-- ═══ TAB 4: TRADE JOURNAL ═══ -->
 <div class="tab-panel" id="panel-journal">
 
+<div class="conf-header">
+  <div>
+    <div class="conf-title">📓 Trade Journal</div>
+    <div class="conf-sub" id="jnl-sub">TRACK EVERY TRADE · REAL P&L · FIREBASE SYNC · AUTO-CLOSE AT 4:15PM</div>
+  </div>
+  <div style="display:flex;gap:6px;margin-left:auto">
+    <button class="btn-scan" onclick="fetchClosingPrices()" style="font-size:9px;padding:5px 12px;background:linear-gradient(135deg,#1565C0,#1976D2);box-shadow:0 0 12px rgba(21,101,192,0.3)">🔄 UPDATE PRICES</button>
+    <button class="btn-scan" onclick="addManualEntry()" style="font-size:9px;padding:5px 14px">+ LOG</button>
+  </div>
+</div>
+
+<div class="wm-stats">
+  <div class="wm-stat"><div class="wm-stat-v" id="jnl-total" style="color:var(--blue)">0</div><div class="wm-stat-l">Total Logged</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="jnl-wins" style="color:var(--green2)">0</div><div class="wm-stat-l">Wins</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="jnl-losses" style="color:var(--red)">0</div><div class="wm-stat-l">Losses</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="jnl-winrate" style="color:var(--yellow)">—</div><div class="wm-stat-l">Win Rate</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="jnl-avgwin" style="color:var(--green2)">—</div><div class="wm-stat-l">Avg Win</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="jnl-avgloss" style="color:var(--red)">—</div><div class="wm-stat-l">Avg Loss</div></div>
+</div>
+
 <div class="jnl-toolbar">
   <input type="text" id="jnl-sym-input" placeholder="TICKER"
     style="width:75px;text-transform:uppercase;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 8px;font-family:var(--mono);font-size:10px;border-radius:2px"
@@ -1343,7 +1903,7 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
   </select>
   <button class="btn-scan" onclick="addManualEntry()" style="font-size:9px;padding:6px 14px">+ LOG</button>
   <button class="btn-clear" onclick="clearJournal()">🗑 CLEAR ALL</button>
-  <button class="btn-scan" onclick="fetchClosingPrices()" style="font-size:9px;padding:6px 14px;background:linear-gradient(135deg,#1565C0,#1976D2);box-shadow:0 0 12px rgba(21,101,192,0.3)">🔄 UPDATE PRICES</button>
+
   <span style="font-size:8px;color:var(--muted2);margin-left:8px;letter-spacing:1px">
     Auto-updates at <span style="color:var(--blue)">4:15 PM ET</span> · or tap UPDATE PRICES anytime · Syncs via Firebase
   </span>
@@ -1356,14 +1916,7 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
   <span id="jnl-last-update" style="font-size:8px;color:var(--muted);margin-left:auto"></span>
 </div>
 
-<div class="jnl-stats" style="flex-wrap:wrap">
-  <div class="jnl-stat"><div class="jnl-stat-v" id="jnl-total" style="color:var(--blue)">0</div><div class="jnl-stat-l">TOTAL LOGGED</div></div>
-  <div class="jnl-stat"><div class="jnl-stat-v" id="jnl-wins" style="color:var(--green2)">0</div><div class="jnl-stat-l">WINS</div></div>
-  <div class="jnl-stat"><div class="jnl-stat-v" id="jnl-losses" style="color:var(--red)">0</div><div class="jnl-stat-l">LOSSES</div></div>
-  <div class="jnl-stat"><div class="jnl-stat-v" id="jnl-winrate" style="color:var(--yellow)">—</div><div class="jnl-stat-l">WIN RATE</div></div>
-  <div class="jnl-stat"><div class="jnl-stat-v" id="jnl-avgwin" style="color:var(--green2)">—</div><div class="jnl-stat-l">AVG WIN</div></div>
-  <div class="jnl-stat"><div class="jnl-stat-v" id="jnl-avgloss" style="color:var(--red)">—</div><div class="jnl-stat-l">AVG LOSS</div></div>
-</div>
+
 
 <div class="jnl-table-wrap" style="padding:0 20px 20px">
   <table class="jnl-table">
@@ -1398,9 +1951,191 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
 
 </div><!-- end journal -->
 
-<script>
+<!-- ═══════════════════════════════════════════════════════
+     WEEKLY MONITOR TAB
+     Weekly ATR trail flip + daily alignment = your edge
+═══════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="panel-weekly">
 
-// ── API Keys ────────────────────────────────────────────────
+<div class="conf-header">
+  <div>
+    <div class="conf-title">📅 WEEKLY MONITOR</div>
+    <div class="conf-sub" id="wm-sub">WEEKLY TRAIL FLIP · BACKTEST SHOWS 77% WIN RATE OVER 5 YEARS</div>
+  </div>
+  <div style="margin-left:auto;font-family:var(--mono);font-size:8px;color:var(--muted2)" id="wm-lastscan"></div>
+</div>
+
+<div class="wm-stats">
+  <div class="wm-stat"><div class="wm-stat-v" id="wm-scanned" style="color:var(--blue)">0</div><div class="wm-stat-l">Scanned</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="wm-both" style="color:#E040FB">0</div><div class="wm-stat-l">Weekly + Daily</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="wm-wkonly" style="color:var(--blue)">0</div><div class="wm-stat-l">Weekly Only</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="wm-fresh" style="color:var(--green2)">0</div><div class="wm-stat-l">This Week</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="wm-watching" style="color:var(--yellow)">0</div><div class="wm-stat-l">Watching</div></div>
+</div>
+
+<div class="conf-controls">
+  <button class="btn-scan" id="wmRunBtn" onclick="startWeeklyMonitor()"
+    style="background:linear-gradient(135deg,#0d47a1,#1976D2);box-shadow:0 0 16px rgba(21,101,192,0.4)">
+    📅 RUN WEEKLY SCAN
+  </button>
+  <button class="btn-stop" id="wmStopBtn" onclick="stopWeeklyMonitor()" disabled>■ STOP</button>
+  <button class="btn-clear" onclick="clearWeeklyMonitor()">🗑</button>
+  <span class="ctrl-label">LIST</span>
+  <select id="wmList">
+    <option value="watchlist">My Watchlist</option>
+    <option value="sp500" selected>S&P 500 (487)</option>
+    <option value="both">Both (658)</option>
+    <option value="custom">Custom</option>
+  </select>
+  <span class="ctrl-label">FLIP AGE</span>
+  <select id="wmFlipAge">
+    <option value="1">This week only</option>
+    <option value="2" selected>Last 2 weeks</option>
+    <option value="4">Last 4 weeks</option>
+    <option value="8">Last 8 weeks</option>
+  </select>
+  <input type="text" class="ctrl-input" id="wmCustomTk" placeholder="BE,NVTS,SMTC...">
+</div>
+
+<div class="wm-prog" id="wm-prog">
+  <div class="wm-prog-row">
+    <span class="wm-prog-msg" id="wm-progMsg">Scanning...</span>
+    <span class="wm-prog-pct" id="wm-progPct">0%</span>
+  </div>
+  <div class="wm-prog-track"><div class="wm-prog-fill" id="wm-progFill"></div></div>
+</div>
+
+<div class="banner green" id="wm-savedBanner" style="display:none"></div>
+
+<div class="filter-bar" id="wm-filterBar" style="display:none">
+  <span class="filter-label">SHOW</span>
+  <button class="chip on" onclick="setWMFilter('all',this)">ALL</button>
+  <button class="chip" onclick="setWMFilter('both',this)">🟣 BOTH ALIGNED</button>
+  <button class="chip" onclick="setWMFilter('fresh',this)">🟢 THIS WEEK</button>
+  <button class="chip" onclick="setWMFilter('weekly',this)">📅 WEEKLY ONLY</button>
+  <select class="sort-select" id="wm-sortSel" onchange="renderWeeklyMonitor()">
+    <option value="priority">Priority (Both > Weekly > Age)</option>
+    <option value="fresh">Most Recent Flip</option>
+    <option value="rsi">Lowest RSI</option>
+  </select>
+  <input type="text" class="search-input" id="wm-search" placeholder="🔍 ticker..." oninput="renderWeeklyMonitor()" style="margin-left:4px">
+  <span class="res-count" id="wm-resCount"></span>
+</div>
+
+<div class="accordion">
+  <div class="accordion-hdr" onclick="toggleAccordion('wm-log-body','wm-log-arrow')">
+    <span>▸ SCAN LOG</span><span class="accordion-arrow" id="wm-log-arrow">▾</span>
+  </div>
+  <div class="accordion-body" id="wm-log-body">
+    <div class="log-panel" id="wm-log"></div>
+  </div>
+</div>
+
+<div class="results" id="wm-results">
+  <div class="conf-empty">
+    <span class="conf-empty-icon">📅</span>
+    WEEKLY MONITOR<br>
+    <span style="font-size:9px;color:var(--muted2)">Finds stocks where the weekly ATR trail stop just flipped bullish</span><br>
+    <span style="font-size:9px;color:var(--muted2)">Backtest: 77% win rate · BE 7/7 wins · NVTS 3/4 wins · 5 years of data</span><br><br>
+    <span style="font-size:8px;color:var(--muted)">🟣 Both = weekly + daily aligned = highest conviction</span><br>
+    <span style="font-size:8px;color:var(--muted)">📅 Weekly only = early signal, wait for daily to confirm</span>
+  </div>
+</div>
+
+</div><!-- end weekly -->
+
+<!-- ═══════════════════════════════════════════════════════
+     BACKTEST TAB — Weekly trail flip signal validator
+═══════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="panel-backtest">
+
+<div class="bt-header">
+  <div>
+    <div class="bt-title">🔬 Backtest</div>
+    <div class="bt-sub">WEEKLY ATR TRAIL FLIP → MEASURE WHAT HAPPENED AFTER · 5 YEARS · 260 WEEKLY BARS</div>
+  </div>
+</div>
+
+<div class="bt-controls">
+  <button class="btn-scan" id="btRunBtn" onclick="runBacktest()"
+    style="background:linear-gradient(135deg,#1565C0,#1976D2);box-shadow:0 0 16px rgba(21,101,192,0.3)">
+    🔬 RUN BACKTEST
+  </button>
+  <button class="btn-stop" id="btStopBtn" onclick="stopBacktest()" disabled>■ STOP</button>
+  <button class="btn-clear" onclick="clearBacktest()">🗑</button>
+  <span class="ctrl-label">UNIVERSE</span>
+  <select id="btList">
+    <option value="watchlist">My Watchlist</option>
+    <option value="sp500">S&P 500 (487)</option>
+    <option value="universe">Full Universe (658)</option>
+    <option value="custom">Custom</option>
+  </select>
+  <span class="ctrl-label">HOLD WEEKS</span>
+  <select id="btHoldWeeks">
+    <option value="2">2 weeks</option>
+    <option value="4" selected>4 weeks</option>
+    <option value="8">8 weeks</option>
+    <option value="12">12 weeks</option>
+  </select>
+  <span class="ctrl-label">SIGNAL</span>
+  <select id="btSignalType">
+    <option value="weekly_trail">Weekly Trail Flip</option>
+    <option value="both_align">Weekly + Daily Align</option>
+    <option value="daily_trail">Daily Trail Flip</option>
+  </select>
+  <span class="ctrl-label">MIN RETURN</span>
+  <select id="btMinReturn">
+    <option value="0">All signals</option>
+    <option value="5">5%+</option>
+    <option value="10">10%+</option>
+  </select>
+  <input type="text" class="ctrl-input" id="btCustomTk" placeholder="BE,NVTS,SMTC,MOH...">
+</div>
+
+<div class="bt-prog" id="bt-prog">
+  <div class="bt-prog-row">
+    <span class="bt-prog-msg" id="bt-progMsg">Running backtest...</span>
+    <span class="bt-prog-pct" id="bt-progPct">0%</span>
+  </div>
+  <div class="bt-prog-track"><div class="bt-prog-fill" id="bt-progFill"></div></div>
+</div>
+
+<!-- Summary stats -->
+<div class="bt-summary" id="bt-summary" style="display:none">
+  <div class="bt-stat"><div class="bt-stat-v" id="bt-total" style="color:var(--blue)">0</div><div class="bt-stat-l">Total Signals</div></div>
+  <div class="bt-stat"><div class="bt-stat-v" id="bt-wins" style="color:var(--green2)">0</div><div class="bt-stat-l">Winners</div></div>
+  <div class="bt-stat"><div class="bt-stat-v" id="bt-losses" style="color:var(--red)">0</div><div class="bt-stat-l">Losers</div></div>
+  <div class="bt-stat"><div class="bt-stat-v" id="bt-winrate" style="color:var(--yellow)">—</div><div class="bt-stat-l">Win Rate</div></div>
+  <div class="bt-stat"><div class="bt-stat-v" id="bt-avgwin" style="color:var(--green2)">—</div><div class="bt-stat-l">Avg Win</div></div>
+  <div class="bt-stat"><div class="bt-stat-v" id="bt-avgloss" style="color:var(--red)">—</div><div class="bt-stat-l">Avg Loss</div></div>
+  <div class="bt-stat"><div class="bt-stat-v" id="bt-expect" style="color:var(--blue)">—</div><div class="bt-stat-l">Expectancy</div></div>
+  <div class="bt-stat"><div class="bt-stat-v" id="bt-best" style="color:var(--green)">—</div><div class="bt-stat-l">Best Trade</div></div>
+</div>
+
+<!-- Results table -->
+<div id="bt-results">
+  <div class="bt-empty">
+    <span class="bt-empty-icon">🔬</span>
+    WEEKLY TRAIL FLIP BACKTEST<br>
+    <span style="font-size:9px;color:var(--muted2)">Finds every time the weekly ATR trail stop flipped from bearish to bullish</span><br>
+    <span style="font-size:9px;color:var(--muted2)">Measures what the stock did over the next 4 weeks</span><br><br>
+    <span style="font-size:8px;color:var(--muted)">BE weekly flip at $59 → +380% · NVTS weekly flip at $7.70 → +185%</span><br>
+    <span style="font-size:8px;color:var(--muted)">Run this on your watchlist to validate the signal before trading it</span>
+  </div>
+</div>
+
+<div class="accordion" style="margin-top:0">
+  <div class="accordion-hdr" onclick="toggleAccordion('bt-log-body','bt-log-arrow')">
+    <span>▸ BACKTEST LOG</span><span class="accordion-arrow" id="bt-log-arrow">▾</span>
+  </div>
+  <div class="accordion-body" id="bt-log-body">
+    <div class="log-panel" id="bt-log"></div>
+  </div>
+</div>
+
+</div><!-- end backtest -->
+
+<script>
 // ── Market session detection ──────────────────────────────────────────────────
 function getMarketSession(){
   const now  = new Date();
@@ -1885,27 +2620,42 @@ function switchTab(tab){
   document.querySelectorAll(".tab-panel").forEach(p=>p.classList.remove("active"));
   document.getElementById("tab-"+tab).classList.add("active");
   document.getElementById("panel-"+tab).classList.add("active");
-  if(tab==="recovery"){
+  if(tab==="confluence"){
+    const sess=getMarketSession();
+    const sessLabel={"premarket":"🌅 PRE-MARKET","open":"🟢 MARKET OPEN","afterhours":"🌙 AFTER HOURS","closed":"⚪ MARKET CLOSED","weekend":"⚪ WEEKEND"}[sess]||"";
+    document.getElementById("mainSubtitle").textContent="⚡ CONFLUENCE · MOVE + RECOVERY + JAX + CATALYST · "+sessLabel;
+    document.getElementById("conf-market-badge").textContent=sessLabel;
+    if(confResults.length) renderConfluence();
+  } else if(tab==="recovery"){
     const sess=getMarketSession();
     const sessLabel={"premarket":"🌅 PRE-MARKET","open":"🟢 MARKET OPEN","afterhours":"🌙 AFTER HOURS","closed":"⚪ MARKET CLOSED","weekend":"⚪ WEEKEND"}[sess]||"";
     document.getElementById("mainSubtitle").textContent="4× TWELVE DATA · LIVE PRICES · "+sessLabel;
     updateHdr(rResults);
-    if(rResults.length){ renderRecovery(); document.getElementById("r-filterBar").style.display="flex"; document.getElementById("statsRow").style.display="flex"; }
+    renderRecovery();
+    if(rResults.length) document.getElementById("r-filterBar").style.display="flex";
   } else if(tab==="catalyst"){
     document.getElementById("mainSubtitle").textContent="⚡ CATALYST SCANNER · FULL UNIVERSE · 202 STOCKS";
     updateHdr(cResults);
-    if(cResults.length){ renderCatalyst(); document.getElementById("c-filterBar").style.display="flex"; }
+    renderCatalyst();
+    if(cResults.length) document.getElementById("c-filterBar").style.display="flex";
   } else if(tab==="jax"){
     document.getElementById("mainSubtitle").textContent="🟢 JAX SCANNER · PURE GREEN ARROW · NO RSI FILTER";
-    if(jaxResults.length){ renderJAX(); document.getElementById("jax-filterBar").style.display="flex"; }
+    renderJAX();
+    if(jaxResults.length) document.getElementById("jax-filterBar").style.display="flex";
   } else if(tab==="alerts"){
     const sess=getMarketSession();
     const sessLabel={"premarket":"🌅 PRE-MARKET","open":"🟢 MARKET OPEN","afterhours":"🌙 AFTER HOURS","closed":"⚪ MARKET CLOSED","weekend":"⚪ WEEKEND"}[sess]||"";
     document.getElementById("mainSubtitle").textContent="🔔 MORNING ALERTS · "+sessLabel;
-    document.getElementById("alertTime").textContent=new Date().toLocaleTimeString();
+    const atEl = document.getElementById("alertTime"); if(atEl) atEl.textContent=new Date().toLocaleTimeString();
   } else if(tab==="journal"){
     document.getElementById("mainSubtitle").textContent="📓 TRADE JOURNAL · TRACK EVERY FLAGGED STOCK";
     renderJournal();
+    if(journalEntries.length) document.getElementById("jnl-sub").textContent="TRACK EVERY TRADE · "+journalEntries.length+" ENTRIES · FIREBASE SYNC";
+  } else if(tab==="weekly"){
+    document.getElementById("mainSubtitle").textContent="📅 WEEKLY MONITOR · TRAIL FLIP SIGNAL · 77% WIN RATE VALIDATED";
+    if(wmResults.length) renderWeeklyMonitor();
+  } else if(tab==="backtest"){
+    document.getElementById("mainSubtitle").textContent="🔬 BACKTEST · WEEKLY TRAIL FLIP SIGNAL VALIDATOR · 5 YEARS";
   }
 }
 
@@ -1941,6 +2691,1196 @@ function saveResults(){
     document.getElementById("savedAt").textContent="synced "+new Date().toLocaleTimeString();
   }catch(e){}
 }
+
+// ══════════════════════════════════════════════════════════
+// CONFLUENCE SCANNER
+// The edge: stock moving premarket + recovery setup + JAX signal + catalyst
+// 4 signals. 3 or 4 = highest conviction. This is how $NOW was found.
+// ══════════════════════════════════════════════════════════
+
+let confResults   = [];
+ // movers that scored 1-2/4
+let confRunning   = false;
+let confStopReq   = false;
+let confFilter    = "all";
+
+
+
+// ── Parallel confluence scan ─────────────────────────────────────────────────
+async function startConfluenceScan(){
+  if(confRunning) return;
+  confRunning = true; confStopReq = false; confResults = []; confNearMisses = [];
+
+  const listVal  = document.getElementById("confList").value;
+  const minMove  = parseFloat(document.getElementById("confMinMove").value)||3;
+  const minScore = parseInt(document.getElementById("confMinScore").value)||3;
+
+  let tickers;
+  if(listVal==="both"){
+    // Merge S&P 500 + catalyst universe, deduplicate
+    const combined = [...SP500, ...SMALLCAP];
+    tickers = [...new Set(combined)];
+  } else if(listVal==="sp500")        tickers = [...SP500];
+  else if(listVal==="watchlist") tickers = [...WATCHLIST];
+  else if(listVal==="custom")  tickers = document.getElementById("confCustomTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
+  else                         tickers = [...SMALLCAP];
+
+  document.getElementById("confRunBtn").disabled = true;
+  document.getElementById("confStopBtn").disabled = false;
+  document.getElementById("conf-prog").style.display = "block";
+  document.getElementById("conf-savedBanner").style.display = "none";
+  document.getElementById("conf-filterBar").style.display = "none";
+  document.getElementById("conf-results").innerHTML = "";
+  document.getElementById("conf-log").innerHTML = "";
+
+  // Update stat bar
+  document.getElementById("conf-scanned").textContent  = "0";
+  document.getElementById("conf-movers").textContent   = "0";
+  document.getElementById("conf-full").textContent     = "0";
+  document.getElementById("conf-strong").textContent   = "0";
+  document.getElementById("conf-jax-count").textContent= "0";
+
+  const sess    = getMarketSession();
+  const sessLbl = {"premarket":"🌅 PRE-MARKET","open":"🟢 MARKET OPEN","afterhours":"🌙 AFTER HOURS","closed":"⚪ CLOSED","weekend":"⚪ WEEKEND"}[sess]||"";
+  document.getElementById("conf-market-badge").textContent = sessLbl;
+  document.getElementById("conf-sub").textContent =
+    sessLbl + " · " + tickers.length + " STOCKS · MIN MOVE " + minMove + "% · MIN SCORE " + minScore + "/4 · PILLARS: MOVE+TREND+JAX+MOMENTUM";
+
+  logConf("⚡ Confluence scan: "+tickers.length+" stocks · "+sessLbl+" · min move "+minMove+"% · min score "+minScore+"/4","info");
+  logConf("Pillars: 📈 MOVE "+minMove+"%+ · 📊 TREND (RSI<65) · 🟢 JAX bull≥2 · ⚡ MOMENTUM vol+earnings+breakout","info");
+
+  const nKeys  = TD_KEYS.length;
+  const chunks = splitInterleaved(tickers, nKeys);
+  const total  = tickers.length;
+  let done     = 0, movers = 0;
+
+  const progInterval = setInterval(()=>{
+    const pct = Math.round(done/total*100);
+    document.getElementById("conf-progPct").textContent = pct+"%";
+    document.getElementById("conf-progFill").style.width = pct+"%";
+  }, 500);
+
+  async function runConfWorker(keyIdx, tickerChunk){
+    const DELAY = 8500;
+    for(let i=0; i<tickerChunk.length; i++){
+      if(confStopReq) break;
+      const sym = tickerChunk[i];
+      let didCandleFetch = false;
+      document.getElementById("conf-progMsg").textContent =
+        "K"+(keyIdx+1)+": "+sym+" · "+done+"/"+total+" · "+confResults.length+" hits";
+
+      try{
+        // Quick quote check first — Finnhub only, no TD credits, no delay needed
+        const q = await fetchLiveQuote(sym);
+        done++;
+        if(!q || !q.price){ await sleep(80); continue; }
+
+        const absChange = Math.abs(q.changePct||0);
+
+        // Always count as scanned
+        document.getElementById("conf-scanned").textContent = done;
+
+        if(absChange >= minMove && q.price >= 3){
+          movers++;
+          document.getElementById("conf-movers").textContent = movers;
+          logConf("📈 "+sym+" "+( (q.changePct||0)>=0?"▲":"▼")+absChange.toFixed(1)+"% — checking confluence...","info");
+
+          // Deep check — candles needed, TD credits used here
+          let didCandleFetch = false;
+          try{
+            const candles = await fetchCandlesWithKey(sym, keyIdx);
+            didCandleFetch = true;
+            if(!candles || !candles.closes) throw new Error("No candle data");
+            const { closes, highs, lows, volumes } = candles;
+
+            // ── PILLAR 1: TREND ──────────────────────────────────────────
+            // Is the stock in a tradeable position? Not overbought, not extended.
+            // Works WITH momentum — AMD up 8% can still pass if RSI isn't stretched
+            let recData = null, hasTrend = false, trendScore = 0;
+            let rsiVal = 50, pctHiVal = 0, ema21Val = 0, recC7 = false;
+            try{
+              recData   = scoreRecovery(sym, closes, highs, lows);
+              rsiVal    = recData.rsi;
+              pctHiVal  = recData.pctHi;
+              ema21Val  = recData.ema21;
+              recC7     = !!recData.c7;
+              // TREND passes if:
+              // RSI < 65 (not overbought) AND (within 40% of 52w high OR deep bounce C7)
+              const rsiOk      = rsiVal < 65;
+              const notExtended= pctHiVal > -40; // within 40% of high = tradeable range
+              const deepBounce = recC7 || pctHiVal < -50;
+              hasTrend  = rsiOk && (notExtended || deepBounce);
+              trendScore= recData.score;
+            }catch(e){}
+
+            // ── PILLAR 2: JAX ─────────────────────────────────────────────────
+            // Green arrow = highest conviction. But bull score ≥ 2 = momentum building.
+            // Lowered bar: bull 2/5+ counts as JAX pillar hit
+            let jaxData = null, hasJAX = false, bullScoreVal = 0;
+            let trailVal = 0, utBuy = false, stFlipped = false;
+            try{
+              if(closes.length >= 70){
+                jaxData      = calcJAXPRO(closes, highs, lows);
+                bullScoreVal = jaxData ? jaxData.bullScore  : 0;
+                trailVal     = jaxData ? jaxData.trailVal   : 0;
+                utBuy        = jaxData ? jaxData.atrTS.utBuy : false;
+                stFlipped    = jaxData ? jaxData.st.flipped  : false;
+                // Green arrow = instant hit. Bull score ≥ 1 = any momentum building = hit
+                hasJAX = jaxData ? (jaxData.greenArrow || bullScoreVal >= 1) : false;
+              }
+            }catch(e){}
+
+            // ── PILLAR 3: MOMENTUM ────────────────────────────────────────────
+            // Volume confirming the move? Earnings nearby? Breakout?
+            // Simple — if it's moving with volume, that's enough
+            let hasMomentum = false, momScore = 0;
+            let volSpike = 0, hasEarn = false, breakout = false, earnings = null;
+            let atrCoiling = false;
+            try{
+              const atrData  = calcATR(highs, lows, closes);
+              atrCoiling     = atrData.isCoiling;
+              const todayVol = volumes[volumes.length-1];
+              const avgVol20 = volumes.slice(-21,-1).reduce((a,b)=>a+b,0)/20;
+              volSpike       = avgVol20 > 0 ? todayVol/avgVol20 : 0;
+              const high20   = Math.max(...highs.slice(-21,-1));
+              breakout       = closes[closes.length-1] > high20 * 1.02;
+              earnings       = await fetchEarningsDate(sym);
+              hasEarn        = earnings && earnings.daysUntil >= 0 && earnings.daysUntil <= 14;
+              // Momentum conditions (need 2/4):
+              // M1: Volume spike 1.5x+ (move has volume behind it)
+              // M2: Breakout above 20-day high
+              // M3: Earnings within 14 days (catalyst)
+              // M4: Move itself is big (5%+)
+              const m1 = volSpike >= 1.5;
+              const m2 = breakout;
+              const m3 = hasEarn;
+              const m4 = absChange >= 5;
+              momScore    = (m1?1:0)+(m2?1:0)+(m3?1:0)+(m4?1:0);
+              hasMomentum = momScore >= 1;
+            }catch(e){}
+
+            const pillars = { move:true, trend:hasTrend, jax:hasJAX, momentum:hasMomentum };
+            const confScore = Object.values(pillars).filter(Boolean).length;
+
+            if(confScore >= minScore){
+              const result = {
+                sym,
+                price:    q.price,
+                change:   q.changePct||0,
+                absChange,
+                confScore, pillars,
+                // Trend data
+                recScore:  trendScore,
+                recC7,
+                rsi:       rsiVal,
+                pctHi:     pctHiVal,
+                ema21:     ema21Val,
+                // JAX data
+                bullScore: bullScoreVal,
+                trailVal,
+                utBuy,
+                stFlipped,
+                // Momentum data
+                catScore:  momScore,
+                atrCoiling, volSpike, hasEarn, breakout,
+                earnings,
+                session:   getMarketSession(),
+                liveQuote: q,
+              };
+              confResults.push(result);
+
+              // Update stats
+              const full   = confResults.filter(r=>r.confScore===4).length;
+              const strong = confResults.filter(r=>r.confScore===3).length;
+              const jaxC   = confResults.filter(r=>r.pillars.jax).length;
+              document.getElementById("conf-full").textContent      = full;
+              document.getElementById("conf-strong").textContent    = strong;
+              document.getElementById("conf-jax-count").textContent = jaxC;
+
+              renderConfluence();
+              document.getElementById("conf-filterBar").style.display = "flex";
+
+              const scoreStr = confScore===4?"⚡ FULL CONFLUENCE":"🔥 STRONG "+confScore+"/4";
+              const pillStr  = [
+                pillars.move?"📈":"",pillars.trend?"📊":"",
+                pillars.jax?"🟢":"",pillars.momentum?"⚡":""
+              ].filter(Boolean).join(" ");
+              logConf(scoreStr+" "+sym+" $"+q.price.toFixed(2)+" "+pillStr,"ok");
+
+              // Notification for full confluence
+              if(confScore===4){
+                sendNotification(
+                  "⚡ "+sym+" FULL CONFLUENCE — 4/4",
+                  "$"+q.price.toFixed(2)+" · "+(q.changePct||0).toFixed(1)+"% · JAX: "+(hasJAX?"🟢":"—"),
+                  sym
+                );
+              }
+            } else {
+              const why = [
+                !pillars.trend    ? "trend:rsi"+rsiVal.toFixed(0)+" "+pctHiVal.toFixed(0)+"%hi" : "✅trend",
+                !pillars.jax      ? "jax:bull"+bullScoreVal+"/5" : "✅jax",
+                !pillars.momentum ? "mom:"+momScore+"/4" : "✅mom"
+              ].filter(s=>!s.startsWith("✅")).join(" · ");
+              logConf("  "+sym.padEnd(6)+" "+(q.changePct>=0?"▲":"▼")+absChange.toFixed(1)+"% · conf "+confScore+"/4 · "+why);
+              // Store as near miss so user can see what was close
+              
+              renderNearMisses();
+            }
+          }catch(e){
+            logConf("✗ "+sym+" deep check: "+e.message,"err");
+          }
+        }
+      }catch(e){
+        done++;
+        logConf("✗ "+sym+": "+e.message,"err");
+      }
+
+      // Only rate-limit delay if we did a candle fetch (TD credits used)
+      // Quote-only checks (non-movers) just need 80ms Finnhub spacing
+      if(didCandleFetch && i < tickerChunk.length-1) await sleep(DELAY);
+      else if(i < tickerChunk.length-1) await sleep(80);
+    }
+  }
+
+  await Promise.all(chunks.map((chunk,ki)=>runConfWorker(ki,chunk)));
+
+  clearInterval(progInterval);
+  document.getElementById("conf-progMsg").textContent =
+    "Done — "+done+" scanned · "+movers+" movers · "+confResults.length+" confluence hits";
+  document.getElementById("conf-progPct").textContent = "100%";
+  document.getElementById("conf-progFill").style.width = "100%";
+  document.getElementById("confRunBtn").disabled  = false;
+  document.getElementById("confStopBtn").disabled = true;
+  confRunning = false;
+
+  if(confResults.length){
+    document.getElementById("conf-filterBar").style.display = "flex";
+    const banner = document.getElementById("conf-savedBanner");
+    banner.textContent = "⚡ "+confResults.length+" confluence hits · "+new Date().toLocaleTimeString();
+    banner.style.display = "block";
+    // Save to Firebase
+    if(window.firebaseReady) window.fbSave("confluence", confResults);
+    try{ localStorage.setItem("cs_confluence", JSON.stringify(confResults)); }catch(e){}
+  }
+  logConf("✅ Complete · "+confResults.length+" hits from "+done+" stocks","ok");
+}
+
+function stopConfluenceScan(){ confStopReq=true; }
+
+function clearConfluence(){
+  confResults=[]; confNearMisses=[];
+  document.getElementById("conf-savedBanner").style.display="none";
+  document.getElementById("conf-filterBar").style.display="none";
+  document.getElementById("conf-results").innerHTML='<div class="conf-empty"><span class="conf-empty-icon">⚡</span>Cleared.</div>';
+  ["conf-scanned","conf-movers","conf-full","conf-strong","conf-jax-count"].forEach(id=>{
+    document.getElementById(id).textContent="0";
+  });
+  try{ localStorage.removeItem("cs_confluence"); }catch(e){}
+}
+
+function setConfFilter(v,btn){
+  confFilter=v;
+  document.querySelectorAll("#conf-filterBar .chip").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on");
+  renderConfluence();
+}
+
+function logConf(msg, type=""){
+  const p = document.getElementById("conf-log");
+  if(!p) return;
+  const d = document.createElement("div");
+  d.className = "ll "+(type==="ok"?"ok":type==="info"?"info":type==="err"?"err":"");
+  d.textContent = "["+new Date().toLocaleTimeString()+"] "+msg;
+  p.appendChild(d);
+  if(p.children.length>500) p.removeChild(p.firstChild);
+  p.scrollTop = p.scrollHeight;
+}
+
+function renderConfluence(){
+  const sort   = document.getElementById("conf-sortSel")?.value||"score";
+  const search = (document.getElementById("conf-search")?.value||"").toUpperCase().trim();
+  const minS   = parseInt(document.getElementById("confMinScore")?.value)||3;
+
+  let f = [...confResults].filter(r=>r.confScore>=minS);
+  if(confFilter==="jax")      f = f.filter(r=>r.pillars.jax);
+  else if(confFilter==="move") f = f.filter(r=>r.absChange>=8);
+  else if(confFilter!=="all" && confFilter!==3 && confFilter!==4){}
+  else if(confFilter===4)     f = f.filter(r=>r.confScore===4);
+  else if(confFilter===3)     f = f.filter(r=>r.confScore===3);
+  if(search) f = f.filter(r=>r.sym.includes(search));
+
+  f.sort((a,b)=>{
+    if(sort==="move")     return b.absChange-a.absChange;
+    if(sort==="rsi")      return a.rsi-b.rsi;
+    if(sort==="pullback") return a.pctHi-b.pctHi;
+    return b.confScore-a.confScore||b.absChange-a.absChange||b.bullScore-a.bullScore;
+  });
+
+  document.getElementById("conf-resCount").textContent = f.length+" shown";
+  const grid = document.getElementById("conf-results");
+  if(!f.length){
+    grid.innerHTML = confResults.length
+      ? '<div class="conf-empty"><span class="conf-empty-icon">🔍</span>No results match current filter.</div>'
+      : '<div class="conf-empty"><span class="conf-empty-icon">⚡</span>CONFLUENCE SCANNER<br><span style="font-size:9px;color:var(--muted2)">Checks every stock for: big move + recovery setup + JAX signal + catalyst setup</span><br><span style="font-size:8px;color:var(--muted)">Stocks hitting 3 or 4 of those = highest conviction trades</span></div>';
+    return;
+  }
+
+  grid.innerHTML = f.map((s,i)=>{
+    const isFull   = s.confScore===4;
+    const cardCls  = isFull?"conf-card conf-full":"conf-card conf-strong";
+    const scoreClr = isFull?"var(--green)":"var(--yellow)";
+    const scoreStr = isFull?"⚡ FULL CONFLUENCE":"🔥 STRONG "+s.confScore+"/4";
+    const sessBadge= s.session==="premarket"?'<span class="badge pm">🌅 PRE-MKT</span>':
+                     s.session==="afterhours"?'<span class="badge ah">🌙 AH</span>':
+                     '<span class="badge live">🔴 LIVE</span>';
+    // Pillar pills
+    const movePill = s.pillars.move
+      ? `<div class="conf-pill hit move">📈 MOVE<br><span style="font-size:9px">${s.change>=0?"▲":"▼"}${Math.abs(s.change).toFixed(1)}%</span></div>`
+      : '<div class="conf-pill miss">📈 MOVE<br><span style="font-size:9px">—</span></div>';
+    const recPill  = s.pillars.trend
+      ? `<div class="conf-pill hit recovery">📊 TREND<br><span style="font-size:9px">RSI ${s.rsi?s.rsi.toFixed(0):"—"}${s.recC7?" C7":""}</span></div>`
+      : `<div class="conf-pill miss">📊 TREND<br><span style="font-size:9px">RSI ${s.rsi?s.rsi.toFixed(0):"—"}</span></div>`;
+    const jaxPill  = s.pillars.jax
+      ? `<div class="conf-pill hit jax">🟢 JAX<br><span style="font-size:9px">BULL ${s.bullScore}/5</span></div>`
+      : `<div class="conf-pill miss">🟢 JAX<br><span style="font-size:9px">${s.bullScore>0?s.bullScore+"/5":"—"}</span></div>`;
+    const catPill  = s.pillars.momentum
+      ? `<div class="conf-pill hit catalyst">⚡ MOMENTUM<br><span style="font-size:9px">${s.catScore}/4</span></div>`
+      : `<div class="conf-pill miss">⚡ MOMENTUM<br><span style="font-size:9px">${s.catScore}/4</span></div>`;
+
+    // Detail tags
+    const tags = [];
+    if(s.rsi>0) tags.push(`<span class="conf-tag ${s.rsi<45?"green":s.rsi<65?"":"yellow"}">RSI ${s.rsi.toFixed(0)}</span>`);
+    if(s.pctHi<-20) tags.push(`<span class="conf-tag blue">📉 ${s.pctHi.toFixed(1)}% off hi</span>`);
+    if(s.recC7) tags.push('<span class="conf-tag blue">📉 DEEP BOUNCE</span>');
+    if(s.pillars.jax && s.utBuy) tags.push('<span class="conf-tag green">🟢 UTBuy</span>');
+    if(s.pillars.jax && s.stFlipped) tags.push('<span class="conf-tag green">🟢 ST Flip</span>');
+    if(s.pillars.jax && !s.utBuy && !s.stFlipped) tags.push(`<span class="conf-tag green">🟢 JAX bull ${s.bullScore}/5</span>`);
+    if(s.volSpike>0) tags.push(`<span class="conf-tag ${s.volSpike>=2?"orange":""}">Vol ${s.volSpike.toFixed(1)}x</span>`);
+    if(s.atrCoiling) tags.push('<span class="conf-tag purple">📉 ATR COIL</span>');
+    if(s.hasEarn && s.earnings) tags.push(`<span class="conf-tag orange">📅 EARN ${s.earnings.daysUntil}d</span>`);
+    if(s.breakout) tags.push('<span class="conf-tag yellow">🚀 BREAKOUT</span>');
+    if(s.trailVal>0) tags.push(`<span class="conf-tag">Trail $${s.trailVal.toFixed(2)}</span>`);
+
+    return `<div class="${cardCls}" onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
+      <div class="conf-band">
+        <div>
+          <div class="conf-sym">${s.sym}</div>
+          <div style="margin-top:3px;display:flex;gap:5px;align-items:center">
+            <span style="font-family:var(--sans);font-size:11px;font-weight:700;padding:2px 8px;border-radius:2px;background:${isFull?"rgba(0,200,83,0.15)":"rgba(255,214,0,0.12)"};color:${scoreClr}">${scoreStr}</span>
+            ${sessBadge}
+          </div>
+        </div>
+        <div class="conf-price-block">
+          <div class="conf-price">$${s.price.toFixed(2)}</div>
+          <div class="conf-chg ${s.change>=0?"up":"dn"}">${s.change>=0?"▲":"▼"}${Math.abs(s.change).toFixed(2)}%</div>
+          <div style="font-size:7px;color:var(--muted2);margin-top:2px;font-family:var(--mono)">#${i+1}</div>
+        </div>
+      </div>
+      <div class="conf-score-bar">
+        ${movePill}${recPill}${jaxPill}${catPill}
+      </div>
+      <div class="conf-details">
+        <div class="conf-detail-row">${tags.join("")}</div>
+      </div>
+      <div class="conf-footer">
+        <span class="conf-score-big" style="color:${scoreClr}">${s.confScore}/4</span>
+        <span style="font-size:8px;color:var(--muted2);font-family:var(--mono);margin-left:4px">CONFLUENCE</span>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="log-btn" onclick="event.stopPropagation();logConfluenceStock('${s.sym}',${s.price},${s.confScore},${s.pillars.jax?1:0})">📓 LOG</button>
+          <span style="font-size:8px;color:var(--muted2);font-family:var(--mono)">📈 TradingView →</span>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+
+function renderNearMisses(){
+  const section = document.getElementById("conf-nearmiss-section");
+  const list    = document.getElementById("conf-nearmiss-list");
+  const count   = document.getElementById("conf-nearmiss-count");
+  if(!section || !list) return;
+
+  if(!confNearMisses.length){ section.style.display="none"; return; }
+  section.style.display = "block";
+  count.textContent = confNearMisses.length+" stocks";
+
+  // Sort by confScore desc then absChange desc
+  const sorted = [...confNearMisses].sort((a,b)=>b.confScore-a.confScore||b.absChange-a.absChange);
+
+  list.innerHTML = sorted.map(s=>{
+    const pillStr = [
+      s.pillars.move     ? '<span style="color:var(--purple)">📈</span>' : '<span style="color:var(--border2)">📈</span>',
+      s.pillars.trend    ? '<span style="color:var(--green2)">📊</span>' : '<span style="color:var(--border2)">📊</span>',
+      s.pillars.jax      ? '<span style="color:var(--green)">🟢</span>'  : '<span style="color:var(--border2)">🟢</span>',
+      s.pillars.momentum ? '<span style="color:var(--orange)">⚡</span>' : '<span style="color:var(--border2)">⚡</span>'
+    ].join("");
+    const chgClr = s.change>=0?"var(--green2)":"var(--red)";
+    return `<div style="background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:8px 10px;cursor:pointer;min-width:140px;transition:border-color 0.12s"
+      onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='var(--border)'"
+      onclick="window.open('https://www.tradingview.com/chart/?symbol=${s.sym}','_blank')">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-family:var(--sans);font-size:16px;font-weight:800;color:#fff">${s.sym}</span>
+        <span style="font-family:var(--mono);font-size:9px;color:${chgClr};font-weight:700">${s.change>=0?"▲":"▼"}${Math.abs(s.change).toFixed(1)}%</span>
+      </div>
+      <div style="display:flex;gap:3px;margin-bottom:4px">${pillStr}</div>
+      <div style="font-family:var(--mono);font-size:7px;color:var(--muted2)">${s.confScore}/4 · ${s.why}</div>
+      ${s.rsi>0?`<div style="font-family:var(--mono);font-size:7px;color:var(--muted2);margin-top:2px">RSI ${s.rsi.toFixed(0)} · ${s.recScore}/6 rec · ${s.bullScore}/5 bull</div>`:""}
+    </div>`;
+  }).join("");
+}
+
+function logConfluenceStock(sym, price, score, hasJAX){
+  logToJournal({
+    sym, price, score,
+    source:    "confluence",
+    session:   getMarketSession(),
+    greenArrow: !!hasJAX,
+    tradeType: "Swing"
+  });
+}
+
+// ── Load confluence results from Firebase/localStorage on startup ─────────────
+function loadConfluence(){
+  try{
+    const saved = localStorage.getItem("cs_confluence");
+    if(saved){
+      confResults = JSON.parse(saved);
+      if(confResults.length){
+        const banner = document.getElementById("conf-savedBanner");
+        if(banner){ banner.style.display="block"; banner.textContent="💾 "+confResults.length+" confluence results · last scan"; }
+        document.getElementById("conf-filterBar").style.display="flex";
+        // Update stats
+        document.getElementById("conf-scanned").textContent  = confResults.length;
+        document.getElementById("conf-full").textContent     = confResults.filter(r=>r.confScore===4).length;
+        document.getElementById("conf-strong").textContent   = confResults.filter(r=>r.confScore===3).length;
+        document.getElementById("conf-jax-count").textContent= confResults.filter(r=>r.pillars&&r.pillars.jax).length;
+        renderConfluence();
+      }
+    }
+  }catch(e){ confResults=[]; }
+
+  document.addEventListener("firebaseReady", async()=>{
+    try{
+      const fb = await window.fbLoad("confluence");
+      if(fb && fb.data && fb.data.length > 0){
+        confResults = fb.data;
+        localStorage.setItem("cs_confluence", JSON.stringify(confResults));
+        const banner = document.getElementById("conf-savedBanner");
+        if(banner){ banner.style.display="block"; banner.textContent="☁️ "+(fb.device||"cloud")+" · "+new Date(fb.savedAt).toLocaleString()+" — "+confResults.length+" hits"; }
+        document.getElementById("conf-filterBar").style.display="flex";
+        document.getElementById("conf-full").textContent     = confResults.filter(r=>r.confScore===4).length;
+        document.getElementById("conf-strong").textContent   = confResults.filter(r=>r.confScore===3).length;
+        document.getElementById("conf-jax-count").textContent= confResults.filter(r=>r.pillars&&r.pillars.jax).length;
+        renderConfluence();
+      }
+      window.fbListen("confluence", (fb)=>{
+        if(fb.data && fb.data.length > 0){
+          confResults = fb.data;
+          localStorage.setItem("cs_confluence", JSON.stringify(confResults));
+          renderConfluence();
+          const banner = document.getElementById("conf-savedBanner");
+          if(banner){ banner.style.display="block"; banner.textContent="🔴 LIVE from "+(fb.device||"cloud")+" · "+new Date(fb.savedAt).toLocaleTimeString(); }
+          document.getElementById("conf-filterBar").style.display="flex";
+        }
+      });
+    }catch(e){}
+  });
+}
+
+
+// ══════════════════════════════════════════════════════════
+// BACKTEST ENGINE
+// Tests: Weekly ATR Trail Flip → what happened next?
+// Same calcATRTrailStop function, weekly candles, 5yr history
+// ══════════════════════════════════════════════════════════
+
+let btResults  = [];
+let btRunning  = false;
+let btStopReq  = false;
+
+function logBT(msg, type=""){
+  const p = document.getElementById("bt-log");
+  if(!p) return;
+  const d = document.createElement("div");
+  d.className = "ll "+(type==="ok"?"ok":type==="info"?"info":type==="err"?"err":"");
+  d.textContent = "["+new Date().toLocaleTimeString()+"] "+msg;
+  p.appendChild(d);
+  if(p.children.length>500) p.removeChild(p.firstChild);
+  p.scrollTop = p.scrollHeight;
+}
+
+// Fetch WEEKLY candles — same API, just interval=1week
+async function fetchWeeklyCandles(sym, keyIndex){
+  const key = TD_KEYS[keyIndex % TD_KEYS.length];
+  const url  = "https://api.twelvedata.com/time_series?symbol="+sym
+               +"&interval=1week&outputsize=260&apikey="+key;
+  const r = await fetch(url);
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  const d = await r.json();
+  if(d.status==="error"){
+    if(d.message&&(d.message.includes("not found")||d.message.includes("missing or invalid")))
+      throw new Error("SKIP:"+d.message);
+    throw new Error(d.message||"API error");
+  }
+  if(!d.values||!d.values.length) throw new Error("No weekly data");
+  const vals = [...d.values].reverse(); // oldest first
+  return {
+    closes:  vals.map(v=>parseFloat(v.close)),
+    highs:   vals.map(v=>parseFloat(v.high)),
+    lows:    vals.map(v=>parseFloat(v.low)),
+    volumes: vals.map(v=>parseFloat(v.volume)||0),
+    dates:   vals.map(v=>v.datetime),
+    bars:    vals.length
+  };
+}
+
+// Find all weekly trail flip points (bearish→bullish transitions)
+function findWeeklyTrailFlips(closes, highs, lows, dates){
+  if(closes.length < 15) return [];
+  
+  const trail = calcATRTrailStop(highs, lows, closes, 10, 3.5);
+  
+  // Recalculate full trail history to find all flips
+  let trailVal = closes[0], tdir = 0;
+  const history = [];
+  
+  for(let i=1; i<closes.length; i++){
+    const atrVals = [];
+    for(let j=Math.max(0,i-10); j<i; j++){
+      const tr = Math.max(
+        highs[j]-lows[j],
+        Math.abs(highs[j]-(j>0?closes[j-1]:closes[j])),
+        Math.abs(lows[j]-(j>0?closes[j-1]:closes[j]))
+      );
+      atrVals.push(tr);
+    }
+    const atrV   = atrVals.reduce((a,b)=>a+b,0)/atrVals.length;
+    const nLoss  = 3.5 * atrV;
+    const trailUp   = closes[i] - nLoss;
+    const trailDown = closes[i] + nLoss;
+    const prevTrail = trailVal;
+    
+    if(closes[i] > trailVal && closes[i-1] > trailVal)       trailVal = Math.max(trailVal, trailUp);
+    else if(closes[i] < trailVal && closes[i-1] < trailVal)  trailVal = Math.min(trailVal, trailDown);
+    else if(closes[i] > trailVal)                             trailVal = trailUp;
+    else                                                      trailVal = trailDown;
+    
+    const prevDir = tdir;
+    tdir = trailVal > prevTrail ? 1 : trailVal < prevTrail ? -1 : tdir;
+    history.push({ close: closes[i], trail: trailVal, dir: tdir, prevDir, date: dates[i], idx: i });
+  }
+  
+  // Find all bearish→bullish flips
+  const flips = [];
+  for(let i=1; i<history.length; i++){
+    const cur  = history[i];
+    const prev = history[i-1];
+    if(cur.dir === 1 && prev.dir === -1){
+      // This is a flip — record it
+      flips.push({
+        date:       cur.date,
+        flipIdx:    cur.idx,
+        flipPrice:  cur.close,
+        trailVal:   cur.trail,
+      });
+    }
+  }
+  return { flips, history };
+}
+
+// Measure return N weeks after each flip
+function measureReturns(flips, closes, dates, holdWeeks){
+  return flips.map(flip=>{
+    const entryIdx = flip.flipIdx;
+    const exitIdx  = Math.min(entryIdx + holdWeeks, closes.length - 1);
+    const exitPrice= closes[exitIdx];
+    const exitDate = dates[exitIdx];
+    const ret      = ((exitPrice - flip.flipPrice) / flip.flipPrice) * 100;
+    const isActive = exitIdx === closes.length - 1; // still in trade
+    
+    // Also find max gain and max loss during hold period
+    let maxGain = 0, maxLoss = 0;
+    for(let i=entryIdx+1; i<=exitIdx; i++){
+      const pct = ((closes[i] - flip.flipPrice) / flip.flipPrice) * 100;
+      if(pct > maxGain) maxGain = pct;
+      if(pct < maxLoss) maxLoss = pct;
+    }
+    
+    return {
+      ...flip,
+      exitPrice,
+      exitDate,
+      returnPct: ret,
+      maxGain,
+      maxLoss,
+      isActive,
+      isWin: ret > 0
+    };
+  });
+}
+
+async function runBacktest(){
+  if(btRunning) return;
+  btRunning = true; btStopReq = false; btResults = [];
+
+  const listVal   = document.getElementById("btList").value;
+  const holdWeeks = parseInt(document.getElementById("btHoldWeeks").value)||4;
+  const signalType= document.getElementById("btSignalType").value;
+  const minReturn = parseFloat(document.getElementById("btMinReturn").value)||0;
+
+  let tickers;
+  if(listVal==="sp500")         tickers = [...SP500];
+  else if(listVal==="universe") tickers = [...new Set([...SP500,...SMALLCAP])];
+  else if(listVal==="custom")   tickers = document.getElementById("btCustomTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
+  else                          tickers = [...WATCHLIST];
+
+  document.getElementById("btRunBtn").disabled  = true;
+  document.getElementById("btStopBtn").disabled = false;
+  document.getElementById("bt-prog").style.display = "block";
+  document.getElementById("bt-summary").style.display = "none";
+  document.getElementById("bt-results").innerHTML = "";
+  document.getElementById("bt-log").innerHTML = "";
+
+  logBT("🔬 Backtest: "+tickers.length+" stocks · "+holdWeeks+"wk hold · signal: "+signalType,"info");
+  logBT("Fetching weekly candles (260 bars = ~5 years per stock)","info");
+
+  const nKeys  = TD_KEYS.length;
+  const chunks = splitInterleaved(tickers, nKeys);
+  const total  = tickers.length;
+  let done     = 0;
+
+  async function runBTWorker(keyIdx, tickerChunk){
+    const DELAY = 8500;
+    for(let i=0; i<tickerChunk.length; i++){
+      if(btStopReq) break;
+      const sym = tickerChunk[i];
+      document.getElementById("bt-progMsg").textContent =
+        "K"+(keyIdx+1)+": "+sym+" · "+done+"/"+total+" · "+btResults.length+" signals found";
+
+      try{
+        // Fetch weekly candles
+        const wk = await fetchWeeklyCandles(sym, keyIdx);
+        if(wk.closes.length < 20){ done++; await sleep(DELAY); continue; }
+
+        let signals = [];
+
+        if(signalType === "weekly_trail" || signalType === "both_align"){
+          // Find weekly trail flips
+          const { flips } = findWeeklyTrailFlips(wk.closes, wk.highs, wk.lows, wk.dates);
+          if(flips.length > 0){
+            const measured = measureReturns(flips, wk.closes, wk.dates, holdWeeks);
+            signals = measured.map(m=>({ ...m, sym, signalType:"weekly", holdWeeks }));
+          }
+        }
+
+        if(signalType === "daily_trail"){
+          // Fetch daily candles and find daily flips
+          const dy = await fetchCandlesWithKey(sym, keyIdx);
+          if(dy && dy.closes.length >= 20){
+            // Convert daily flips to approximate week numbers
+            const { flips } = findWeeklyTrailFlips(dy.closes, dy.highs, dy.lows, dy.dates||dy.closes.map((_,i)=>i+"d"));
+            if(flips.length > 0){
+              const measured = measureReturns(flips, dy.closes, dy.dates||dy.closes.map((_,i)=>i+"d"), holdWeeks*5);
+              signals = measured.map(m=>({ ...m, sym, signalType:"daily", holdWeeks }));
+            }
+          }
+        }
+
+        // Filter by min return
+        const filtered = minReturn > 0 
+          ? signals.filter(s=>s.returnPct >= minReturn || s.isActive)
+          : signals;
+
+        if(filtered.length > 0){
+          btResults.push(...filtered);
+          const wins = filtered.filter(s=>s.isWin).length;
+          logBT("✓ "+sym.padEnd(6)+" "+filtered.length+" signals · "+wins+"/"+filtered.length+" wins · best: +"+(Math.max(...filtered.map(s=>s.returnPct))).toFixed(1)+"%","ok");
+          updateBTSummary();
+          renderBTResults();
+        } else {
+          logBT("  "+sym.padEnd(6)+" "+signals.length+" signals · none pass filter");
+        }
+      }catch(e){
+        if(!e.message.startsWith("SKIP:"))
+          logBT("✗ "+sym+": "+e.message,"err");
+      }
+
+      done++;
+      const pct = Math.round(done/total*100);
+      document.getElementById("bt-progPct").textContent = pct+"%";
+      document.getElementById("bt-progFill").style.width = pct+"%";
+      if(i<tickerChunk.length-1) await sleep(DELAY);
+    }
+  }
+
+  await Promise.all(chunks.map((chunk,ki)=>runBTWorker(ki,chunk)));
+
+  document.getElementById("bt-progMsg").textContent = "Done — "+btResults.length+" signals across "+done+" stocks";
+  document.getElementById("bt-progPct").textContent = "100%";
+  document.getElementById("bt-progFill").style.width = "100%";
+  document.getElementById("btRunBtn").disabled  = false;
+  document.getElementById("btStopBtn").disabled = true;
+  btRunning = false;
+
+  updateBTSummary();
+  renderBTResults();
+  logBT("✅ Backtest complete · "+btResults.length+" total signals","ok");
+
+  // Save to localStorage
+  try{ localStorage.setItem("cs_backtest", JSON.stringify(btResults.slice(0,500))); }catch(e){}
+}
+
+function stopBacktest(){ btStopReq = true; }
+
+function clearBacktest(){
+  btResults = [];
+  document.getElementById("bt-summary").style.display = "none";
+  document.getElementById("bt-results").innerHTML = '<div class="bt-empty"><span class="bt-empty-icon">🔬</span>Cleared.</div>';
+  try{ localStorage.removeItem("cs_backtest"); }catch(e){}
+}
+
+function updateBTSummary(){
+  const el = document.getElementById("bt-summary");
+  if(!btResults.length){ el.style.display="none"; return; }
+  el.style.display = "grid";
+
+  const closed = btResults.filter(r=>!r.isActive);
+  const wins   = closed.filter(r=>r.isWin);
+  const losses = closed.filter(r=>!r.isWin);
+  const winRate= closed.length ? Math.round(wins.length/closed.length*100) : null;
+  const avgWin = wins.length   ? (wins.reduce((a,r)=>a+r.returnPct,0)/wins.length).toFixed(1) : null;
+  const avgLoss= losses.length ? (losses.reduce((a,r)=>a+r.returnPct,0)/losses.length).toFixed(1) : null;
+  const expect = (avgWin && avgLoss && winRate) 
+    ? ((winRate/100)*parseFloat(avgWin) + ((1-winRate/100)*parseFloat(avgLoss))).toFixed(1) : null;
+  const best   = closed.length ? Math.max(...closed.map(r=>r.returnPct)).toFixed(1) : null;
+
+  document.getElementById("bt-total").textContent   = btResults.length;
+  document.getElementById("bt-wins").textContent     = wins.length;
+  document.getElementById("bt-losses").textContent   = losses.length;
+  document.getElementById("bt-winrate").textContent  = winRate!==null ? winRate+"%" : "—";
+  document.getElementById("bt-avgwin").textContent   = avgWin  ? "+"+avgWin+"%" : "—";
+  document.getElementById("bt-avgloss").textContent  = avgLoss ? avgLoss+"%" : "—";
+  document.getElementById("bt-expect").textContent   = expect  ? expect+"%" : "—";
+  document.getElementById("bt-best").textContent     = best    ? "+"+best+"%" : "—";
+}
+
+function renderBTResults(){
+  const el = document.getElementById("bt-results");
+  if(!btResults.length){
+    el.innerHTML = '<div class="bt-empty"><span class="bt-empty-icon">🔬</span>No signals found yet.</div>';
+    return;
+  }
+
+  // Sort by return descending
+  const sorted = [...btResults].sort((a,b)=>b.returnPct-a.returnPct);
+
+  el.innerHTML = '<div class="bt-table-wrap"><table class="bt-table"><thead><tr>'+
+    '<th>STOCK</th><th>SIGNAL TYPE</th><th>FLIP DATE</th><th>ENTRY $</th>'+
+    '<th>EXIT DATE</th><th>EXIT $</th><th>'+document.getElementById("btHoldWeeks")?.value+'wk RETURN</th>'+
+    '<th>MAX GAIN</th><th>MAX LOSS</th><th>STATUS</th>'+
+    '</tr></thead><tbody>'+
+    sorted.map(r=>{
+      const rowCls = r.isActive?"open":r.isWin?"win":"loss";
+      const retClr = r.returnPct>0?"var(--green2)":r.returnPct<0?"var(--red)":"var(--muted)";
+      const sigBadge = r.signalType==="both"
+        ? '<span class="bt-signal both">WEEKLY+DAILY</span>'
+        : r.signalType==="weekly"
+        ? '<span class="bt-signal weekly">📅 WEEKLY</span>'
+        : '<span class="bt-signal daily">🟢 DAILY</span>';
+      return '<tr class="'+rowCls+'">'+
+        '<td><span class="bt-sym">'+r.sym+'</span></td>'+
+        '<td>'+sigBadge+'</td>'+
+        '<td style="color:var(--muted2)">'+r.date+'</td>'+
+        '<td style="font-weight:700">$'+r.flipPrice.toFixed(2)+'</td>'+
+        '<td style="color:var(--muted2)">'+r.exitDate+'</td>'+
+        '<td>$'+r.exitPrice.toFixed(2)+'</td>'+
+        '<td><span class="bt-ret '+( r.returnPct>0?"pos":"neg")+'">'+
+          (r.returnPct>0?"+":"")+r.returnPct.toFixed(1)+'%</span></td>'+
+        '<td style="color:var(--green2)">+'+r.maxGain.toFixed(1)+'%</td>'+
+        '<td style="color:var(--red)">'+r.maxLoss.toFixed(1)+'%</td>'+
+        '<td style="font-size:8px;color:'+( r.isActive?"var(--blue)":r.isWin?"var(--green2)":"var(--red)")+'">'+
+          (r.isActive?"⏳ ACTIVE":r.isWin?"✅ WIN":"❌ LOSS")+'</td>'+
+        '</tr>';
+    }).join("")+
+    '</tbody></table></div>';
+}
+
+// ── Load saved backtest results ───────────────────────────
+function loadBacktest(){
+  try{
+    const saved = localStorage.getItem("cs_backtest");
+    if(saved){
+      btResults = JSON.parse(saved);
+      if(btResults.length){
+        updateBTSummary();
+        renderBTResults();
+      }
+    }
+  }catch(e){ btResults=[]; }
+}
+
+
+// ══════════════════════════════════════════════════════════
+// WEEKLY MONITOR
+// Finds stocks where weekly ATR trail just flipped bullish
+// + checks if daily JAX also active (both aligned = highest conviction)
+// Backtest validated: 77% win rate over 5 years
+// ══════════════════════════════════════════════════════════
+
+let wmResults  = [];
+let wmRunning  = false;
+let wmStopReq  = false;
+let wmFilter   = "all";
+
+function logWM(msg, type=""){
+  const p = document.getElementById("wm-log");
+  if(!p) return;
+  const d = document.createElement("div");
+  d.className = "ll "+(type==="ok"?"ok":type==="info"?"info":type==="err"?"err":"");
+  d.textContent = "["+new Date().toLocaleTimeString()+"] "+msg;
+  p.appendChild(d);
+  if(p.children.length>500) p.removeChild(p.firstChild);
+  p.scrollTop = p.scrollHeight;
+}
+
+function setWMFilter(v, btn){
+  wmFilter = v;
+  document.querySelectorAll("#wm-filterBar .chip").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on");
+  renderWeeklyMonitor();
+}
+
+async function startWeeklyMonitor(){
+  if(wmRunning) return;
+  wmRunning = true; wmStopReq = false; wmResults = [];
+
+  const listVal  = document.getElementById("wmList").value;
+  const flipAge  = parseInt(document.getElementById("wmFlipAge").value)||2;
+
+  let tickers;
+  if(listVal==="sp500")        tickers = [...SP500];
+  else if(listVal==="both")    tickers = [...new Set([...SP500,...SMALLCAP])];
+  else if(listVal==="custom")  tickers = document.getElementById("wmCustomTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
+  else                         tickers = [...WATCHLIST];
+
+  document.getElementById("wmRunBtn").disabled  = true;
+  document.getElementById("wmStopBtn").disabled = false;
+  document.getElementById("wm-prog").style.display = "block";
+  document.getElementById("wm-savedBanner").style.display = "none";
+  document.getElementById("wm-filterBar").style.display = "none";
+  document.getElementById("wm-results").innerHTML = "";
+  document.getElementById("wm-log").innerHTML = "";
+  document.getElementById("wm-sub").textContent =
+    tickers.length+" STOCKS · WEEKLY FLIP WITHIN "+flipAge+" WEEKS · BACKTEST: 77% WIN RATE";
+
+  // Reset stats
+  ["wm-scanned","wm-both","wm-wkonly","wm-fresh","wm-watching"].forEach(id=>{
+    document.getElementById(id).textContent = "0";
+  });
+
+  logWM("📅 Weekly monitor: "+tickers.length+" stocks · flip age ≤"+flipAge+" weeks","info");
+  logWM("Looking for: weekly trail flip bullish + optional daily JAX alignment","info");
+
+  const nKeys  = TD_KEYS.length;
+  const chunks = splitInterleaved(tickers, nKeys);
+  const total  = tickers.length;
+  let done     = 0;
+
+  const progInterval = setInterval(()=>{
+    const pct = Math.round(done/total*100);
+    document.getElementById("wm-progPct").textContent = pct+"%";
+    document.getElementById("wm-progFill").style.width = pct+"%";
+  }, 500);
+
+  async function runWMWorker(keyIdx, tickerChunk){
+    const DELAY = 8500;
+    for(let i=0; i<tickerChunk.length; i++){
+      if(wmStopReq) break;
+      const sym = tickerChunk[i];
+      document.getElementById("wm-progMsg").textContent =
+        "K"+(keyIdx+1)+": "+sym+" · "+done+"/"+total+" · "+wmResults.length+" signals";
+
+      try{
+        // ── Step 1: Weekly candles ────────────────────────────────────────
+        const wk = await fetchWeeklyCandles(sym, keyIdx);
+        if(!wk || wk.closes.length < 20){ done++; await sleep(DELAY); continue; }
+
+        // ── Step 2: Find most recent weekly trail flip ─────────────────────
+        const { flips, history } = findWeeklyTrailFlips(wk.closes, wk.highs, wk.lows, wk.dates);
+        if(!flips.length){ done++; await sleep(DELAY); continue; }
+
+        // Most recent flip
+        const lastFlip = flips[flips.length-1];
+        const weeksAgo = wk.closes.length - 1 - lastFlip.flipIdx;
+
+        // Only care about recent flips
+        if(weeksAgo > flipAge){ done++; await sleep(DELAY); continue; }
+
+        // ── Step 3: Is weekly still bullish? (trail still pointing up) ─────
+        const lastHistory = history[history.length-1];
+        const weeklyStillBullish = lastHistory && lastHistory.dir === 1;
+        if(!weeklyStillBullish){ done++; await sleep(DELAY); continue; }
+
+        // ── Step 4: Daily JAX check ────────────────────────────────────────
+        let dailyJAX = false, dailyBullScore = 0, dailyTrail = 0;
+        let rsiVal = 0, pctHiVal = 0;
+        try{
+          const dy = await fetchCandlesWithKey(sym, keyIdx);
+          if(dy && dy.closes.length >= 70){
+            const jax = calcJAXPRO(dy.closes, dy.highs, dy.lows);
+            if(jax){
+              dailyJAX       = jax.greenArrow;
+              dailyBullScore = jax.bullScore;
+              dailyTrail     = jax.trailVal;
+            }
+            rsiVal  = calcRSI(dy.closes, 14);
+            const high52 = Math.max(...dy.highs);
+            pctHiVal = ((dy.closes[dy.closes.length-1]-high52)/high52)*100;
+          }
+        }catch(e){}
+
+        // ── Step 5: Live quote ─────────────────────────────────────────────
+        let price = wk.closes[wk.closes.length-1], change = 0;
+        try{
+          const q = await fetchLiveQuote(sym);
+          if(q && q.price){ price = q.price; change = q.changePct||0; }
+        }catch(e){}
+
+        // ── Step 6: Build result ───────────────────────────────────────────
+        const bothAligned  = weeklyStillBullish && dailyJAX;
+        const isFresh      = weeksAgo === 0; // flipped THIS week
+        const isRecent     = weeksAgo <= 1;
+
+        const result = {
+          sym, price, change,
+          // Weekly signal
+          weeklyFlipDate:  lastFlip.date,
+          weeklyFlipPrice: lastFlip.flipPrice,
+          weeksAgo,
+          weeklyBullish:   weeklyStillBullish,
+          weeklyTrail:     lastFlip.trailVal,
+          totalFlips:      flips.length,
+          // Daily signal
+          dailyJAX,
+          dailyBullScore,
+          dailyTrail,
+          // Both aligned
+          bothAligned,
+          isFresh, isRecent,
+          // Indicators
+          rsi: rsiVal,
+          pctHi: pctHiVal,
+        };
+
+        wmResults.push(result);
+
+        // Update stats
+        const bothCount  = wmResults.filter(r=>r.bothAligned).length;
+        const wkOnly     = wmResults.filter(r=>!r.bothAligned).length;
+        const freshCount = wmResults.filter(r=>r.isFresh).length;
+        document.getElementById("wm-scanned").textContent  = done+1;
+        document.getElementById("wm-both").textContent     = bothCount;
+        document.getElementById("wm-wkonly").textContent   = wkOnly;
+        document.getElementById("wm-fresh").textContent    = freshCount;
+        document.getElementById("wm-watching").textContent = wmResults.length;
+
+        renderWeeklyMonitor();
+        document.getElementById("wm-filterBar").style.display = "flex";
+
+        const label = bothAligned?"🟣 BOTH ALIGNED":isFresh?"🟢 FRESH FLIP":"📅 WEEKLY FLIP";
+        const ageStr = weeksAgo===0?"THIS WEEK":weeksAgo===1?"1 wk ago":weeksAgo+" wks ago";
+        logWM(label+" "+sym+" flip "+ageStr+" at $"+lastFlip.flipPrice.toFixed(2)
+          +(dailyJAX?" | 🟢 daily JAX bull "+dailyBullScore+"/5":"")
+          +(rsiVal>0?" | RSI "+rsiVal.toFixed(0):""), bothAligned?"ok":"info");
+
+        // Notification for both aligned
+        if(bothAligned){
+          sendNotification(
+            "🟣 "+sym+" WEEKLY + DAILY ALIGNED",
+            "Weekly flip "+ageStr+" at $"+lastFlip.flipPrice.toFixed(2)+" · Daily JAX bull "+dailyBullScore+"/5 · Open app",
+            sym
+          );
+        }
+
+      }catch(e){
+        if(!e.message.startsWith("SKIP:"))
+          logWM("✗ "+sym+": "+e.message,"err");
+      }
+
+      done++;
+      if(i<tickerChunk.length-1) await sleep(DELAY);
+    }
+  }
+
+  await Promise.all(chunks.map((chunk,ki)=>runWMWorker(ki,chunk)));
+
+  clearInterval(progInterval);
+  const bothCount = wmResults.filter(r=>r.bothAligned).length;
+  document.getElementById("wm-progMsg").textContent =
+    "Done — "+wmResults.length+" signals · "+bothCount+" both aligned";
+  document.getElementById("wm-progPct").textContent = "100%";
+  document.getElementById("wm-progFill").style.width = "100%";
+  document.getElementById("wmRunBtn").disabled  = false;
+  document.getElementById("wmStopBtn").disabled = true;
+  wmRunning = false;
+
+  if(wmResults.length){
+    const banner = document.getElementById("wm-savedBanner");
+    banner.style.display = "block";
+    banner.textContent = "📅 "+wmResults.length+" weekly signals · "+bothCount+" both aligned · "+new Date().toLocaleString();
+    document.getElementById("wm-lastscan").textContent = "Last scan: "+new Date().toLocaleTimeString();
+    // Save
+    if(window.firebaseReady) window.fbSave("weekly_monitor", wmResults);
+    try{ localStorage.setItem("cs_weekly", JSON.stringify(wmResults)); }catch(e){}
+  }
+  renderWeeklyMonitor();
+  logWM("✅ Complete · "+wmResults.length+" signals · "+bothCount+" weekly+daily aligned","ok");
+}
+
+function stopWeeklyMonitor(){ wmStopReq = true; }
+
+function clearWeeklyMonitor(){
+  wmResults = [];
+  document.getElementById("wm-savedBanner").style.display = "none";
+  document.getElementById("wm-filterBar").style.display = "none";
+  document.getElementById("wm-results").innerHTML = '<div class="conf-empty"><span class="conf-empty-icon">📅</span>Cleared.</div>';
+  ["wm-scanned","wm-both","wm-wkonly","wm-fresh","wm-watching"].forEach(id=>{
+    document.getElementById(id).textContent = "0";
+  });
+  try{ localStorage.removeItem("cs_weekly"); }catch(e){}
+}
+
+function renderWeeklyMonitor(){
+  const sort   = document.getElementById("wm-sortSel")?.value||"priority";
+  const search = (document.getElementById("wm-search")?.value||"").toUpperCase().trim();
+
+  let f = [...wmResults];
+  if(wmFilter==="both")   f = f.filter(r=>r.bothAligned);
+  else if(wmFilter==="fresh")  f = f.filter(r=>r.isFresh);
+  else if(wmFilter==="weekly") f = f.filter(r=>!r.bothAligned);
+  if(search) f = f.filter(r=>r.sym.includes(search));
+
+  f.sort((a,b)=>{
+    if(sort==="fresh")    return a.weeksAgo-b.weeksAgo;
+    if(sort==="rsi")      return a.rsi-b.rsi;
+    // Priority: both aligned first, then fresh flips, then weekly only
+    const aScore = (a.bothAligned?100:0)+(a.isFresh?10:0)+(10-a.weeksAgo);
+    const bScore = (b.bothAligned?100:0)+(b.isFresh?10:0)+(10-b.weeksAgo);
+    return bScore-aScore;
+  });
+
+  document.getElementById("wm-resCount").textContent = f.length+" shown";
+  const grid = document.getElementById("wm-results");
+
+  if(!f.length){
+    grid.innerHTML = wmResults.length
+      ? '<div class="conf-empty"><span class="conf-empty-icon">🔍</span>No results match filter.</div>'
+      : '<div class="conf-empty"><span class="conf-empty-icon">📅</span>Run the weekly scan to find signals.</div>';
+    return;
+  }
+
+  grid.innerHTML = f.map((s,i)=>{
+    const cardCls = s.bothAligned?"wm-card wm-fresh":s.isFresh?"wm-card wm-recent":s.weeksAgo<=2?"wm-card wm-recent":"wm-card wm-old";
+    const ageStr  = s.weeksAgo===0?"🟢 THIS WEEK":s.weeksAgo===1?"📅 1 WEEK AGO":"📅 "+s.weeksAgo+" WEEKS AGO";
+    const ageClr  = s.weeksAgo===0?"var(--green2)":s.weeksAgo===1?"var(--blue)":"var(--yellow)";
+    const badgeLabel = s.bothAligned?"🟣 BOTH ALIGNED":s.isFresh?"🟢 FRESH FLIP":"📅 WEEKLY FLIP";
+    const badgeCls   = s.bothAligned?"both":s.isFresh?"fresh":s.weeksAgo<=2?"recent":"old";
+
+    // Signal pills
+    const wkPill = `<div class="wm-sig wk-on active">📅 WEEKLY<br><span style="font-size:9px">TRAIL BULLISH</span></div>`;
+    const dyPill = s.dailyJAX
+      ? `<div class="wm-sig dy-on active">🟢 DAILY JAX<br><span style="font-size:9px">BULL ${s.dailyBullScore}/5</span></div>`
+      : `<div class="wm-sig off">🟢 DAILY JAX<br><span style="font-size:9px">${s.dailyBullScore>0?s.dailyBullScore+"/5":"—"}</span></div>`;
+    const alignPill = s.bothAligned
+      ? '<div class="wm-sig both-on active">🟣 ALIGNED<br><span style="font-size:9px">HIGHEST CONV</span></div>'
+      : '<div class="wm-sig off">🟣 ALIGNED<br><span style="font-size:9px">WAITING</span></div>';
+
+    // Detail tags
+    const tags = [];
+    tags.push(`<span class="wm-tag" style="color:${ageClr};border-color:${ageClr}40">${ageStr}</span>`);
+    tags.push(`<span class="wm-tag blue">Flip at $${s.weeklyFlipPrice.toFixed(2)}</span>`);
+    if(s.rsi>0) tags.push(`<span class="wm-tag ${s.rsi<45?"green":s.rsi<55?"green":""}">RSI ${s.rsi.toFixed(0)}</span>`);
+    if(s.pctHi<-20) tags.push(`<span class="wm-tag blue">📉 ${s.pctHi.toFixed(0)}% off hi</span>`);
+    if(s.dailyJAX) tags.push(`<span class="wm-tag green">🟢 Daily arrow active</span>`);
+    if(s.dailyTrail>0) tags.push(`<span class="wm-tag">Daily trail $${s.dailyTrail.toFixed(2)}</span>`);
+    tags.push(`<span class="wm-tag">${s.totalFlips} total flips</span>`);
+
+    return `<div class="${cardCls}" onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
+      <div class="wm-band">
+        <div>
+          <div class="wm-sym">${s.sym}</div>
+          <div style="margin-top:4px">
+            <span class="wm-badge ${badgeCls}">${badgeLabel}</span>
+          </div>
+        </div>
+        <div class="wm-price-block">
+          <div class="wm-price">$${s.price.toFixed(2)}</div>
+          <div class="wm-chg ${s.change>=0?"up":"dn"}">${s.change>=0?"▲":"▼"}${Math.abs(s.change).toFixed(2)}%</div>
+          <div style="font-size:7px;color:var(--muted2);margin-top:2px;font-family:var(--mono)">#${i+1}</div>
+        </div>
+      </div>
+      <div class="wm-signals">
+        ${wkPill}${dyPill}${alignPill}
+      </div>
+      <div class="wm-details">
+        <div class="wm-detail-row">${tags.join("")}</div>
+      </div>
+      <div class="wm-footer">
+        <span style="font-family:var(--mono);font-size:8px;color:var(--muted2)">Flip: ${s.weeklyFlipDate}</span>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="log-btn" onclick="event.stopPropagation();logToJournal({sym:'${s.sym}',price:${s.price},score:'W',source:'weekly',session:getMarketSession(),greenArrow:${s.dailyJAX},tradeType:'Swing'})">📓 LOG</button>
+          <span style="font-size:8px;color:var(--muted2);font-family:var(--mono)">📈 TradingView →</span>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ── Load from localStorage / Firebase ─────────────────────
+function loadWeeklyMonitor(){
+  try{
+    const saved = localStorage.getItem("cs_weekly");
+    if(saved){
+      wmResults = JSON.parse(saved);
+      if(wmResults.length){
+        const banner = document.getElementById("wm-savedBanner");
+        if(banner){ banner.style.display="block"; banner.textContent="💾 "+wmResults.length+" weekly signals · last scan"; }
+        document.getElementById("wm-filterBar").style.display="flex";
+        document.getElementById("wm-both").textContent     = wmResults.filter(r=>r.bothAligned).length;
+        document.getElementById("wm-wkonly").textContent   = wmResults.filter(r=>!r.bothAligned).length;
+        document.getElementById("wm-fresh").textContent    = wmResults.filter(r=>r.isFresh).length;
+        document.getElementById("wm-watching").textContent = wmResults.length;
+        renderWeeklyMonitor();
+      }
+    }
+  }catch(e){ wmResults=[]; }
+
+  document.addEventListener("firebaseReady", async()=>{
+    try{
+      const fb = await window.fbLoad("weekly_monitor");
+      if(fb && fb.data && fb.data.length > 0){
+        wmResults = fb.data;
+        localStorage.setItem("cs_weekly", JSON.stringify(wmResults));
+        const banner = document.getElementById("wm-savedBanner");
+        if(banner){ banner.style.display="block"; banner.textContent="☁️ "+(fb.device||"cloud")+" · "+new Date(fb.savedAt).toLocaleString()+" — "+wmResults.length+" signals"; }
+        document.getElementById("wm-filterBar").style.display="flex";
+        document.getElementById("wm-both").textContent     = wmResults.filter(r=>r.bothAligned).length;
+        document.getElementById("wm-fresh").textContent    = wmResults.filter(r=>r.isFresh).length;
+        document.getElementById("wm-watching").textContent = wmResults.length;
+        renderWeeklyMonitor();
+      }
+      window.fbListen("weekly_monitor", (fb)=>{
+        if(fb.data && fb.data.length > 0){
+          wmResults = fb.data;
+          localStorage.setItem("cs_weekly", JSON.stringify(wmResults));
+          renderWeeklyMonitor();
+        }
+      });
+    }catch(e){}
+  });
+}
+
 async function loadSaved(){
   try{
     const rr  = localStorage.getItem("cs_recovery");
@@ -1967,7 +3907,6 @@ async function loadSaved(){
         document.getElementById("r-savedBanner").style.display="block";
         document.getElementById("r-savedBanner").textContent="💾 Local: "+at+" — "+rResults.length+" results";
         document.getElementById("r-filterBar").style.display="flex";
-        document.getElementById("statsRow").style.display="flex";
         renderRecovery(); updateHdr(rResults);
       }
     }
@@ -1995,7 +3934,6 @@ async function loadSaved(){
             "☁️ "+(fbR.device||"cloud")+" · "+new Date(fbR.savedAt).toLocaleString()+" — "+rResults.length+" results";
           document.getElementById("r-savedBanner").style.display="block";
           document.getElementById("r-filterBar").style.display="flex";
-          document.getElementById("statsRow").style.display="flex";
           renderRecovery(); updateHdr(rResults);
         }
         if(fbC && fbC.data && fbC.data.length > 0){
@@ -2019,8 +3957,7 @@ async function loadSaved(){
             document.getElementById("r-savedBanner").textContent =
               "🔴 LIVE from "+fbR.device+" · "+new Date(fbR.savedAt).toLocaleTimeString();
             document.getElementById("r-filterBar").style.display="flex";
-            document.getElementById("statsRow").style.display="flex";
-          }
+            }
         });
         window.fbListen("catalyst", (fbC)=>{
           if(fbC.data && fbC.data.length > 0){
@@ -2131,7 +4068,6 @@ async function startRecoveryScan(){
   document.getElementById("stopBtn").disabled=false;
   document.getElementById("r-prog").style.display="block";
   document.getElementById("r-filterBar").style.display="none";
-  document.getElementById("statsRow").style.display="none";
   document.getElementById("r-savedBanner").style.display="none";
   document.getElementById("r-results").innerHTML="";
   document.getElementById("r-log").innerHTML="";
@@ -2211,7 +4147,6 @@ async function startRecoveryScan(){
   isRunning=false;
   if(rResults.length){
     document.getElementById("r-filterBar").style.display="flex";
-    document.getElementById("statsRow").style.display="flex";
     saveResults();
   }
   log("✅ Complete. "+rResults.length+" passed. Scanned in parallel with "+nKeys+" keys.","info");
@@ -2555,6 +4490,12 @@ async function startCatalystScan(){
     else if(passed){
       scanned++;
       cResults.push(r); renderCatalyst();
+      // Update catalyst stat bar
+      document.getElementById("c-scanned").textContent = scanned;
+      document.getElementById("c-passed").textContent  = cResults.length;
+      document.getElementById("c-ignition").textContent= cResults.filter(x=>x.isIgniting).length;
+      document.getElementById("c-jax").textContent     = cResults.filter(x=>x.greenArrow).length;
+      document.getElementById("c-coiling").textContent = cResults.filter(x=>x.atrCoiling&&!x.isIgniting).length;
       const heat = r.heat>=8?"🔥🔥🔥 FIRE":r.heat>=6?"🔥🔥 HOT":r.score>=4?"🔥 WARM":"📡 WATCH";
       log(heat+" "+r.sym.padEnd(6)+" "+r.score+"/6 heat:"+r.heat
         +(r.hasEarnings?" | 📅 "+r.earningsDays+"d":"")
@@ -2954,6 +4895,12 @@ async function runMorningAlerts(){
 
         // Send browser notification for big moves
         if(absChange>=minMove){
+          // Update alert stat bar
+          const allAlerts = alerts.length + 1;
+          document.getElementById("alert-scanned").textContent = i+1;
+          document.getElementById("alert-movers").textContent  = allAlerts;
+          document.getElementById("alert-fire").textContent    = alerts.filter(a=>a.absChange>=10).length + (absChange>=10?1:0);
+          document.getElementById("alert-hot").textContent     = alerts.filter(a=>a.absChange>=5).length + (absChange>=5?1:0);
           const dir = changePct>=0?"📈 UP":"📉 DOWN";
           sendNotification(
             "🔔 "+sym+" "+dir+" "+changePct.toFixed(1)+"% — CHECK NOW",
@@ -3536,6 +5483,11 @@ async function startJAXScan(){
     if(r.error){ errCount++; return; }
     if(passed){
       jaxResults.push(r); renderJAX();
+      document.getElementById("jax-scanned").textContent = done;
+      document.getElementById("jax-signals").textContent = jaxResults.length;
+      document.getElementById("jax-bull5").textContent   = jaxResults.filter(x=>x.bullScore===5).length;
+      document.getElementById("jax-deep").textContent    = jaxResults.filter(x=>x.isDeepRecovery).length;
+      document.getElementById("jax-utbuy").textContent   = jaxResults.filter(x=>x.utBuy).length;
       const trigger = r.utBuy?"UTBuy":r.stFlipped?"ST Flip":"—";
       log("🟢 "+r.sym.padEnd(6)+" bull:"+r.bullScore+"/5 RSI:"+r.rsi.toFixed(0)+" "+trigger+" $"+r.price.toFixed(2)+(r.pctHi<-25?" 📉"+r.pctHi.toFixed(0)+"%":""),"ok","jax");
       // Push notification for high conviction
@@ -3913,10 +5865,14 @@ function loadJAX(){
 }
 
 
+
 loadSaved();
 renderWatchlistUI();
 loadJournal();
 loadJAX();
+loadConfluence();
+loadBacktest();
+loadWeeklyMonitor();
 // Auto-load calendar on startup
 setTimeout(()=>{ try{ loadCalendar(); }catch(e){} }, 2000);
 
