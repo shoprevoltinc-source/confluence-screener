@@ -1134,9 +1134,14 @@ pre.dout{
 .wm-stats{
   display:flex;gap:0;border-bottom:1px solid var(--border);
   background:var(--bg);
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
 }
+.wm-stats::-webkit-scrollbar{display:none}
 .wm-stat{
-  flex:1;padding:8px 16px;border-right:1px solid var(--border);
+  flex:0 0 auto;min-width:80px;padding:8px 14px;
+  border-right:1px solid var(--border);
   display:flex;flex-direction:column;gap:2px;
 }
 .wm-stat:last-child{border-right:none}
@@ -3150,8 +3155,8 @@ function loadConfluence(){
         const banner = document.getElementById("conf-savedBanner");
         if(banner){ banner.style.display="block"; banner.textContent="💾 "+confResults.length+" confluence results · last scan"; }
         document.getElementById("conf-filterBar").style.display="flex";
-        // Update stats
         document.getElementById("conf-scanned").textContent  = confResults.length;
+        document.getElementById("conf-movers").textContent   = confResults.length;
         document.getElementById("conf-full").textContent     = confResults.filter(r=>r.confScore===4).length;
         document.getElementById("conf-strong").textContent   = confResults.filter(r=>r.confScore===3).length;
         document.getElementById("conf-jax-count").textContent= confResults.filter(r=>r.pillars&&r.pillars.jax).length;
@@ -3907,6 +3912,7 @@ async function loadSaved(){
         document.getElementById("r-savedBanner").style.display="block";
         document.getElementById("r-savedBanner").textContent="💾 Local: "+at+" — "+rResults.length+" results";
         document.getElementById("r-filterBar").style.display="flex";
+        if(at) document.getElementById("r-lastscan").textContent="Last scan: "+at;
         renderRecovery(); updateHdr(rResults);
       }
     }
@@ -3916,6 +3922,12 @@ async function loadSaved(){
         document.getElementById("c-savedBanner").style.display="block";
         document.getElementById("c-savedBanner").textContent="⚡ Local: "+at+" — "+cResults.length+" catalyst setups";
         document.getElementById("c-filterBar").style.display="flex";
+        // Sync stat bar
+        document.getElementById("c-scanned").textContent  = cResults.length;
+        document.getElementById("c-passed").textContent   = cResults.length;
+        document.getElementById("c-ignition").textContent = cResults.filter(r=>r.isIgniting).length;
+        document.getElementById("c-jax").textContent      = cResults.filter(r=>r.greenArrow).length;
+        document.getElementById("c-coiling").textContent  = cResults.filter(r=>r.atrCoiling&&!r.isIgniting).length;
         renderCatalyst();
       }
     }
@@ -5823,6 +5835,12 @@ function loadJAX(){
         const fb = document.getElementById("jax-filterBar");
         if(el){ el.style.display="block"; el.textContent="💾 "+jaxResults.length+" JAX signals · last scan"; }
         if(fb) fb.style.display="flex";
+        // Sync stat bar
+        document.getElementById("jax-scanned").textContent = jaxResults.length;
+        document.getElementById("jax-signals").textContent = jaxResults.length;
+        document.getElementById("jax-bull5").textContent   = jaxResults.filter(r=>r.bullScore===5).length;
+        document.getElementById("jax-deep").textContent    = jaxResults.filter(r=>r.isDeepRecovery).length;
+        document.getElementById("jax-utbuy").textContent   = jaxResults.filter(r=>r.utBuy).length;
         renderJAX();
       }
     }
