@@ -2709,14 +2709,10 @@ function saveResults(){
     localStorage.setItem("cs_catalyst",JSON.stringify(cResults));
     localStorage.setItem("cs_saved_at",new Date().toLocaleString());
 
-    // Save to Firebase (all devices)
-    if(window.firebaseReady){
-      window.fbSave("recovery", rResults);
-      window.fbSave("catalyst", cResults);
-      document.getElementById("r-savedBanner").textContent="💾 Saved locally + synced to Firebase · "+new Date().toLocaleTimeString();
-    } else {
-      document.getElementById("r-savedBanner").textContent="💾 Saved locally · "+new Date().toLocaleTimeString();
-    }
+    // Save to Firebase (all devices) — fbSafeSave queues if not ready
+    fbSafeSave("recovery", rResults);
+    fbSafeSave("catalyst", cResults);
+    document.getElementById("r-savedBanner").textContent="💾 Saved · syncing to Firebase · "+new Date().toLocaleTimeString();
     document.getElementById("r-savedBanner").style.display="block";
     document.getElementById("savedAt").textContent="synced "+new Date().toLocaleTimeString();
   }catch(e){}
@@ -2989,7 +2985,7 @@ async function startConfluenceScan(){
     banner.textContent = "⚡ "+confResults.length+" confluence hits · "+new Date().toLocaleTimeString();
     banner.style.display = "block";
     // Save to Firebase
-    if(window.firebaseReady) window.fbSave("confluence", confResults);
+    fbSafeSave("confluence", confResults);
     try{ localStorage.setItem("cs_confluence", JSON.stringify(confResults)); }catch(e){}
   }
   logConf("✅ Complete · "+confResults.length+" hits from "+done+" stocks","ok");
@@ -3459,7 +3455,7 @@ async function runBacktest(){
 
   // Save to localStorage
   try{ localStorage.setItem("cs_backtest", JSON.stringify(btResults.slice(0,500))); }catch(e){}
-  if(window.firebaseReady) window.fbSave("backtest", btResults.slice(0,500));
+  fbSafeSave("backtest", btResults.slice(0,500));
 }
 
 function stopBacktest(){ btStopReq = true; }
@@ -3795,7 +3791,7 @@ async function startWeeklyMonitor(){
     banner.textContent = "📅 "+wmResults.length+" weekly signals · "+bothCount+" both aligned · "+new Date().toLocaleString();
     document.getElementById("wm-lastscan").textContent = "Last scan: "+new Date().toLocaleTimeString();
     // Save
-    if(window.firebaseReady) window.fbSave("weekly_monitor", wmResults);
+    fbSafeSave("weekly_monitor", wmResults);
     try{ localStorage.setItem("cs_weekly", JSON.stringify(wmResults)); }catch(e){}
   }
   renderWeeklyMonitor();
@@ -3945,6 +3941,16 @@ function loadWeeklyMonitor(){
   };
   if(window.firebaseReady){ _doWMFirebase(); }
   else { document.addEventListener("firebaseReady", _doWMFirebase, {once:true}); }
+}
+
+
+// ── Safe Firebase save — queues if Firebase not ready yet ─────────────────
+function fbSafeSave(key, data){
+  if(window.firebaseReady){
+    window.fbSave(key, data);
+  } else {
+    document.addEventListener("firebaseReady", ()=>window.fbSave(key, data), {once:true});
+  }
 }
 
 async function loadSaved(){
@@ -4984,7 +4990,7 @@ async function runPulseScan(){
     const wkCount = pulseResults.filter(r=>r.weeklyMatch).length;
     banner.textContent = "🔔 "+movers+" movers · "+wkCount+" weekly+move · "+sessLbl+" · "+new Date().toLocaleTimeString();
     // Save to Firebase
-    if(window.firebaseReady) window.fbSave("pulse", pulseResults);
+    fbSafeSave("pulse", pulseResults);
     try{ localStorage.setItem("cs_pulse", JSON.stringify(pulseResults)); }catch(e){}
   }
 
@@ -5173,7 +5179,7 @@ function loadJournal(){
 
 function saveJournal(){
   try{ localStorage.setItem("cs_journal", JSON.stringify(journalEntries)); }catch(e){}
-  if(window.firebaseReady) window.fbSave("journal", journalEntries);
+  fbSafeSave("journal", journalEntries);
   const el = document.getElementById("jnl-last-update");
   if(el) el.textContent = "last updated " + new Date().toLocaleTimeString();
 }
@@ -5644,7 +5650,7 @@ async function startJAXScan(){
     // Save to localStorage (this device)
     try{ localStorage.setItem("cs_jax", JSON.stringify(jaxResults)); }catch(e){}
     // Save to Firebase (all devices)
-    if(window.firebaseReady) window.fbSave("jax_scan", jaxResults);
+    fbSafeSave("jax_scan", jaxResults);
     document.getElementById("jax-savedBanner").textContent =
       "🟢 "+jaxResults.length+" JAX signals saved · "+new Date().toLocaleTimeString();
   }
@@ -5823,7 +5829,7 @@ function mergeJAXResults(){
 function clearJAX(){
   jaxResults=[];
   try{ localStorage.removeItem("cs_jax"); }catch(e){}
-  if(window.firebaseReady) window.fbSave("jax_scan", {data:"[]", savedAt:new Date().toISOString(), device:"cleared"});
+  fbSafeSave("jax_scan", {data:"[]", savedAt:new Date().toISOString(), device:"cleared"});
   document.getElementById("jax-savedBanner").style.display="none";
   document.getElementById("jax-filterBar").style.display="none";
   document.getElementById("jax-results").innerHTML='<div class="empty"><span class="empty-icon">🟢</span>Cleared.</div>';
