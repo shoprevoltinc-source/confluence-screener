@@ -4086,8 +4086,8 @@ async function startWeeklyMonitor(){
     tickers.length+" STOCKS · WEEKLY FLIP WITHIN "+flipAge+" WEEKS · BACKTEST: 77% WIN RATE";
 
   // Reset stats
-  ["wm-scanned","wm-both","wm-wkonly","wm-fresh","wm-watching"].forEach(id=>{
-    document.getElementById(id).textContent = "0";
+  ["wm-scanned","wm-both","wm-fresh","wm-watching"].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.textContent = "0";
   });
 
   logWM("📅 Weekly monitor: "+tickers.length+" stocks · flip age ≤"+flipAge+" weeks","info");
@@ -4302,8 +4302,8 @@ function clearWeeklyMonitor(){
   document.getElementById("wm-savedBanner").style.display = "none";
   document.getElementById("wm-filterBar").style.display = "none";
   document.getElementById("wm-results").innerHTML = '<div class="conf-empty"><span class="conf-empty-icon">📅</span>Cleared.</div>';
-  ["wm-scanned","wm-both","wm-wkonly","wm-fresh","wm-watching"].forEach(id=>{
-    document.getElementById(id).textContent = "0";
+  ["wm-scanned","wm-both","wm-fresh","wm-watching"].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.textContent = "0";
   });
   try{ localStorage.removeItem("cs_weekly"); }catch(e){}
 }
@@ -4409,7 +4409,7 @@ function loadWeeklyMonitor(){
         if(banner){ banner.style.display="block"; banner.textContent="💾 "+wmResults.length+" weekly signals · last scan"; }
         document.getElementById("wm-filterBar").style.display="flex";
         document.getElementById("wm-both").textContent     = wmResults.filter(r=>r.bothAligned).length;
-        document.getElementById("wm-wkonly").textContent   = wmResults.filter(r=>!r.bothAligned).length;
+        const wkonly = document.getElementById("wm-wkonly"); if(wkonly) wkonly.textContent = wmResults.filter(r=>!r.bothAligned).length;
         document.getElementById("wm-fresh").textContent    = wmResults.filter(r=>r.isFresh).length;
         document.getElementById("wm-watching").textContent = wmResults.length;
         renderWeeklyMonitor();
