@@ -1219,9 +1219,17 @@ pre.dout{
 }
 .agent-card-body{padding:14px;min-height:120px}
 .agent-output{
-  font-family:var(--mono);font-size:10px;
+  font-family:var(--mono);font-size:11px;
   color:var(--text);line-height:1.8;
-  white-space:pre-wrap;
+}
+.agent-output p, .agent-output div p{
+  margin:0 0 8px 0;
+}
+.agent-output strong, .agent-output div strong{
+  color:#fff;font-weight:700;
+}
+.agent-output em, .agent-output div em{
+  color:var(--yellow);font-style:normal;
 }
 .agent-output.loading{color:var(--muted2);animation:pulse2 1.5s infinite}
 @keyframes pulse2{0%,100%{opacity:1}50%{opacity:0.4}}
@@ -4459,9 +4467,9 @@ function fbSafeSave(key, data){
 async function callClaude(systemPrompt, userPrompt, maxTokens=1500){
   // Requires Cloudflare proxy to handle API key + CORS
   // Wire up tomorrow in the Cloudflare session
-  const workerUrl = localStorage.getItem("cs_claude_proxy")||"";
+  const workerUrl = localStorage.getItem("cs_claude_proxy")||"https://yellow-hall-2317confluence-proxy.kevonjones26.workers.dev";
   if(!workerUrl){
-    throw new Error("Claude proxy not configured yet. Coming in next session — Cloudflare will proxy the API key securely.");
+    throw new Error("Claude proxy not configured. Set cs_claude_proxy in localStorage.");
   }
   const response = await fetch(workerUrl+"/claude", {
     method: "POST",
@@ -4471,6 +4479,23 @@ async function callClaude(systemPrompt, userPrompt, maxTokens=1500){
   const data = await response.json();
   if(data.error) throw new Error(data.error.message);
   return data.content[0].text;
+}
+
+// ── Markdown renderer for Claude responses ───────────────
+function renderMD(text){
+  if(!text) return "";
+  let html = text
+    // Escape HTML special chars first
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    // **bold**
+    .replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>")
+    // *italic*
+    .replace(/\*(.+?)\*/g,"<em>$1</em>")
+    // Blank line = paragraph break
+    .replace(/\n{2,}/g,"</p><p>")
+    // Single newline = line break
+    .replace(/\n/g,"<br>");
+  return `<p>${html}</p>`;
 }
 
 // ── Gather all scanner data from Firebase ─────────────────
@@ -4620,42 +4645,131 @@ async function runMorningBrief(){
     const jnlCtx  = buildJournalContext(data.journal);
     const sess    = getMarketSession();
 
-    const system = `You are a professional trading advisor analyzing a retail trader's scanner data and journal history. 
-You must be concise, direct, and actionable. No fluff. Think like a quant hedge fund analyst.
-The trader has an account of $${account} with ${risk}% risk per trade ($${riskAmt.toFixed(0)} max risk).
-They want maximum ${maxT} trades per day.
+    const system = `You are a professional trading advisor. Respond ONLY with valid JSON, no markdown, no explanation, no preamble.
+The trader has $${account} account, ${risk}% risk per trade ($${riskAmt.toFixed(0)} max risk), max ${maxT} trades.
 Market session: ${sess.toUpperCase()}.
 
-CRITICAL RULES:
-- Only recommend stocks with the strongest signal confluence
-- Weekly Monitor TIER 1 (⭐ ENTER NOW) = highest conviction, always prioritize
-- If weekly trail not confirmed, say so explicitly
+Rules:
+- Weekly Monitor TIER 1 = highest conviction, always prioritize
 - Position size = risk amount / (entry - stop) = shares
-- Always give entry, stop, target, and exact share count
-- Be honest if signals are weak — say "no trades today" if needed
-- Keep response under 400 words`;
+- Be honest if signals are weak
+
+Return this exact JSON structure:
+{
+  "context": "one sentence market context",
+  "confidence": "X/10 — one sentence explanation",
+  "avoid": "one sentence on what to avoid today",
+  "trades": [
+    {
+      "sym": "TICKER",
+      "action": "ENTER" or "WATCH" or "SMALL SIZE",
+      "entry": 123.45,
+      "stop": 120.00,
+      "target": 135.00,
+      "shares": 12,
+      "size_pct": 2,
+      "win_rate_note": "your weekly+4H trades win 89%",
+      "notes": "extra context if needed"
+    }
+  ],
+  "recommendation": "bold final recommendation paragraph with key reasoning"
+}`;
 
     const user = `Here is today's scanner data and my trading history. Give me my morning brief with up to ${maxT} trades.
 
 ${scanCtx}
 
-${jnlCtx}
+${jnlCtx}`;
 
-Format your response as:
-1. One sentence market context
-2. Each trade on its own line with: TICKER — action — entry — stop — target — shares — why
-3. One sentence on what to avoid today
-4. One sentence confidence rating`;
+    const raw = await callClaude(system, user, 1000);
 
-    const response = await callClaude(system, user, 800);
+    // Parse JSON response
+    let brief;
+    try{
+      const clean = raw.replace(/```json|```/g,"").trim();
+      brief = JSON.parse(clean);
+    }catch(ex){
+      // Fallback to markdown render if JSON fails
+      body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(raw)}</div>`;
+      document.getElementById("agent-brief-time").textContent = new Date().toLocaleTimeString();
+      document.getElementById("agent-lastrun").textContent = "Last brief: "+new Date().toLocaleTimeString();
+      try{ localStorage.setItem("cs_agent_brief", JSON.stringify({text:raw, time:new Date().toISOString(), isJson:false})); }catch(e){}
+      btn.disabled = false;
+      return;
+    }
 
-    // Parse and render
-    body.innerHTML = `<div style="font-family:var(--mono);font-size:10px;line-height:1.9;color:var(--text);white-space:pre-wrap">${response}</div>`;
+    // Action color
+    function actionColor(a){
+      if(!a) return "var(--green2)";
+      const u = a.toUpperCase();
+      if(u==="ENTER") return "var(--green2)";
+      if(u==="WATCH") return "var(--yellow)";
+      return "#FF9800";
+    }
+
+    // Render structured cards
+    const tradesHTML = (brief.trades||[]).map((t,i)=>`
+      <div style="background:#0d1f14;border:1px solid #1a3a20;border-radius:4px;padding:12px 14px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:15px;font-weight:700;color:#fff">${i+1}. ${t.sym}</span>
+          <span style="font-size:9px;font-weight:700;letter-spacing:1px;padding:2px 8px;border-radius:2px;background:${actionColor(t.action)};color:#000">${t.action||"ENTER"}</span>
+          ${t.win_rate_note?`<span style="font-size:9px;color:var(--muted2);margin-left:auto">${t.win_rate_note}</span>`:""}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">
+          <div style="background:#0a1a0f;border-radius:3px;padding:6px 8px">
+            <div style="font-size:8px;color:var(--muted2);letter-spacing:1px">ENTRY</div>
+            <div style="font-size:13px;font-weight:700;color:var(--green2)">$${t.entry||"—"}</div>
+          </div>
+          <div style="background:#0a1a0f;border-radius:3px;padding:6px 8px">
+            <div style="font-size:8px;color:var(--muted2);letter-spacing:1px">STOP</div>
+            <div style="font-size:13px;font-weight:700;color:var(--red)">$${t.stop||"—"}</div>
+          </div>
+          <div style="background:#0a1a0f;border-radius:3px;padding:6px 8px">
+            <div style="font-size:8px;color:var(--muted2);letter-spacing:1px">TARGET</div>
+            <div style="font-size:13px;font-weight:700;color:#64B5F6">$${t.target||"—"}</div>
+          </div>
+          <div style="background:#0a1a0f;border-radius:3px;padding:6px 8px">
+            <div style="font-size:8px;color:var(--muted2);letter-spacing:1px">SIZE</div>
+            <div style="font-size:13px;font-weight:700;color:#fff">${t.shares||"—"} <span style="font-size:9px;color:var(--muted2)">shares</span></div>
+          </div>
+        </div>
+        ${t.notes?`<div style="font-size:10px;color:var(--muted2);line-height:1.6;border-top:1px solid #1a3a20;padding-top:7px">${t.notes}</div>`:""}
+      </div>`).join("");
+
+    const confidenceColor = ()=>{
+      const n = parseInt((brief.confidence||"0").split("/")[0]);
+      if(n>=7) return "var(--green2)";
+      if(n>=4) return "var(--yellow)";
+      return "var(--red)";
+    };
+
+    body.innerHTML = `
+      <div style="font-family:var(--mono)">
+        <!-- Context bar -->
+        <div style="font-size:11px;color:var(--text);line-height:1.7;margin-bottom:14px;padding:10px 12px;background:#0a1520;border-left:3px solid var(--green2);border-radius:2px">
+          ${brief.context||""}
+        </div>
+
+        <!-- Trade cards -->
+        ${tradesHTML}
+
+        <!-- Avoid -->
+        ${brief.avoid?`<div style="font-size:10px;color:var(--red);margin-bottom:12px;padding:8px 12px;background:#1a0a0a;border-left:3px solid var(--red);border-radius:2px">⚠️ ${brief.avoid}</div>`:""}
+
+        <!-- Recommendation -->
+        ${brief.recommendation?`<div style="font-size:11px;color:var(--text);line-height:1.8;margin-bottom:12px;padding:10px 12px;background:#0d1520;border-left:3px solid #64B5F6;border-radius:2px">${renderMD(brief.recommendation)}</div>`:""}
+
+        <!-- Confidence -->
+        <div style="font-size:10px;color:${confidenceColor()};padding:8px 12px;background:#0a0a0a;border-radius:3px;border:1px solid #1a1a1a">
+          📊 CONFIDENCE: ${brief.confidence||"—"}
+        </div>
+      </div>`;
+
     document.getElementById("agent-brief-time").textContent = new Date().toLocaleTimeString();
     document.getElementById("agent-lastrun").textContent = "Last brief: "+new Date().toLocaleTimeString();
 
     // Save to localStorage
-    try{ localStorage.setItem("cs_agent_brief", JSON.stringify({text:response, time:new Date().toISOString()})); }catch(e){}
+    try{ localStorage.setItem("cs_agent_brief", JSON.stringify({text:raw, time:new Date().toISOString(), isJson:true})); }catch(e){}
 
   }catch(e){
     body.innerHTML = `<div class="agent-output" style="color:var(--red)">Error: ${e.message}<br><br>Make sure your scanner has run today and Firebase has data.</div>`;
@@ -4737,8 +4851,8 @@ Answer: YES/NO/WAIT, then:
     const isNo     = response.toLowerCase().startsWith("no");
     const clr      = isYes?"var(--green2)":isNo?"var(--red)":"var(--yellow)";
 
-    body.innerHTML = `<div style="font-family:var(--mono);font-size:10px;line-height:1.8;color:${clr};font-weight:700;font-size:13px;margin-bottom:6px">${response.split("\n")[0]}</div>
-<div style="font-family:var(--mono);font-size:10px;line-height:1.8;color:var(--text);white-space:pre-wrap">${response.split("\n").slice(1).join("\n")}</div>`;
+    body.innerHTML = `<div style="font-family:var(--mono);font-size:13px;line-height:1.8;color:${clr};font-weight:700;margin-bottom:6px">${response.split("\n")[0]}</div>
+<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(response.split("\n").slice(1).join("\n"))}</div>`;
 
   }catch(e){
     body.innerHTML = `<div class="agent-output" style="color:var(--red)">Error: ${e.message}</div>`;
@@ -4876,7 +4990,7 @@ ${JSON.stringify(jnlData, null, 1)}
 Be specific with numbers. If a pattern isn't clear in the data, say so.`;
 
     const response = await callClaude(system, user, 600);
-    body.innerHTML = `<div style="font-family:var(--mono);font-size:10px;line-height:1.9;color:var(--text);white-space:pre-wrap">${response}</div>`;
+    body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(response)}</div>`;
 
   }catch(e){
     body.innerHTML = `<div class="agent-output" style="color:var(--red)">Error: ${e.message}</div>`;
@@ -4922,7 +5036,7 @@ Current scanner signals summary:
 ${buildScannerContext(data)}`;
 
     const response = await callClaude(system, user, 600);
-    body.innerHTML = `<div style="font-family:var(--mono);font-size:10px;line-height:1.9;color:var(--text);white-space:pre-wrap">${response}</div>`;
+    body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(response)}</div>`;
 
   }catch(e){
     body.innerHTML = `<div class="agent-output" style="color:var(--red)">Error: ${e.message}</div>`;
@@ -4935,10 +5049,17 @@ function loadAgent(){
   try{
     const saved = localStorage.getItem("cs_agent_brief");
     if(saved){
-      const { text, time } = JSON.parse(saved);
+      const { text, time, isJson } = JSON.parse(saved);
       const body = document.getElementById("agent-brief-body");
       const timeEl = document.getElementById("agent-brief-time");
-      if(body) body.innerHTML = `<div style="font-family:var(--mono);font-size:10px;line-height:1.9;color:var(--text);white-space:pre-wrap">${text}</div>`;
+      if(body){
+        if(isJson){
+          // Just show a prompt to re-run — can't re-render cards without scanner data
+          body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--muted2);padding:10px">📋 Last brief from ${new Date(time).toLocaleTimeString()} — tap MORNING BRIEF to refresh.</div>`;
+        } else {
+          body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(text)}</div>`;
+        }
+      }
       if(timeEl) timeEl.textContent = new Date(time).toLocaleTimeString();
     }
   }catch(e){}
