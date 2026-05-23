@@ -1147,6 +1147,145 @@ pre.dout{
 .wm-stat:last-child{border-right:none}
 .wm-stat-v{font-family:var(--sans);font-size:22px;font-weight:700;line-height:1}
 .wm-stat-l{font-family:var(--mono);font-size:7px;color:var(--muted2);letter-spacing:2px;text-transform:uppercase}
+
+/* ── Journal source breakdown ── */
+.jnl-breakdown{
+  padding:10px 20px;
+  background:var(--bg);
+  border-bottom:1px solid var(--border);
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.jnl-breakdown::-webkit-scrollbar{display:none}
+.jnl-breakdown-title{
+  font-family:var(--mono);font-size:7px;color:var(--muted2);
+  letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;
+}
+.jnl-source-grid{
+  display:flex;gap:8px;min-width:max-content;
+}
+.jnl-source-card{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:3px;padding:8px 12px;min-width:100px;
+  display:flex;flex-direction:column;gap:3px;
+}
+.jnl-source-card.top{border-color:rgba(0,200,83,0.3);background:rgba(0,200,83,0.04)}
+.jnl-src-name{font-family:var(--mono);font-size:8px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase}
+.jnl-src-wr{font-family:var(--sans);font-size:20px;font-weight:700;line-height:1}
+.jnl-src-detail{font-family:var(--mono);font-size:8px;color:var(--muted2)}
+
+/* ═══════════════════════════════════════════════════════════
+   AGENT TAB
+═══════════════════════════════════════════════════════════ */
+.agent-header{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 20px;background:var(--bg2);
+  border-bottom:1px solid var(--border);
+}
+.agent-title{
+  font-family:var(--sans);font-size:20px;font-weight:800;
+  letter-spacing:2px;text-transform:uppercase;
+  background:linear-gradient(135deg,var(--green2),var(--blue));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.agent-sub{font-size:8px;color:var(--muted2);letter-spacing:1px;margin-top:2px;font-family:var(--mono)}
+.agent-settings{
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  padding:8px 16px;background:var(--bg2);border-bottom:1px solid var(--border);
+}
+.agent-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  padding:12px 16px;
+}
+@media(max-width:768px){.agent-grid{grid-template-columns:1fr}}
+.agent-card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:3px;
+  overflow:hidden;
+}
+.agent-card-header{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 14px;
+  background:rgba(0,0,0,0.2);
+  border-bottom:1px solid var(--border);
+}
+.agent-card-icon{font-size:16px}
+.agent-card-title{
+  font-family:var(--sans);font-size:13px;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;color:#fff;
+}
+.agent-card-body{padding:14px;min-height:120px}
+.agent-output{
+  font-family:var(--mono);font-size:10px;
+  color:var(--text);line-height:1.8;
+  white-space:pre-wrap;
+}
+.agent-output.loading{color:var(--muted2);animation:pulse2 1.5s infinite}
+@keyframes pulse2{0%,100%{opacity:1}50%{opacity:0.4}}
+.agent-btn{
+  background:linear-gradient(135deg,var(--green2),var(--green));
+  color:#000;border:none;padding:7px 16px;
+  font-family:var(--mono);font-size:9px;font-weight:700;
+  cursor:pointer;border-radius:2px;letter-spacing:1px;
+  text-transform:uppercase;transition:all 0.15s;
+  box-shadow:0 0 12px rgba(0,200,83,0.3);
+}
+.agent-btn:hover{box-shadow:0 0 20px rgba(0,200,83,0.5)}
+.agent-btn:disabled{background:var(--border2);color:var(--muted);box-shadow:none;cursor:not-allowed}
+.agent-btn.blue{background:linear-gradient(135deg,#1565C0,#1976D2);box-shadow:0 0 12px rgba(21,101,192,0.3)}
+.agent-btn.purple{background:linear-gradient(135deg,#6A1B9A,#AB47BC);box-shadow:0 0 12px rgba(106,27,154,0.3)}
+/* Trade cards from morning brief */
+.agent-trade{
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:2px;
+  padding:10px 12px;
+  margin-bottom:8px;
+}
+.agent-trade.t1{border-color:rgba(0,200,83,0.4);background:rgba(0,200,83,0.04)}
+.agent-trade.t2{border-color:rgba(0,176,255,0.3);background:rgba(0,176,255,0.04)}
+.agent-trade.watch{border-color:rgba(255,214,0,0.2)}
+.agent-trade-sym{
+  font-family:var(--sans);font-size:18px;font-weight:800;
+  color:#fff;letter-spacing:1px;
+}
+.agent-trade-action{
+  font-family:var(--mono);font-size:9px;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;
+  margin-left:8px;
+}
+.agent-trade-detail{
+  font-family:var(--mono);font-size:9px;
+  color:var(--text2);margin-top:4px;line-height:1.7;
+}
+.agent-trade-size{
+  font-family:var(--sans);font-size:13px;font-weight:700;
+  color:var(--green2);margin-top:4px;
+}
+.agent-divider{
+  height:1px;background:var(--border);margin:12px 0;
+}
+/* Pattern insight cards */
+.insight-card{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:8px 12px;background:var(--bg3);
+  border-radius:2px;border:1px solid var(--border);
+  margin-bottom:6px;font-family:var(--mono);font-size:9px;
+}
+.insight-icon{font-size:14px;flex-shrink:0;margin-top:1px}
+.insight-text{color:var(--text2);line-height:1.6}
+.insight-text strong{color:var(--text)}
+/* Settings */
+.agent-setting-label{font-family:var(--mono);font-size:8px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase}
+.agent-setting-input{
+  background:var(--bg3);border:1px solid var(--border2);
+  color:var(--text);padding:5px 8px;font-family:var(--mono);
+  font-size:10px;border-radius:2px;width:90px;
+}
+.agent-setting-input:focus{outline:none;border-color:var(--green2)}
 </style>
 </head>
 <body>
@@ -1232,6 +1371,7 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <div class="tab" id="tab-journal" onclick="switchTab('journal')">📓 Journal</div>
   <div class="tab" id="tab-weekly" onclick="switchTab('weekly')">📅 Weekly</div>
   <div class="tab" id="tab-backtest" onclick="switchTab('backtest')">🔬 Backtest</div>
+  <div class="tab" id="tab-agent" onclick="switchTab('agent')" style="color:var(--green2);font-weight:700">🤖 Agent</div>
 </div>
 
 <!-- ═══ WATCHLIST BAR ═══ -->
@@ -1840,6 +1980,11 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <div class="wm-stat"><div class="wm-stat-v" id="jnl-avgloss" style="color:var(--red)">—</div><div class="wm-stat-l">Avg Loss</div></div>
 </div>
 
+<div class="jnl-breakdown" id="jnl-breakdown" style="display:none">
+  <div class="jnl-breakdown-title">Win rate by signal source</div>
+  <div class="jnl-source-grid" id="jnl-source-grid"></div>
+</div>
+
 <div class="jnl-toolbar">
   <input type="text" id="jnl-sym-input" placeholder="TICKER"
     style="width:75px;text-transform:uppercase;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 8px;font-family:var(--mono);font-size:10px;border-radius:2px"
@@ -2013,6 +2158,117 @@ function switchTab(tab){ _doSwitchTab(tab); }
 </div>
 
 </div><!-- end weekly -->
+
+<!-- ═══════════════════════════════════════════════════════
+     AGENT TAB — AI-powered trading decision engine
+     Reads all scanner data + your journal history
+     Outputs: morning brief, entry confirm, exit signals,
+              weekly review, position sizing, pattern learning
+═══════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="panel-agent">
+
+<div class="agent-header">
+  <div>
+    <div class="agent-title">🤖 Trading Agent</div>
+    <div class="agent-sub">READS ALL SCANNERS · LEARNS YOUR PATTERNS · TELLS YOU EXACTLY WHAT TO DO</div>
+  </div>
+  <div style="margin-left:auto;font-family:var(--mono);font-size:8px;color:var(--muted2)" id="agent-lastrun"></div>
+</div>
+
+<!-- Settings bar -->
+<div class="agent-settings">
+  <span class="agent-setting-label">Account $</span>
+  <input type="number" class="agent-setting-input" id="agent-account" value="10000" min="1000" step="1000">
+  <span class="agent-setting-label">Risk %</span>
+  <input type="number" class="agent-setting-input" id="agent-risk" value="1" min="0.5" max="5" step="0.5" style="width:60px">
+  <span class="agent-setting-label">Max trades</span>
+  <input type="number" class="agent-setting-input" id="agent-maxtrades" value="3" min="1" max="5" style="width:60px">
+  <div style="margin-left:auto;display:flex;gap:6px">
+    <button class="agent-btn" id="agent-brief-btn" onclick="runMorningBrief()">☀️ MORNING BRIEF</button>
+    <button class="agent-btn blue" id="agent-review-btn" onclick="runWeeklyReview()">📊 WEEKLY REVIEW</button>
+    <button class="agent-btn purple" id="agent-patterns-btn" onclick="runPatternAnalysis()">🧠 MY PATTERNS</button>
+  </div>
+</div>
+
+<!-- Stat bar -->
+<div class="wm-stats">
+  <div class="wm-stat"><div class="wm-stat-v" id="agent-signals" style="color:var(--blue)">0</div><div class="wm-stat-l">Total Signals</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="agent-top" style="color:var(--green2)">0</div><div class="wm-stat-l">Top Picks</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="agent-winrate" style="color:var(--yellow)">—</div><div class="wm-stat-l">Your Win Rate</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="agent-expect" style="color:var(--green2)">—</div><div class="wm-stat-l">Expectancy</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="agent-openpos" style="color:var(--orange)">0</div><div class="wm-stat-l">Open Positions</div></div>
+</div>
+
+<!-- Main grid -->
+<div class="agent-grid">
+
+  <!-- Morning Brief -->
+  <div class="agent-card">
+    <div class="agent-card-header">
+      <span class="agent-card-icon">☀️</span>
+      <span class="agent-card-title">Morning Brief</span>
+      <span style="margin-left:auto;font-family:var(--mono);font-size:8px;color:var(--muted2)" id="agent-brief-time"></span>
+    </div>
+    <div class="agent-card-body" id="agent-brief-body">
+      <div class="agent-output loading">Tap MORNING BRIEF to get your trades for today...</div>
+    </div>
+  </div>
+
+  <!-- Entry Confirmation -->
+  <div class="agent-card">
+    <div class="agent-card-header">
+      <span class="agent-card-icon">✅</span>
+      <span class="agent-card-title">Entry Confirmation</span>
+    </div>
+    <div class="agent-card-body">
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input type="text" id="agent-entry-sym" placeholder="TICKER" 
+          style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:5px 8px;font-family:var(--mono);font-size:10px;border-radius:2px;width:90px;text-transform:uppercase"
+          onkeydown="if(event.key==='Enter') confirmEntry()">
+        <input type="number" id="agent-entry-price" placeholder="Price $"
+          style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:5px 8px;font-family:var(--mono);font-size:10px;border-radius:2px;width:80px">
+        <button class="agent-btn" onclick="confirmEntry()" style="font-size:8px;padding:5px 10px">ASK</button>
+      </div>
+      <div class="agent-output" id="agent-entry-body" style="color:var(--muted2)">Enter a ticker and price to get entry confirmation...</div>
+    </div>
+  </div>
+
+  <!-- Exit Monitor -->
+  <div class="agent-card">
+    <div class="agent-card-header">
+      <span class="agent-card-icon">🚨</span>
+      <span class="agent-card-title">Exit Monitor</span>
+      <button class="agent-btn" onclick="runExitMonitor()" style="margin-left:auto;font-size:8px;padding:4px 10px">CHECK NOW</button>
+    </div>
+    <div class="agent-card-body" id="agent-exit-body">
+      <div class="agent-output" style="color:var(--muted2)">Monitors your open positions for exit signals...</div>
+    </div>
+  </div>
+
+  <!-- Pattern Learning -->
+  <div class="agent-card">
+    <div class="agent-card-header">
+      <span class="agent-card-icon">🧠</span>
+      <span class="agent-card-title">My Patterns</span>
+    </div>
+    <div class="agent-card-body" id="agent-patterns-body">
+      <div class="agent-output" style="color:var(--muted2)">Tap MY PATTERNS to discover what makes you win...</div>
+    </div>
+  </div>
+
+  <!-- Weekly Review — full width -->
+  <div class="agent-card" style="grid-column:1/-1">
+    <div class="agent-card-header">
+      <span class="agent-card-icon">📊</span>
+      <span class="agent-card-title">Weekly Review</span>
+    </div>
+    <div class="agent-card-body" id="agent-review-body">
+      <div class="agent-output" style="color:var(--muted2)">Tap WEEKLY REVIEW for a full analysis of your trading week...</div>
+    </div>
+  </div>
+
+</div><!-- end agent-grid -->
+</div><!-- end panel-agent -->
 
 <!-- ═══════════════════════════════════════════════════════
      BACKTEST TAB — Weekly trail flip signal validator
@@ -2674,6 +2930,9 @@ function _doSwitchTab(tab){
   } else if(tab==="weekly"){
     document.getElementById("mainSubtitle").textContent="📅 WEEKLY MONITOR · TRAIL FLIP SIGNAL · 77% WIN RATE VALIDATED";
     if(wmResults.length) renderWeeklyMonitor();
+  } else if(tab==="agent"){
+    document.getElementById("mainSubtitle").textContent="🤖 TRADING AGENT · AI-POWERED DECISION ENGINE";
+    loadAgent();
   } else if(tab==="backtest"){
     document.getElementById("mainSubtitle").textContent="🔬 BACKTEST · WEEKLY TRAIL FLIP SIGNAL VALIDATOR · 5 YEARS";
   }
@@ -4187,6 +4446,512 @@ function fbSafeSave(key, data){
   }
 }
 
+
+// ══════════════════════════════════════════════════════════
+// TRADING AGENT
+// AI-powered decision engine using Claude API
+// Reads all scanner Firebase data + journal history
+// Jobs: morning brief, entry confirm, exit monitor,
+//       weekly review, pattern learning, position sizing
+// ══════════════════════════════════════════════════════════
+
+// ── Call Claude API ───────────────────────────────────────
+async function callClaude(systemPrompt, userPrompt, maxTokens=1500){
+  // Requires Cloudflare proxy to handle API key + CORS
+  // Wire up tomorrow in the Cloudflare session
+  const workerUrl = localStorage.getItem("cs_claude_proxy")||"";
+  if(!workerUrl){
+    throw new Error("Claude proxy not configured yet. Coming in next session — Cloudflare will proxy the API key securely.");
+  }
+  const response = await fetch(workerUrl+"/claude", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ system: systemPrompt, user: userPrompt, max_tokens: maxTokens })
+  });
+  const data = await response.json();
+  if(data.error) throw new Error(data.error.message);
+  return data.content[0].text;
+}
+
+// ── Gather all scanner data from Firebase ─────────────────
+async function gatherAllData(){
+  const data = {};
+  const keys = ["recovery","catalyst","jax_scan","confluence","weekly_monitor","pulse","journal"];
+  await Promise.all(keys.map(async key=>{
+    try{
+      const fb = await window.fbLoad(key);
+      data[key] = fb ? fb.data : [];
+    }catch(e){ data[key] = []; }
+  }));
+  return data;
+}
+
+// ── Build scanner context string for Claude ───────────────
+function buildScannerContext(data){
+  const sections = [];
+
+  // Weekly monitor — most important
+  const wm = (data.weekly_monitor||[]);
+  const t1  = wm.filter(r=>r.tier1);
+  const t2  = wm.filter(r=>r.tier2&&!r.tier1);
+  if(wm.length){
+    sections.push(`WEEKLY MONITOR (${wm.length} signals):
+⭐ ENTER NOW (tier1, 96% win rate): ${t1.map(r=>r.sym+"@$"+r.price?.toFixed(2)).join(", ")||"none"}
+🟢 4H BULLISH (tier2): ${t2.map(r=>r.sym+"@$"+r.price?.toFixed(2)).join(", ")||"none"}`);
+  }
+
+  // Pulse — what's moving today
+  const pulse = (data.pulse||[]).sort((a,b)=>b.absChange-a.absChange).slice(0,10);
+  if(pulse.length){
+    sections.push(`TODAY'S MOVERS (pulse scan):
+${pulse.map(r=>`${r.sym} ${r.changePct>=0?"▲":"▼"}${Math.abs(r.changePct||0).toFixed(1)}%${r.weeklyMatch?" 🟣WEEKLY":""}`).join(", ")}`);
+  }
+
+  // Confluence
+  const conf = (data.confluence||[]).sort((a,b)=>b.confScore-a.confScore).slice(0,5);
+  if(conf.length){
+    sections.push(`CONFLUENCE (${data.confluence?.length||0} total):
+Top: ${conf.map(r=>r.sym+" "+r.confScore+"/4").join(", ")}`);
+  }
+
+  // JAX
+  const jax = (data.jax_scan||[]).filter(r=>r.greenArrow).slice(0,5);
+  if(jax.length){
+    sections.push(`JAX GREEN ARROWS: ${jax.map(r=>r.sym+" bull"+r.bullScore+"/5").join(", ")}`);
+  }
+
+  // Recovery
+  const rec = (data.recovery||[]).filter(r=>r.score>=5||r.greenArrow).slice(0,5);
+  if(rec.length){
+    sections.push(`RECOVERY (5/6+): ${rec.map(r=>r.sym+" "+r.score+"/6"+(r.greenArrow?" 🟢":"")).join(", ")}`);
+  }
+
+  return sections.join("\n\n");
+}
+
+// ── Build journal context string ──────────────────────────
+function buildJournalContext(journal){
+  const entries = Array.isArray(journal) ? journal : [];
+  const closed  = entries.filter(e=>e.status==="win"||e.status==="loss");
+  const wins    = entries.filter(e=>e.status==="win");
+  const losses  = entries.filter(e=>e.status==="loss");
+  const open    = entries.filter(e=>e.status==="open"&&e.price);
+  const winRate = closed.length ? Math.round(wins.length/closed.length*100) : null;
+  const avgWin  = wins.length   ? (wins.reduce((a,e)=>a+parseFloat(e.result||0),0)/wins.length).toFixed(1) : null;
+  const avgLoss = losses.length ? (losses.reduce((a,e)=>a+parseFloat(e.result||0),0)/losses.length).toFixed(1) : null;
+
+  // Source breakdown
+  const srcMap = {};
+  entries.forEach(e=>{
+    const s = e.source||"manual";
+    if(!srcMap[s]) srcMap[s]={w:0,l:0};
+    if(e.status==="win") srcMap[s].w++;
+    if(e.status==="loss") srcMap[s].l++;
+  });
+  const srcStr = Object.entries(srcMap).map(([s,v])=>{
+    const wr = v.w+v.l>0?Math.round(v.w/(v.w+v.l)*100):null;
+    return `${s}: ${wr!==null?wr+"%":"—"} (${v.w}W/${v.l}L)`;
+  }).join(", ");
+
+  // Open positions
+  const openStr = open.slice(0,5).map(e=>{
+    const sl = parseFloat(e.stopLoss)||0;
+    const t1 = parseFloat(e.target1)||0;
+    return `${e.sym} entered $${parseFloat(e.price).toFixed(2)}${sl?" stop $"+sl.toFixed(2):""}${t1?" target $"+t1.toFixed(2):""}`;
+  }).join("; ");
+
+  return `TRADING HISTORY (${entries.length} total):
+Win Rate: ${winRate!==null?winRate+"%":"—"} | Avg Win: ${avgWin?"+"+avgWin+"%":"—"} | Avg Loss: ${avgLoss||"—"}%
+By Source: ${srcStr||"no data"}
+Open Positions: ${openStr||"none"}`;
+}
+
+// ── Update agent stat bar ─────────────────────────────────
+function updateAgentStats(data){
+  const journal = Array.isArray(data.journal) ? data.journal : [];
+  const wm = data.weekly_monitor||[];
+  const pulse = data.pulse||[];
+
+  // Count unique tickers across all scanners
+  const allSyms = new Set([
+    ...wm.map(r=>r.sym),
+    ...(data.jax_scan||[]).filter(r=>r.greenArrow).map(r=>r.sym),
+    ...(data.confluence||[]).map(r=>r.sym),
+    ...pulse.map(r=>r.sym)
+  ]);
+
+  const closed   = journal.filter(e=>e.status==="win"||e.status==="loss");
+  const wins     = journal.filter(e=>e.status==="win");
+  const wr       = closed.length ? Math.round(wins.length/closed.length*100) : null;
+  const avgWin   = wins.length ? wins.reduce((a,e)=>a+parseFloat(e.result||0),0)/wins.length : 0;
+  const avgLoss  = journal.filter(e=>e.status==="loss").length
+    ? journal.filter(e=>e.status==="loss").reduce((a,e)=>a+parseFloat(e.result||0),0)/journal.filter(e=>e.status==="loss").length
+    : 0;
+  const expect   = wr ? ((wr/100)*avgWin + ((1-wr/100)*avgLoss)).toFixed(1) : null;
+  const openPos  = journal.filter(e=>e.status==="open"&&e.price).length;
+
+  const el = id=>document.getElementById(id);
+  if(el("agent-signals")) el("agent-signals").textContent = allSyms.size;
+  if(el("agent-top"))     el("agent-top").textContent     = wm.filter(r=>r.tier1).length;
+  if(el("agent-winrate")) el("agent-winrate").textContent = wr!==null?wr+"%":"—";
+  if(el("agent-expect"))  el("agent-expect").textContent  = expect?"+"+expect+"%":"—";
+  if(el("agent-openpos")) el("agent-openpos").textContent = openPos;
+}
+
+// ══════════════════════════════════════════════════════════
+// JOB 1: MORNING BRIEF
+// ══════════════════════════════════════════════════════════
+async function runMorningBrief(){
+  const btn = document.getElementById("agent-brief-btn");
+  const body = document.getElementById("agent-brief-body");
+  btn.disabled = true;
+  body.innerHTML = '<div class="agent-output loading">⏳ Reading all scanners and your journal history...</div>';
+
+  try{
+    const data    = await gatherAllData();
+    const account = parseFloat(document.getElementById("agent-account").value)||10000;
+    const risk    = parseFloat(document.getElementById("agent-risk").value)||1;
+    const maxT    = parseInt(document.getElementById("agent-maxtrades").value)||3;
+    const riskAmt = account * (risk/100);
+
+    updateAgentStats(data);
+
+    const scanCtx = buildScannerContext(data);
+    const jnlCtx  = buildJournalContext(data.journal);
+    const sess    = getMarketSession();
+
+    const system = `You are a professional trading advisor analyzing a retail trader's scanner data and journal history. 
+You must be concise, direct, and actionable. No fluff. Think like a quant hedge fund analyst.
+The trader has an account of $${account} with ${risk}% risk per trade ($${riskAmt.toFixed(0)} max risk).
+They want maximum ${maxT} trades per day.
+Market session: ${sess.toUpperCase()}.
+
+CRITICAL RULES:
+- Only recommend stocks with the strongest signal confluence
+- Weekly Monitor TIER 1 (⭐ ENTER NOW) = highest conviction, always prioritize
+- If weekly trail not confirmed, say so explicitly
+- Position size = risk amount / (entry - stop) = shares
+- Always give entry, stop, target, and exact share count
+- Be honest if signals are weak — say "no trades today" if needed
+- Keep response under 400 words`;
+
+    const user = `Here is today's scanner data and my trading history. Give me my morning brief with up to ${maxT} trades.
+
+${scanCtx}
+
+${jnlCtx}
+
+Format your response as:
+1. One sentence market context
+2. Each trade on its own line with: TICKER — action — entry — stop — target — shares — why
+3. One sentence on what to avoid today
+4. One sentence confidence rating`;
+
+    const response = await callClaude(system, user, 800);
+
+    // Parse and render
+    body.innerHTML = `<div style="font-family:var(--mono);font-size:10px;line-height:1.9;color:var(--text);white-space:pre-wrap">${response}</div>`;
+    document.getElementById("agent-brief-time").textContent = new Date().toLocaleTimeString();
+    document.getElementById("agent-lastrun").textContent = "Last brief: "+new Date().toLocaleTimeString();
+
+    // Save to localStorage
+    try{ localStorage.setItem("cs_agent_brief", JSON.stringify({text:response, time:new Date().toISOString()})); }catch(e){}
+
+  }catch(e){
+    body.innerHTML = `<div class="agent-output" style="color:var(--red)">Error: ${e.message}<br><br>Make sure your scanner has run today and Firebase has data.</div>`;
+  }
+  btn.disabled = false;
+}
+
+// ══════════════════════════════════════════════════════════
+// JOB 2: ENTRY CONFIRMATION
+// ══════════════════════════════════════════════════════════
+async function confirmEntry(){
+  const sym   = (document.getElementById("agent-entry-sym")?.value||"").trim().toUpperCase();
+  const price = parseFloat(document.getElementById("agent-entry-price")?.value)||0;
+  const body  = document.getElementById("agent-entry-body");
+
+  if(!sym){ body.innerHTML='<div class="agent-output" style="color:var(--red)">Enter a ticker symbol</div>'; return; }
+
+  body.innerHTML = '<div class="agent-output loading">⏳ Analyzing '+sym+'...</div>';
+
+  try{
+    const data    = await gatherAllData();
+    const account = parseFloat(document.getElementById("agent-account").value)||10000;
+    const risk    = parseFloat(document.getElementById("agent-risk").value)||1;
+    const riskAmt = account * (risk/100);
+
+    // Find sym in all scanners
+    const inWeekly    = (data.weekly_monitor||[]).find(r=>r.sym===sym);
+    const inJAX       = (data.jax_scan||[]).find(r=>r.sym===sym&&r.greenArrow);
+    const inConf      = (data.confluence||[]).find(r=>r.sym===sym);
+    const inPulse     = (data.pulse||[]).find(r=>r.sym===sym);
+    const inRecovery  = (data.recovery||[]).find(r=>r.sym===sym);
+    const inCatalyst  = (data.catalyst||[]).find(r=>r.sym===sym);
+
+    // Journal history for this symbol
+    const journal     = Array.isArray(data.journal)?data.journal:[];
+    const symHistory  = journal.filter(e=>e.sym===sym);
+    const openPos     = journal.find(e=>e.sym===sym&&e.status==="open");
+    const srcStats    = {};
+    journal.forEach(e=>{
+      const s=e.source||"manual";
+      if(!srcStats[s]) srcStats[s]={w:0,l:0};
+      if(e.status==="win") srcStats[s].w++;
+      if(e.status==="loss") srcStats[s].l++;
+    });
+
+    const symCtx = [
+      inWeekly ? `Weekly Monitor: TIER${inWeekly.tier1?"1 ⭐ ENTER NOW":inWeekly.tier2?"2 🟢 4H BULL":"3"} | flip ${inWeekly.weeksAgo}wk ago at $${inWeekly.weeklyFlipPrice?.toFixed(2)} | 4H ${inWeekly.h4Bullish?"bullish":"bearish"}` : "Weekly Monitor: NOT FOUND",
+      inJAX     ? `JAX: GREEN ARROW | bull score ${inJAX.bullScore}/5 | trail $${inJAX.trailVal?.toFixed(2)}` : "JAX: no signal",
+      inConf    ? `Confluence: ${inConf.confScore}/4 | ${Object.entries(inConf.pillars||{}).filter(([,v])=>v).map(([k])=>k).join("+")}` : "Confluence: not in scan",
+      inPulse   ? `Pulse: moving ${inPulse.changePct>=0?"▲":"▼"}${Math.abs(inPulse.changePct||0).toFixed(1)}% today` : "Pulse: not moving today",
+      inRecovery? `Recovery: ${inRecovery.score}/6${inRecovery.c7?" +C7 deep bounce":""}` : "",
+      inCatalyst? `Catalyst: heat ${inCatalyst.heat} | ${inCatalyst.status}` : "",
+      openPos   ? `⚠️ ALREADY OPEN POSITION: entered $${parseFloat(openPos.price).toFixed(2)}` : "",
+      symHistory.length ? `Trade history: ${symHistory.filter(e=>e.status==="win").length}W/${symHistory.filter(e=>e.status==="loss").length}L on ${sym}` : "No history on this stock",
+    ].filter(Boolean).join("\n");
+
+    const winRateCtx = Object.entries(srcStats).map(([s,v])=>`${s}: ${v.w+v.l>0?Math.round(v.w/(v.w+v.l)*100)+"%":"—"}`).join(", ");
+
+    const system = `You are a professional trading advisor. Be direct. Give a clear YES or NO on this trade entry with brief reasoning. Under 150 words total.`;
+    const user   = `Should I enter ${sym} at $${price>0?"$"+price.toFixed(2):"current price"}?
+
+SCANNER DATA FOR ${sym}:
+${symCtx}
+
+MY OVERALL WIN RATES BY SOURCE:
+${winRateCtx}
+
+Account: $${account} | Risk per trade: $${riskAmt.toFixed(0)}
+
+Answer: YES/NO/WAIT, then:
+- One line why
+- Stop level suggestion
+- Target suggestion  
+- Exact share count based on my risk
+- Confidence: HIGH/MEDIUM/LOW`;
+
+    const response = await callClaude(system, user, 300);
+    const isYes    = response.toLowerCase().startsWith("yes");
+    const isNo     = response.toLowerCase().startsWith("no");
+    const clr      = isYes?"var(--green2)":isNo?"var(--red)":"var(--yellow)";
+
+    body.innerHTML = `<div style="font-family:var(--mono);font-size:10px;line-height:1.8;color:${clr};font-weight:700;font-size:13px;margin-bottom:6px">${response.split("\n")[0]}</div>
+<div style="font-family:var(--mono);font-size:10px;line-height:1.8;color:var(--text);white-space:pre-wrap">${response.split("\n").slice(1).join("\n")}</div>`;
+
+  }catch(e){
+    body.innerHTML = `<div class="agent-output" style="color:var(--red)">Error: ${e.message}</div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// JOB 3: EXIT MONITOR
+// ══════════════════════════════════════════════════════════
+async function runExitMonitor(){
+  const body = document.getElementById("agent-exit-body");
+  body.innerHTML = '<div class="agent-output loading">⏳ Checking open positions...</div>';
+
+  try{
+    const data    = await gatherAllData();
+    const journal = Array.isArray(data.journal)?data.journal:[];
+    const open    = journal.filter(e=>e.status==="open"&&e.price&&parseFloat(e.price)>0);
+
+    if(!open.length){
+      body.innerHTML = '<div class="agent-output" style="color:var(--muted2)">No open positions in journal.</div>';
+      return;
+    }
+
+    // Check each open position against current JAX and weekly data
+    const exitSignals = [];
+    const holds       = [];
+
+    for(const pos of open){
+      const sym      = pos.sym;
+      const entry    = parseFloat(pos.price);
+      const stop     = parseFloat(pos.stopLoss)||0;
+      const target   = parseFloat(pos.target1)||0;
+
+      // Check JAX status
+      const jaxData  = (data.jax_scan||[]).find(r=>r.sym===sym);
+      const wkData   = (data.weekly_monitor||[]).find(r=>r.sym===sym);
+      const pulseData= (data.pulse||[]).find(r=>r.sym===sym);
+
+      const currentPrice = pulseData?.price || entry;
+      const unrealPct    = ((currentPrice-entry)/entry*100).toFixed(1);
+      const jaxBearish   = jaxData && !jaxData.greenArrow && jaxData.bullScore <= 2;
+      const wkBearish    = wkData && !wkData.weeklyBullish;
+
+      if(jaxBearish || wkBearish){
+        exitSignals.push({sym, entry, currentPrice, unrealPct, reason: jaxBearish?"JAX turned bearish":"Weekly trail flipped"});
+      } else {
+        holds.push({sym, entry, currentPrice, unrealPct, target, stop});
+      }
+    }
+
+    let html = "";
+
+    if(exitSignals.length){
+      html += `<div style="color:var(--red);font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1px;margin-bottom:8px">🚨 EXIT SIGNALS</div>`;
+      exitSignals.forEach(s=>{
+        const pnlClr = parseFloat(s.unrealPct)>=0?"var(--green2)":"var(--red)";
+        html += `<div class="agent-trade" style="border-color:rgba(255,23,68,0.4);background:rgba(255,23,68,0.04);margin-bottom:6px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="agent-trade-sym">${s.sym}</span>
+            <span style="font-family:var(--mono);font-size:8px;color:var(--red);font-weight:700">🚨 CONSIDER EXIT</span>
+          </div>
+          <div class="agent-trade-detail">Entry $${s.entry.toFixed(2)} → Now $${s.currentPrice.toFixed(2)} · <span style="color:${pnlClr}">${parseFloat(s.unrealPct)>=0?"+":""}${s.unrealPct}%</span><br>Reason: ${s.reason}</div>
+        </div>`;
+      });
+    }
+
+    if(holds.length){
+      html += `<div style="color:var(--green2);font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1px;margin:8px 0">✅ HOLD</div>`;
+      holds.forEach(s=>{
+        const pnlClr = parseFloat(s.unrealPct)>=0?"var(--green2)":"var(--red)";
+        const toTarget = s.target>0?((s.target-s.currentPrice)/s.currentPrice*100).toFixed(1):null;
+        html += `<div class="agent-trade" style="margin-bottom:6px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="agent-trade-sym">${s.sym}</span>
+            <span style="font-family:var(--mono);font-size:8px;color:var(--green2)">HOLD</span>
+          </div>
+          <div class="agent-trade-detail">Entry $${s.entry.toFixed(2)} → Now $${s.currentPrice.toFixed(2)} · <span style="color:${pnlClr}">${parseFloat(s.unrealPct)>=0?"+":""}${s.unrealPct}%</span>${toTarget?` · ${toTarget}% to target`:""}${s.stop?" · Stop $"+s.stop.toFixed(2):""}</div>
+        </div>`;
+      });
+    }
+
+    body.innerHTML = html || '<div class="agent-output" style="color:var(--muted2)">No signals detected on open positions.</div>';
+
+  }catch(e){
+    body.innerHTML = `<div class="agent-output" style="color:var(--red)">Error: ${e.message}</div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// JOB 4: PATTERN ANALYSIS
+// ══════════════════════════════════════════════════════════
+async function runPatternAnalysis(){
+  const btn  = document.getElementById("agent-patterns-btn");
+  const body = document.getElementById("agent-patterns-body");
+  btn.disabled = true;
+  body.innerHTML = '<div class="agent-output loading">⏳ Analyzing your trading patterns...</div>';
+
+  try{
+    const data    = await gatherAllData();
+    const journal = Array.isArray(data.journal)?data.journal:[];
+
+    if(journal.length < 5){
+      body.innerHTML = '<div class="agent-output" style="color:var(--muted2)">Need at least 5 journal entries for pattern analysis.</div>';
+      btn.disabled = false;
+      return;
+    }
+
+    // Build detailed journal data for Claude
+    const closed = journal.filter(e=>e.status==="win"||e.status==="loss");
+    const jnlData = closed.slice(0,50).map(e=>({
+      sym:    e.sym,
+      source: e.source||"manual",
+      result: parseFloat(e.result||0),
+      status: e.status,
+      rsi:    e.rsi||null,
+      score:  e.score,
+      greenArrow: e.greenArrow||false,
+      session: e.session||"unknown",
+      tradeType: e.tradeType||"",
+      date:   e.date||""
+    }));
+
+    const system = `You are a quantitative trading analyst. Analyze this trader's journal data and identify specific, actionable patterns. Be data-driven. Focus on what ACTUALLY improves their win rate based on the data. Under 300 words. Use bullet points.`;
+
+    const user = `Analyze my trading journal and tell me:
+1. Which signal sources produce my best results
+2. Any time/session patterns (morning vs afternoon)
+3. What my worst trades have in common
+4. My single biggest improvement opportunity
+5. What I should do MORE of based on the data
+
+My journal (${closed.length} closed trades):
+${JSON.stringify(jnlData, null, 1)}
+
+Be specific with numbers. If a pattern isn't clear in the data, say so.`;
+
+    const response = await callClaude(system, user, 600);
+    body.innerHTML = `<div style="font-family:var(--mono);font-size:10px;line-height:1.9;color:var(--text);white-space:pre-wrap">${response}</div>`;
+
+  }catch(e){
+    body.innerHTML = `<div class="agent-output" style="color:var(--red)">Error: ${e.message}</div>`;
+  }
+  btn.disabled = false;
+}
+
+// ══════════════════════════════════════════════════════════
+// JOB 5: WEEKLY REVIEW
+// ══════════════════════════════════════════════════════════
+async function runWeeklyReview(){
+  const btn  = document.getElementById("agent-review-btn");
+  const body = document.getElementById("agent-review-body");
+  btn.disabled = true;
+  body.innerHTML = '<div class="agent-output loading">⏳ Running weekly review...</div>';
+
+  try{
+    const data    = await gatherAllData();
+    const journal = Array.isArray(data.journal)?data.journal:[];
+
+    // Get last 7 days
+    const weekAgo  = new Date(Date.now() - 7*24*60*60*1000);
+    const thisWeek = journal.filter(e=>{
+      try{ return new Date(e.loggedAt||e.date) >= weekAgo; }catch(ex){ return false; }
+    });
+
+    const system = `You are a professional trading coach doing a weekly performance review. Be honest, direct, and constructive. Focus on process not just results. Under 400 words.`;
+
+    const user = `Review my trading week and give me:
+1. Performance summary (numbers)
+2. What worked well this week
+3. What to improve next week
+4. Specific rule to follow next week based on my patterns
+5. Confidence level going into next week
+
+This week's trades (${thisWeek.length} entries):
+${JSON.stringify(thisWeek.slice(0,20), null, 1)}
+
+Overall journal context:
+${buildJournalContext(journal)}
+
+Current scanner signals summary:
+${buildScannerContext(data)}`;
+
+    const response = await callClaude(system, user, 600);
+    body.innerHTML = `<div style="font-family:var(--mono);font-size:10px;line-height:1.9;color:var(--text);white-space:pre-wrap">${response}</div>`;
+
+  }catch(e){
+    body.innerHTML = `<div class="agent-output" style="color:var(--red)">Error: ${e.message}</div>`;
+  }
+  btn.disabled = false;
+}
+
+// ── Load saved agent brief on startup ─────────────────────
+function loadAgent(){
+  try{
+    const saved = localStorage.getItem("cs_agent_brief");
+    if(saved){
+      const { text, time } = JSON.parse(saved);
+      const body = document.getElementById("agent-brief-body");
+      const timeEl = document.getElementById("agent-brief-time");
+      if(body) body.innerHTML = `<div style="font-family:var(--mono);font-size:10px;line-height:1.9;color:var(--text);white-space:pre-wrap">${text}</div>`;
+      if(timeEl) timeEl.textContent = new Date(time).toLocaleTimeString();
+    }
+  }catch(e){}
+
+  // Update stats on load
+  document.addEventListener("firebaseReady", async()=>{
+    try{
+      const data = await gatherAllData();
+      updateAgentStats(data);
+    }catch(e){}
+  });
+}
+
 async function loadSaved(){
   try{
     const rr  = localStorage.getItem("cs_recovery");
@@ -5573,6 +6338,55 @@ function renderJournal(){
   document.getElementById("jnl-avgwin").textContent   = avgWin  ? "+"+avgWin+"%" : "—";
   document.getElementById("jnl-avgloss").textContent  = avgLoss ? avgLoss+"%" : "—";
 
+  // ── Source breakdown ──────────────────────────────────────────────────
+  const sourceMap = {};
+  journalEntries.forEach(e=>{
+    const src = e.source||"manual";
+    if(!sourceMap[src]) sourceMap[src]={wins:0,losses:0,total:0,avgWin:0,avgLoss:0,wSum:0,lSum:0};
+    sourceMap[src].total++;
+    if(e.status==="win"){ sourceMap[src].wins++; sourceMap[src].wSum+=parseFloat(e.result||0); }
+    if(e.status==="loss"){ sourceMap[src].losses++; sourceMap[src].lSum+=parseFloat(e.result||0); }
+  });
+
+  const srcLabels = {
+    recovery:"📈 Recovery", catalyst:"⚡ Catalyst", jax:"🟢 JAX",
+    confluence:"⚡ Confluence", weekly:"📅 Weekly", pulse:"🔔 Pulse", manual:"✏️ Manual"
+  };
+  const srcOrder = ["weekly","confluence","jax","recovery","catalyst","pulse","manual"];
+  const breakdown = document.getElementById("jnl-breakdown");
+  const grid      = document.getElementById("jnl-source-grid");
+
+  if(grid && Object.keys(sourceMap).length > 1){
+    const sorted = srcOrder.filter(s=>sourceMap[s]).concat(
+      Object.keys(sourceMap).filter(s=>!srcOrder.includes(s))
+    );
+    const bestWR = Math.max(...sorted.map(s=>{
+      const sm = sourceMap[s];
+      const closed = sm.wins+sm.losses;
+      return closed>0 ? Math.round(sm.wins/closed*100) : 0;
+    }));
+
+    grid.innerHTML = sorted.map(src=>{
+      const sm     = sourceMap[src];
+      const closed = sm.wins + sm.losses;
+      const wr     = closed>0 ? Math.round(sm.wins/closed*100) : null;
+      const avgW   = sm.wins>0   ? (sm.wSum/sm.wins).toFixed(1) : null;
+      const avgL   = sm.losses>0 ? (sm.lSum/sm.losses).toFixed(1) : null;
+      const wrClr  = wr===null?"var(--muted)":wr>=70?"var(--green2)":wr>=50?"var(--yellow)":"var(--red)";
+      const isTop  = wr === bestWR && wr !== null && closed >= 3;
+      return `<div class="jnl-source-card${isTop?" top":""}">
+        <div class="jnl-src-name">${srcLabels[src]||src}</div>
+        <div class="jnl-src-wr" style="color:${wrClr}">${wr!==null?wr+"%":"—"}</div>
+        <div class="jnl-src-detail">${sm.wins}W / ${sm.losses}L / ${sm.total-closed} open</div>
+        <div class="jnl-src-detail">${avgW?"+"+avgW+"%":""} ${avgL?avgL+"%":""}</div>
+      </div>`;
+    }).join("");
+
+    if(breakdown) breakdown.style.display = "block";
+  } else {
+    if(breakdown) breakdown.style.display = "none";
+  }
+
   const filteredEntries = journalEntries
     .filter(e=> jnlModeFilter==="all" ? true :
                 jnlModeFilter==="trade" ? e.entryMode==="trade" :
@@ -6223,6 +7037,7 @@ loadConfluence();
 loadBacktest();
 loadWeeklyMonitor();
 loadPulseAlerts();
+loadAgent();
 // Auto-load calendar on startup
 setTimeout(()=>{ try{ loadCalendar(); }catch(e){} }, 2000);
 
