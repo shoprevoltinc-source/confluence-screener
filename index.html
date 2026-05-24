@@ -5114,6 +5114,7 @@ SCORE THRESHOLDS:
 TRADE SLOTS (up to 5):
 - Fill slots in score order — highest score first
 - Never recommend a stock scoring below 4
+- CRITICAL: Never say a stock is 'already in open position' unless it explicitly appears in the journal data as an unclosed trade with no exit recorded. Do NOT assume positions from context.
 - Leave slots empty rather than fill with weak signals
 - If 49 green arrows fired — score ALL of them, recommend only top scorers ≥ 4
 
