@@ -16,8 +16,10 @@ const TD_KEYS = [
   "c05d8242562f496e8709d5c9e0ce4109",
   "9802166cf9694f42a64738bd776c22b9",
   "5a13fcf43f1347c6b2b4459a0076ba51",
-  "257f261bbb394e8bad0c871eb5d9218d"
-];
+  "257f261bbb394e8bad0c871eb5d9218d",
+  "2a6a1433dd864417a504d1913c2bfc5d",
+  "250893f6cebe4fddb505c2c50e99b8a7"
+].filter(Boolean);
 const FH_KEY    = "d819lthr01qler4hgk4gd819lthr01qler4hgk50";
 const PROXY_URL = ""; // unused — calling APIs directly
 
@@ -2129,6 +2131,15 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <div class="wm-prog-track"><div class="wm-prog-fill" id="wm-progFill"></div></div>
 </div>
 
+<!-- Cron Alert Banner — shows when GitHub Action finds green arrows -->
+<div id="cron-alert-banner" style="display:none;background:linear-gradient(135deg,#0d2b0d,#1a4a1a);border:1px solid var(--green2);border-radius:4px;padding:10px 14px;margin-bottom:8px;cursor:pointer" onclick="showCronAlerts()">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font-size:13px;font-weight:700;color:var(--green2);font-family:var(--mono)">🔥 AUTO-SCAN ALERT</span>
+    <span id="cron-alert-count" style="font-size:11px;color:#fff;font-family:var(--mono)"></span>
+    <span id="cron-alert-time" style="font-size:9px;color:var(--muted2);margin-left:auto;font-family:var(--mono)"></span>
+  </div>
+  <div id="cron-alert-tickers" style="font-size:10px;color:var(--green2);margin-top:4px;font-family:var(--mono)"></div>
+</div>
 <div class="banner green" id="wm-savedBanner" style="display:none"></div>
 
 <!-- Daily Trigger Results -->
@@ -2957,6 +2968,8 @@ function _doSwitchTab(tab){
   } else if(tab==="weekly"){
     document.getElementById("mainSubtitle").textContent="📅 WEEKLY MONITOR · TRAIL FLIP SIGNAL · 77% WIN RATE VALIDATED";
     if(wmResults.length) renderWeeklyMonitor();
+  } else if(tab==="weekly"){
+    loadCronAlerts();
   } else if(tab==="agent"){
     document.getElementById("mainSubtitle").textContent="🤖 TRADING AGENT · AI-POWERED DECISION ENGINE";
     loadAgent();
@@ -4126,7 +4139,7 @@ async function startWeeklyMonitor(){
   }, 500);
 
   async function runWMWorker(keyIdx, tickerChunk){
-    const DELAY = 8500;
+    const DELAY = 10000; // 10s = 6 stocks/min per key × 3 calls = 18 credits/min — safe under per-key limit
     for(let i=0; i<tickerChunk.length; i++){
       if(wmStopReq) break;
       const sym = tickerChunk[i];
@@ -4254,9 +4267,9 @@ async function startWeeklyMonitor(){
         // FILTER 1: Price vs 4H trail <= 20% above — filters extended breakouts
         const pctAbove4H = h4Trail > 0 ? ((price - h4Trail) / h4Trail) * 100 : 0;
         const f_notExtended = h4Trail === 0 || pctAbove4H <= 20;
-        // FILTER 2: Weekly RSI <= 65 — room to run, not overbought
+        // FILTER 2: Weekly RSI <= 70 — room to run, not overbought (raised from 65 — CRDO at 68 is valid)
         const weeklyRsi = calcRSI(wk.closes, 14);
-        const f_weeklyRsiOk = weeklyRsi === 0 || weeklyRsi <= 65;
+        const f_weeklyRsiOk = weeklyRsi === 0 || weeklyRsi <= 70;
         // FILTER 3: Daily RSI <= 70 — not exhausted on daily
         const f_dailyRsiOk = rsiVal === 0 || rsiVal <= 70;
         // FILTER 4: Flip age <= 3 weeks — fresh signal only
@@ -4692,6 +4705,38 @@ function renderWeeklyMonitor(){
 }
 
 // ── Load from localStorage / Firebase ─────────────────────
+// ── Load and display GitHub Action cron alerts ───────────
+async function loadCronAlerts(){
+  try{
+    const fb = await window.fbLoad("jax_cron_alerts");
+    if(!fb || !fb.data) return;
+    const alerts = fb.data;
+    if(!alerts.data || !alerts.data.length) return;
+    const fired  = alerts.data;
+    const banner = document.getElementById("cron-alert-banner");
+    const count  = document.getElementById("cron-alert-count");
+    const time   = document.getElementById("cron-alert-time");
+    const tickers= document.getElementById("cron-alert-tickers");
+    const checked = new Date(alerts.time);
+    const hoursAgo = (Date.now() - checked.getTime()) / (1000*60*60);
+    if(hoursAgo > 6) return;
+    banner.style.display = "block";
+    count.textContent    = fired.length + " green arrow" + (fired.length>1?"s":"") + " fired";
+    time.textContent     = "Auto-scan at " + alerts.checkTime;
+    tickers.textContent  = fired.map(r=>`${r.sym} $${r.price?.toFixed(2)} bull${r.bullScore}/5`).join(" · ");
+  }catch(e){}
+}
+
+function showCronAlerts(){
+  const panel = document.getElementById("dt-panel");
+  if(panel) panel.style.display = "block";
+  window.fbLoad("jax_cron_alerts").then(fb=>{
+    if(!fb || !fb.data || !fb.data.data) return;
+    const fired = fb.data.data.map(r=>({...r, firedToday:true}));
+    renderDailyTriggers(fired);
+  }).catch(()=>{});
+}
+
 function loadWeeklyMonitor(){
   try{
     const saved = localStorage.getItem("cs_weekly");
@@ -4801,6 +4846,12 @@ async function gatherAllData(){
       data[key] = fb ? fb.data : [];
     }catch(e){ data[key] = []; }
   }));
+  // Cron alerts from GitHub Action
+  try{
+    const cron = await window.fbLoad("jax_cron_alerts");
+    data.jax_cron_alerts = (cron && cron.data) ? cron.data : null;
+  }catch(e){ data.jax_cron_alerts = null; }
+
   // Daily triggers has nested structure — fbSafeSave wraps it as fb.data = {data:[], time:""}
   try{
     const dt = await window.fbLoad("daily_triggers");
@@ -4812,6 +4863,16 @@ async function gatherAllData(){
 // ── Build scanner context string for Claude ───────────────
 function buildScannerContext(data){
   const sections = [];
+
+  // GitHub Action Cron Alerts — auto-scan fired green arrows
+  const cronAlerts = data.jax_cron_alerts;
+  if(cronAlerts && cronAlerts.data && cronAlerts.data.length){
+    const hoursAgo = (Date.now() - new Date(cronAlerts.time).getTime()) / (1000*60*60);
+    if(hoursAgo <= 6){
+      sections.push(`🤖 AUTO-SCAN (${cronAlerts.checkTime} ET — all 658 stocks):
+GREEN ARROWS: ${cronAlerts.data.map(r=>`${r.sym}@$${r.price?.toFixed(2)} bull${r.bullScore}/5 RSI${r.rsi?.toFixed(0)}`).join(", ")||"none"}`);
+    }
+  }
 
   // Daily Trigger — highest priority, green arrows fired today on watchlist
   const dt = data.daily_triggers;
@@ -4883,10 +4944,21 @@ ON WEEKLY WATCHLIST (highest conviction): ${weeklyAlso.map(fmtJAX).join(", ")||"
 JAX ONLY: ${jaxOnly.map(fmtJAX).join(", ")||"none"}`);
   }
 
-  // Catalyst
-  const cat = (data.catalyst||[]).slice(0,5);
+  // Catalyst — ATR coil breakouts only (not earnings plays)
+  const cat = (data.catalyst||[]).filter(r=>r.atrCoiling).sort((a,b)=>b.bullScore-a.bullScore).slice(0,6);
   if(cat.length){
-    sections.push(`CATALYST (ATR coil + volume + earnings): ${cat.map(r=>r.sym+(r.earningsDate?" E:"+r.earningsDate:"")).join(", ")}`);
+    const wmSyms = new Set((data.weekly_monitor||[]).map(r=>r.sym));
+    const fmtCat = r => {
+      const cross   = wmSyms.has(r.sym) ? " ⭐ALSO-ON-WEEKLY" : "";
+      const coil    = r.atrRatio ? `coil${(r.atrRatio*100).toFixed(0)}%` : "coiling";
+      const vol     = r.isIgniting ? "VOL-IGNITING🔥" : r.isWakingUp ? "vol-waking" : "";
+      return `${r.sym}@$${r.price?.toFixed(2)} bull${r.bullScore||0}/5 RSI${r.rsi?.toFixed(0)||"?"} ${coil}${vol?" "+vol:""}${cross}`;
+    };
+    const withWeekly = cat.filter(r=>wmSyms.has(r.sym));
+    const standalone = cat.filter(r=>!wmSyms.has(r.sym));
+    sections.push(`CATALYST — ATR COIL SETUPS (energy building, breakout pending):
+ON WEEKLY (highest conviction): ${withWeekly.map(fmtCat).join(", ")||"none"}
+COIL ONLY: ${standalone.map(fmtCat).join(", ")||"none"}`);
   }
 
   // Recovery
@@ -4996,7 +5068,7 @@ Market session: ${sess.toUpperCase()}.
 YOUR A+ SETUP RULES (derived from backtested winning trades NVTS, CRDO vs filtered-out BE, SMTC):
 1. Weekly trail must be BULLISH (green trail flipped from bearish)
 2. Weekly flip must be RECENT (within 3 weeks) — not an old flip that already ran
-3. Weekly RSI must be <= 65 — room to run, not overbought
+3. Weekly RSI must be <= 70 — room to run, not overbought
 4. Daily RSI must be <= 70 — momentum healthy, not exhausted
 5. Price must be within 20% of the 4H trail stop — not an extended breakout
 6. 4H trail must ALSO be bullish for highest conviction (TIER 1/2)
@@ -5033,6 +5105,10 @@ CROSS-REFERENCE RULES (highest conviction combos):
 - Stock on WEEKLY WATCHLIST + CONFLUENCE 3/4 + RSI < 65 = strong entry
 - JAX only (not on weekly) = wait for pullback, smaller size 0.5%
 - CONFLUENCE only (not on weekly) = secondary trade, only if slots 1+2 empty
+- CATALYST coil on weekly = treat as TIER 2 conviction — energy building + weekly confirmed
+- CATALYST coil only (no weekly) = 0.5% risk max, only if vol igniting
+- CATALYST with vol igniting (VOL-IGNITING) = breakout imminent, prioritize over regular coil
+- Never recommend catalyst earnings plays — only ATR coil breakouts
 
 POSITION SIZING BY CONVICTION:
 - Daily Trigger fired today + Weekly = full 1% risk
@@ -5043,7 +5119,7 @@ POSITION SIZING BY CONVICTION:
 
 WHAT TO AVOID:
 - Any stock where price is >20% above 4H trail (extended, chasing)
-- Weekly RSI > 65 (late stage, momentum fading)
+- Weekly RSI > 70 (late stage, momentum fading)
 - Daily RSI > 70 (short term overbought)
 - Weekly flip older than 3 weeks without a pullback re-entry setup
 - Stocks showing RSI Bear divergence on weekly or daily
