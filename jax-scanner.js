@@ -6,17 +6,10 @@
 const https = require('https');
 
 // ── Config from environment ────────────────────────────────
-const TD_KEYS = [
-  process.env.TD_KEY_1,
-  process.env.TD_KEY_2,
-  process.env.TD_KEY_3,
-  process.env.TD_KEY_4,
-  process.env.TD_KEY_5,
-  process.env.TD_KEY_6,
-  process.env.TD_KEY_7,
-].filter(Boolean);
-
-const FIREBASE_URL = process.env.FIREBASE_URL; // e.g. https://your-project-default-rtdb.firebaseio.com
+// TD_KEYS secret = comma-separated list of all keys
+// Supports both comma-separated and newline-separated keys
+const TD_KEYS = (process.env.TD_KEYS || '').split(/[,\n]/).map(k=>k.trim()).filter(Boolean);
+const FIREBASE_URL = process.env.FIREBASE_DB_URL; // matches your existing secret name
 
 // ── Full 658 stock universe ────────────────────────────────
 const SP500 = [
@@ -266,6 +259,12 @@ async function saveToFirebase(key, data){
 async function main(){
   console.log(`🔍 JAX Scanner starting — ${ALL_TICKERS.length} stocks — ${new Date().toISOString()}`);
   console.log(`📡 Using ${TD_KEYS.length} API keys`);
+  console.log(`🔑 Keys detected: ${TD_KEYS.map(k=>k.substring(0,8)+'...').join(', ')||'NONE'}`);
+
+  if(!TD_KEYS.length){
+    console.error('❌ No API keys found. Check TD_KEYS secret in GitHub — must be comma or newline separated.');
+    process.exit(1);
+  }
 
   const fired   = [];
   const errors  = [];
