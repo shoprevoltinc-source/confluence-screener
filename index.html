@@ -1568,6 +1568,8 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <span class="k" id="ks2">K3</span>
   <span class="k" id="ks3">K4</span>
   <span class="k" id="ks4">K5</span>
+  <span class="k" id="ks5">K6</span>
+  <span class="k" id="ks6">K7</span>
   <span class="key-info" id="key-info-display">7 keys · 56 credits/min · parallel</span>
 </div>
 
@@ -7650,7 +7652,12 @@ setTimeout(()=>{ try{ loadCalendar(); }catch(e){} }, 2000);
 try{
   const nk = TD_KEYS.filter(Boolean).length;
   const el = document.getElementById("key-info-display");
-  if(el) el.textContent = nk+"× keys · "+(nk*8)+" credits/min · parallel";
+  if(el) el.textContent = nk+" keys · "+(nk*8)+" credits/min · parallel";
+  // Show/hide K6 K7 indicators based on actual key count
+  for(let i=0; i<7; i++){
+    const k = document.getElementById("ks"+i);
+    if(k) k.style.display = i < nk ? "" : "none";
+  }
 }catch(e){}
 
 // Load cron alerts on startup — wait for Firebase to be ready
