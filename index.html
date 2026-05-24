@@ -5011,7 +5011,7 @@ function buildJournalContext(journal){
   return `TRADING HISTORY (${entries.length} total):
 Win Rate: ${winRate!==null?winRate+"%":"—"} | Avg Win: ${avgWin?"+"+avgWin+"%":"—"} | Avg Loss: ${avgLoss||"—"}%
 By Source: ${srcStr||"no data"}
-Open Positions: ${openStr||"none"}`;
+Open Positions RIGHT NOW: ${open.length > 0 ? openStr : "NONE — no open trades, all slots available"}`;
 }
 
 // ── Update agent stat bar ─────────────────────────────────
@@ -5201,7 +5201,7 @@ ${scanCtx}
 
 ${jnlCtx}`;
 
-    const raw = await callClaude(system, user, 1500);
+    const raw = await callClaude(system, user, 2500);
 
     // Parse JSON response — strip any markdown formatting Claude adds
     let brief;
@@ -5210,8 +5210,16 @@ ${jnlCtx}`;
       let clean = raw.replace(/```json/gi,"").replace(/```/g,"").trim();
       // Find first { and last } to extract just the JSON object
       const start = clean.indexOf("{");
-      const end   = clean.lastIndexOf("}");
+      let end     = clean.lastIndexOf("}");
       if(start !== -1 && end !== -1) clean = clean.substring(start, end+1);
+      // If JSON is truncated, try to close it
+      if(start !== -1 && end === -1){
+        clean = clean.substring(start);
+        // Close any open arrays/objects
+        let depth = 0;
+        for(const c of clean){ if(c==="{") depth++; if(c==="}") depth--; }
+        clean += "]}".repeat(Math.max(0,depth));
+      }
       brief = JSON.parse(clean);
     }catch(ex){
       // Show parse error clearly so we can debug
