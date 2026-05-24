@@ -2224,7 +2224,7 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <span class="agent-setting-label">Risk %</span>
   <input type="number" class="agent-setting-input" id="agent-risk" value="1" min="0.5" max="5" step="0.5" style="width:60px">
   <span class="agent-setting-label">Max trades</span>
-  <input type="number" class="agent-setting-input" id="agent-maxtrades" value="3" min="1" max="5" style="width:60px">
+  <input type="number" class="agent-setting-input" id="agent-maxtrades" value="5" min="1" max="5" style="width:60px">
   <div style="margin-left:auto;display:flex;gap:6px">
     <button class="agent-btn" id="agent-brief-btn" onclick="runMorningBrief()">☀️ MORNING BRIEF</button>
     <button class="agent-btn blue" id="agent-review-btn" onclick="runWeeklyReview()">📊 WEEKLY REVIEW</button>
@@ -5079,14 +5079,53 @@ YOUR A+ SETUP RULES (derived from backtested winning trades NVTS, CRDO vs filter
 7. Daily green arrow (JAX) firing = additional confirmation (TIER 3)
 8. Weekly green arrow (JAX) firing within last 3 weeks = INSTITUTIONAL momentum signal — IONQ, CDNS, QUBT all fired this on April 13th before major moves. When weekly JAX fires AND 4H confirms = A++
 
+SCORING SYSTEM — rank every candidate 0-10 before recommending:
+Award points for each condition that is true:
+
+WEEKLY FOUNDATION (required — no weekly = max 2 points total):
++3 = On weekly watchlist (trail flip confirmed within 3 weeks)
++2 = Weekly JAX fired recently
++1 = 200 EMA reclaim on daily
+
+TIMING SIGNALS:
++2 = Green arrow fired TODAY (auto-scan or daily trigger)
++1 = Green arrow fired YESTERDAY (still valid)
++1 = 4H just flipped bullish (fresh, not established)
+
+MOMENTUM QUALITY:
++2 = Bull score 4/5 or 5/5
++1 = Bull score 3/5
++1 = Confluence 4/4 (all pillars)
++1 = Catalyst coil active (ATR coiling)
+
+DEDUCTIONS:
+-2 = RSI > 70 (overbought)
+-1 = RSI 65-70 (elevated)
+-1 = Price > 15% above 4H trail (extended)
+-2 = No weekly watchlist confirmation
+
+SCORE THRESHOLDS:
+8-10 = A++ — ENTER, full 1% risk
+6-7  = A+  — ENTER, 0.75% risk  
+4-5  = A   — ENTER, 0.5% risk
+2-3  = WATCH — monitor only, no entry
+0-1  = SKIP — ignore completely
+
+TRADE SLOTS (up to 5):
+- Fill slots in score order — highest score first
+- Never recommend a stock scoring below 4
+- Leave slots empty rather than fill with weak signals
+- If 49 green arrows fired — score ALL of them, recommend only top scorers ≥ 4
+
 DATA SOURCES PRIORITY (highest to lowest):
-1. 🔥 DAILY TRIGGER — green arrow fired TODAY on a weekly watchlist stock = IMMEDIATE ENTRY
-2. ⭐⭐ A++ weekly signal — weekly flip + 4H flip + 200EMA reclaim
-3. ⭐ TIER 1 weekly — weekly flip + 4H just flipped
-4. 🟢 TIER 2 weekly — weekly flip + 4H established
-5. JAX scanner green arrows — daily signal only
-6. Pulse movers crossing weekly signals
-7. Confluence, Recovery, Catalyst — secondary confirmation only
+1. 🔥 AUTO-SCAN — green arrow fired today across all 657 stocks
+2. 🔥 DAILY TRIGGER — green arrow fired on weekly watchlist stock
+3. ⭐⭐ A++ weekly signal — weekly flip + 4H flip + 200EMA reclaim
+4. ⭐ TIER 1 weekly — weekly flip + 4H just flipped
+5. 🟢 TIER 2 weekly — weekly flip + 4H established
+6. Confluence 4/4 — all pillars firing
+7. Catalyst coil — energy building
+8. Pulse movers crossing weekly signals
 
 TIER SYSTEM (priority order):
 - A++ ⭐⭐ ENTER NOW: Weekly bull + 4H just flipped + daily 200 EMA fresh reclaim = HIGHEST CONVICTION
@@ -5137,16 +5176,19 @@ Return ONLY this exact JSON structure (no other text):
   "trades": [
     {
       "sym": "TICKER",
-      "action": "ENTER or WATCH or SMALL SIZE",
+      "score": 8,
+      "action": "ENTER or WATCH or SKIP",
       "entry": 123.45,
       "stop": 120.00,
       "target": 135.00,
       "shares": 12,
-      "win_rate_note": "weekly+4H trades win 96%",
-      "notes": "tier, RSI values, distance from trail"
+      "risk_pct": 1.0,
+      "win_rate_note": "weekly+4H+200EMA = A++ setup",
+      "notes": "score breakdown: +3 weekly +2 today +2 bull5/5 +1 200EMA = 8/10"
     }
   ],
-  "recommendation": "final recommendation with key reasoning"
+  "recommendation": "final recommendation with key reasoning",
+  "skipped": "brief note on why other signals were skipped"
 }`;
 
     const user = `Here is today's scanner data and my trading history. Give me my morning brief with up to ${maxT} trades.
@@ -5186,11 +5228,14 @@ ${jnlCtx}`;
     }
 
     // Render structured cards
-    const tradesHTML = (brief.trades||[]).map((t,i)=>`
+    const scoreColor = (s)=> s>=8?"#00E676":s>=6?"var(--green2)":s>=4?"var(--yellow)":"var(--red)";
+    const tradesHTML = (brief.trades||[]).filter(t=>t.action!=="SKIP").map((t,i)=>`
       <div style="background:#0d1f14;border:1px solid #1a3a20;border-radius:4px;padding:12px 14px;margin-bottom:10px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
           <span style="font-size:15px;font-weight:700;color:#fff">${i+1}. ${t.sym}</span>
           <span style="font-size:9px;font-weight:700;letter-spacing:1px;padding:2px 8px;border-radius:2px;background:${actionColor(t.action)};color:#000">${t.action||"ENTER"}</span>
+          ${t.score?`<span style="font-size:10px;font-weight:700;color:${scoreColor(t.score)};padding:2px 6px;background:rgba(0,0,0,0.3);border-radius:2px">${t.score}/10</span>`:""}
+          ${t.risk_pct?`<span style="font-size:9px;color:var(--muted2)">${t.risk_pct}% risk</span>`:""}
           ${t.win_rate_note?`<span style="font-size:9px;color:var(--muted2);margin-left:auto">${t.win_rate_note}</span>`:""}
         </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">
@@ -5236,6 +5281,9 @@ ${jnlCtx}`;
 
         <!-- Recommendation -->
         ${brief.recommendation?`<div style="font-size:11px;color:var(--text);line-height:1.8;margin-bottom:12px;padding:10px 12px;background:#0d1520;border-left:3px solid #64B5F6;border-radius:2px">${renderMD(brief.recommendation)}</div>`:""}
+
+        <!-- Skipped -->
+        ${brief.skipped?`<div style="font-size:9px;color:var(--muted2);padding:6px 12px;margin-bottom:8px;font-family:var(--mono)">⏭ SKIPPED: ${brief.skipped}</div>`:""}
 
         <!-- Confidence -->
         <div style="font-size:10px;color:${confidenceColor()};padding:8px 12px;background:#0a0a0a;border-radius:3px;border:1px solid #1a1a1a">
