@@ -5068,7 +5068,7 @@ async function runMorningBrief(){
     const jnlCtx  = buildJournalContext(data.journal);
     const sess    = getMarketSession();
 
-    const system = `You are a professional trading advisor and technical analyst. Respond ONLY with valid JSON, no markdown, no explanation, no preamble.
+    const system = `You are a professional trading advisor and technical analyst. You MUST respond with ONLY a raw JSON object. NO backticks, NO markdown, NO code fences, NO explanation before or after. Start your response with { and end with }. Any other format will cause a system error.
 The trader has $${account} account, ${risk}% risk per trade ($${riskAmt.toFixed(0)} max risk), max ${maxT} trades.
 Market session: ${sess.toUpperCase()}.
 
@@ -5206,11 +5206,8 @@ ${jnlCtx}`;
     // Parse JSON response — strip any markdown formatting Claude adds
     let brief;
     try{
-      // Remove backtick fences, "json" labels, leading/trailing whitespace
-      let clean = raw
-        .replace(/^```json\s*/i,"").replace(/```$/,"")  // remove fences
-        .replace(/^```\s*/,"").replace(/```$/,"")        // remove plain fences
-        .trim();
+      // Remove ALL backtick code fences regardless of position
+      let clean = raw.replace(/```json/gi,"").replace(/```/g,"").trim();
       // Find first { and last } to extract just the JSON object
       const start = clean.indexOf("{");
       const end   = clean.lastIndexOf("}");
