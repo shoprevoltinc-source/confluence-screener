@@ -5198,16 +5198,25 @@ ${scanCtx}
 
 ${jnlCtx}`;
 
-    const raw = await callClaude(system, user, 1000);
+    const raw = await callClaude(system, user, 1500);
 
-    // Parse JSON response
+    // Parse JSON response — strip any markdown formatting Claude adds
     let brief;
     try{
-      const clean = raw.replace(/```json|```/g,"").trim();
+      // Remove backtick fences, "json" labels, leading/trailing whitespace
+      let clean = raw
+        .replace(/^```json\s*/i,"").replace(/```$/,"")  // remove fences
+        .replace(/^```\s*/,"").replace(/```$/,"")        // remove plain fences
+        .trim();
+      // Find first { and last } to extract just the JSON object
+      const start = clean.indexOf("{");
+      const end   = clean.lastIndexOf("}");
+      if(start !== -1 && end !== -1) clean = clean.substring(start, end+1);
       brief = JSON.parse(clean);
     }catch(ex){
-      // Fallback to markdown render if JSON fails
+      // Show parse error clearly so we can debug
       body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(raw)}</div>`;
+      console.error("JSON parse failed:", ex.message, "\nRaw:", raw.substring(0,500));
       document.getElementById("agent-brief-time").textContent = new Date().toLocaleTimeString();
       document.getElementById("agent-lastrun").textContent = "Last brief: "+new Date().toLocaleTimeString();
       try{
