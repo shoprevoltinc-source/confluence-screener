@@ -254,7 +254,17 @@ async function fetchCandles(sym, keyIndex){
 // ── Save results to Firebase ──────────────────────────────
 async function saveToFirebase(key, data){
   const url = `${FIREBASE_URL}/${key}.json`;
-  await httpRequest(url, 'PUT', { data, savedAt: new Date().toISOString(), device: 'github-action' });
+  console.log(`💾 Saving to Firebase: ${url}`);
+  try{
+    const result = await httpRequest(url, 'PUT', { data, savedAt: new Date().toISOString(), device: 'github-action' });
+    console.log(`✅ Firebase save response:`, JSON.stringify(result).substring(0, 200));
+  }catch(e){
+    console.error(`❌ Firebase save failed:`, e.message);
+    // Try with .json suffix explicitly
+    console.log(`🔄 Retrying Firebase save...`);
+    const result2 = await httpRequest(url, 'PUT', { data, savedAt: new Date().toISOString(), device: 'github-action' });
+    console.log(`✅ Retry response:`, JSON.stringify(result2).substring(0, 200));
+  }
 }
 
 // ── Main scanner ──────────────────────────────────────────
