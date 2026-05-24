@@ -252,21 +252,37 @@ async function fetchCandles(sym, keyIndex){
 }
 
 // ── Save results to Firebase ──────────────────────────────
-async function saveToFirebase(key, data){
+async function saveToFirebase(key, payload){
   const url = `${FIREBASE_URL}/screener/${key}.json`;
   console.log(`💾 Saving to Firebase: ${FIREBASE_URL}/screener/${key}.json`);
-  // fbLoad does JSON.parse(val.data) so data must be a stringified JSON string
-  const payload = {
-    data:      JSON.stringify(data),
-    savedAt:   new Date().toISOString(),
-    device:    'github-action'
-  };
-  try{
-    const result = await httpRequest(url, 'PUT', payload);
-    console.log(`✅ Firebase save response:`, JSON.stringify(result).substring(0, 200));
-  }catch(e){
-    console.error(`❌ Firebase save failed:`, e.message);
-  }
+  // fbLoad does JSON.parse(val.data) so data field must be a JSON string
+  // httpRequest does JSON.stringify(body) so we pass data as a pre-stringified string
+  // to avoid double stringify, we build the full payload as a raw string
+  const raw = JSON.stringify({
+    data:    JSON.stringify(payload),
+    savedAt: new Date().toISOString(),
+    device:  'github-action'
+  });
+  return new Promise((resolve, reject)=>{
+    const u = new URL(url);
+    const options = {
+      hostname: u.hostname,
+      path: u.pathname + u.search,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(raw) }
+    };
+    const req = https.request(options, res=>{
+      let data = '';
+      res.on('data', chunk=> data+=chunk);
+      res.on('end', ()=>{
+        console.log(`✅ Firebase save response:`, data.substring(0, 200));
+        resolve(data);
+      });
+    });
+    req.on('error', reject);
+    req.write(raw);
+    req.end();
+  });
 }
 
 // ── Main scanner ──────────────────────────────────────────
