@@ -5250,7 +5250,8 @@ ${jnlCtx}`;
           ${t.score?`<span style="font-size:10px;font-weight:700;color:${scoreColor(t.score)};padding:2px 6px;background:rgba(0,0,0,0.3);border-radius:2px">${t.score}/10</span>`:""}
           ${t.risk_pct?`<span style="font-size:9px;color:var(--muted2)">${t.risk_pct}% risk</span>`:""}
           ${t.win_rate_note?`<span style="font-size:9px;color:var(--muted2);margin-left:auto">${t.win_rate_note}</span>`:""}
-          <button onclick="logToJournal({sym:'${t.sym}',price:${t.entry||0},score:'W',source:'agent',session:getMarketSession(),greenArrow:true,tradeType:'Swing',stopLoss:${t.stop||0},target1:${t.target||0}})"
+          <button data-sym="${t.sym}" data-price="${t.entry||0}" data-stop="${t.stop||0}" data-target="${t.target||0}"
+            onclick="const d=this.dataset;logToJournal({sym:d.sym,price:parseFloat(d.price),score:'W',source:'agent',session:getMarketSession(),greenArrow:true,tradeType:'Swing',stopLoss:parseFloat(d.stop),target1:parseFloat(d.target)})"
             style="background:#0d2b0d;border:1px solid var(--green2);color:var(--green2);font-family:var(--mono);font-size:8px;padding:3px 8px;cursor:pointer;border-radius:2px;letter-spacing:1px;margin-left:${t.win_rate_note?'4px':'auto'}">
             📓 LOG
           </button>
