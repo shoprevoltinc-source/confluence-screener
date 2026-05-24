@@ -5049,7 +5049,7 @@ ${jnlCtx}`;
       body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(raw)}</div>`;
       document.getElementById("agent-brief-time").textContent = new Date().toLocaleTimeString();
       document.getElementById("agent-lastrun").textContent = "Last brief: "+new Date().toLocaleTimeString();
-      try{ localStorage.setItem("cs_agent_brief", JSON.stringify({text:raw, time:new Date().toISOString(), isJson:false})); }catch(e){}
+      try{ localStorage.setItem("cs_agent_brief", JSON.stringify({text:raw, html:body.innerHTML, time:new Date().toISOString(), isJson:false})); }catch(e){}
       btn.disabled = false;
       return;
     }
@@ -5124,8 +5124,15 @@ ${jnlCtx}`;
     document.getElementById("agent-brief-time").textContent = new Date().toLocaleTimeString();
     document.getElementById("agent-lastrun").textContent = "Last brief: "+new Date().toLocaleTimeString();
 
-    // Save to localStorage
-    try{ localStorage.setItem("cs_agent_brief", JSON.stringify({text:raw, time:new Date().toISOString(), isJson:true})); }catch(e){}
+    // Save both raw text AND rendered HTML so tab switching restores perfectly
+    try{
+      localStorage.setItem("cs_agent_brief", JSON.stringify({
+        text: raw,
+        html: body.innerHTML,
+        time: new Date().toISOString(),
+        isJson: true
+      }));
+    }catch(e){}
 
   }catch(e){
     body.innerHTML = `<div class="agent-output" style="color:var(--red)">Error: ${e.message}<br><br>Make sure your scanner has run today and Firebase has data.</div>`;
@@ -5401,22 +5408,27 @@ ${buildScannerContext(data)}`;
 }
 
 // ── Load saved agent brief on startup ─────────────────────
+// ── Load saved agent brief on startup / tab switch ────────
 function loadAgent(){
   try{
     const saved = localStorage.getItem("cs_agent_brief");
     if(saved){
-      const { text, time, isJson } = JSON.parse(saved);
-      const body = document.getElementById("agent-brief-body");
+      const { text, html, time, isJson } = JSON.parse(saved);
+      const body   = document.getElementById("agent-brief-body");
       const timeEl = document.getElementById("agent-brief-time");
+      const lastRun = document.getElementById("agent-lastrun");
       if(body){
-        if(isJson){
-          // Just show a prompt to re-run — can't re-render cards without scanner data
+        if(html){
+          // Restore the full rendered HTML — cards, colors, everything
+          body.innerHTML = html;
+        } else if(isJson){
           body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--muted2);padding:10px">📋 Last brief from ${new Date(time).toLocaleTimeString()} — tap MORNING BRIEF to refresh.</div>`;
         } else {
           body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(text)}</div>`;
         }
       }
-      if(timeEl) timeEl.textContent = new Date(time).toLocaleTimeString();
+      if(timeEl)  timeEl.textContent = new Date(time).toLocaleTimeString();
+      if(lastRun) lastRun.textContent = "Last brief: "+new Date(time).toLocaleTimeString();
     }
   }catch(e){}
 
