@@ -2100,6 +2100,10 @@ function switchTab(tab){ _doSwitchTab(tab); }
   </button>
   <button class="btn-stop" id="wmStopBtn" onclick="stopWeeklyMonitor()" disabled>■ STOP</button>
   <button class="btn-clear" onclick="clearWeeklyMonitor()">🗑</button>
+  <button class="btn-scan" id="dtRunBtn" onclick="runDailyTrigger()"
+    style="background:linear-gradient(135deg,#1a4a1a,#00C853);box-shadow:0 0 16px rgba(0,200,83,0.4);margin-left:8px">
+    🔥 DAILY TRIGGER
+  </button>
   <span class="ctrl-label">LIST</span>
   <select id="wmList">
     <option value="watchlist">My Watchlist</option>
@@ -2126,6 +2130,23 @@ function switchTab(tab){ _doSwitchTab(tab); }
 </div>
 
 <div class="banner green" id="wm-savedBanner" style="display:none"></div>
+
+<!-- Daily Trigger Results -->
+<div id="dt-panel" style="display:none;margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+    <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--green2);letter-spacing:1px">🔥 DAILY TRIGGER — GREEN ARROWS FIRED TODAY</span>
+    <span id="dt-time" style="font-family:var(--mono);font-size:9px;color:var(--muted2)"></span>
+    <span id="dt-prog-msg" style="font-family:var(--mono);font-size:9px;color:var(--blue);margin-left:auto"></span>
+  </div>
+  <div class="wm-prog" id="dt-prog" style="display:none;margin-bottom:8px">
+    <div class="wm-prog-row">
+      <span class="wm-prog-msg" id="dt-progMsg">Checking daily signals...</span>
+      <span class="wm-prog-pct" id="dt-progPct">0%</span>
+    </div>
+    <div class="wm-prog-track"><div class="wm-prog-fill" id="dt-progFill" style="background:linear-gradient(90deg,#00C853,#69F0AE)"></div></div>
+  </div>
+  <div id="dt-results"></div>
+</div>
 
 <div class="filter-bar" id="wm-filterBar" style="display:none">
   <span class="filter-label">SHOW</span>
@@ -2595,10 +2616,8 @@ function calcJAXPRO(closes, highs, lows){
   const {hist} = calcMACD(closes);
   const st    = calcSuperTrend(highs, lows, closes, 1.5, 10);
   const atrTS = calcATRTrailStop(highs, lows, closes, 10, 3.5);
-  // EMA stack — relaxed: price > EMA20 AND EMA20 rising
-  const ema20old  = calcEMA(closes.slice(0,-5), 20);
-  const ema20rising = ema20 > ema20old;
-  const emaStack  = price > ema20 && ema20rising;
+  // EMA stack — exact Pine Script match: ema20 > ema40 > ema60 AND close > ema20
+  const emaStack  = price > ema20 && ema20 > ema40 && ema40 > ema60;
   const macdBull  = hist > 0;
   const rsiBull   = rsi14 > 50;
   const wrBull    = wr14 > -50;
@@ -4082,6 +4101,8 @@ async function startWeeklyMonitor(){
   document.getElementById("wm-filterBar").style.display = "none";
   document.getElementById("wm-results").innerHTML = "";
   document.getElementById("wm-log").innerHTML = "";
+  // Clear stale data at scan start so old results never mix with new
+  try{ localStorage.removeItem("cs_weekly"); }catch(e){}
   document.getElementById("wm-sub").textContent =
     tickers.length+" STOCKS · WEEKLY FLIP WITHIN "+flipAge+" WEEKS · BACKTEST: 77% WIN RATE";
 
@@ -4304,7 +4325,18 @@ async function startWeeklyMonitor(){
           pctHi:      pctHiVal,
         };
 
-        wmResults.push(result);
+        // Deduplicate — skip if already found by another worker
+        if(wmResults.find(r=>r.sym===sym)){ done++; if(i<tickerChunk.length-1) await sleep(DELAY); continue; }
+        // Deduplicate — keep highest tier if same sym scanned by multiple workers
+        const existingIdx = wmResults.findIndex(r=>r.sym===sym);
+        if(existingIdx>=0){
+          const ex = wmResults[existingIdx];
+          const newScore = (result.tierApp?4:result.tier1?3:result.tier2?2:result.tier3?1:0);
+          const exScore  = (ex.tierApp?4:ex.tier1?3:ex.tier2?2:ex.tier3?1:0);
+          if(newScore > exScore) wmResults[existingIdx] = result; // replace with better
+        } else {
+          wmResults.push(result);
+        }
 
         // Update stats
         const t1Count    = wmResults.filter(r=>r.tier1).length;
@@ -4386,6 +4418,162 @@ async function startWeeklyMonitor(){
   }
   renderWeeklyMonitor();
   logWM("✅ Complete · "+wmResults.length+" signals · "+t1Count+" ⭐ ENTER NOW · "+t2Count+" 🟢 4H Bull","ok");
+}
+
+// ══════════════════════════════════════════════════════════
+// DAILY TRIGGER — checks weekly watchlist for fresh green arrows
+// Runs calcJAXPRO on daily candles matching your exact Pine Script
+// Fires alert when green arrow fired within last 2 daily bars
+// ══════════════════════════════════════════════════════════
+async function runDailyTrigger(){
+  const btn = document.getElementById("dtRunBtn");
+  if(!wmResults.length){
+    alert("Run the weekly scan first — need a watchlist to check.");
+    return;
+  }
+
+  btn.disabled = true;
+  const panel    = document.getElementById("dt-panel");
+  const results  = document.getElementById("dt-results");
+  const prog     = document.getElementById("dt-prog");
+  const progMsg  = document.getElementById("dt-progMsg");
+  const progPct  = document.getElementById("dt-progPct");
+  const progFill = document.getElementById("dt-progFill");
+  const timeEl   = document.getElementById("dt-time");
+
+  panel.style.display   = "block";
+  prog.style.display    = "block";
+  results.innerHTML     = "";
+  timeEl.textContent    = "";
+
+  const tickers  = wmResults.map(r=>r.sym);
+  const total    = tickers.length;
+  let done       = 0;
+  const fired    = []; // stocks where green arrow fired today
+  const DELAY    = 8500;
+  const nKeys    = TD_KEYS.length;
+  const chunks   = splitInterleaved(tickers, nKeys);
+
+  const progInterval = setInterval(()=>{
+    const pct = Math.round(done/total*100);
+    progPct.textContent    = pct+"%";
+    progFill.style.width   = pct+"%";
+  }, 400);
+
+  async function dtWorker(keyIdx, chunk){
+    for(let i=0; i<chunk.length; i++){
+      const sym = chunk[i];
+      progMsg.textContent = "Checking "+sym+" ("+done+"/"+total+")...";
+      try{
+        const dy = await fetchCandlesWithKey(sym, keyIdx);
+        if(dy && dy.closes.length >= 70){
+          // Check if green arrow fired on current bar OR previous bar
+          const jaxNow  = calcJAXPRO(dy.closes, dy.highs, dy.lows);
+          const jaxPrev = calcJAXPRO(
+            dy.closes.slice(0,-1),
+            dy.highs.slice(0,-1),
+            dy.lows.slice(0,-1)
+          );
+
+          const firedToday     = jaxNow  && jaxNow.greenArrow;
+          const firedYesterday = jaxPrev && jaxPrev.greenArrow;
+
+          if(firedToday || firedYesterday){
+            const wm    = wmResults.find(r=>r.sym===sym)||{};
+            const price = dy.closes[dy.closes.length-1];
+            fired.push({
+              sym,
+              price,
+              firedToday,
+              firedYesterday,
+              bullScore:  jaxNow?.bullScore||0,
+              rsi:        jaxNow?.rsi14||0,
+              tier:       wm.tierApp?"A++":wm.tier1?"TIER1":wm.tier2?"TIER2":wm.tier3?"TIER3":"WEEKLY",
+              h4Bullish:  wm.h4Bullish||false,
+              weeklyRsi:  wm.weeklyRsi||0,
+              weeksAgo:   wm.weeksAgo||0,
+              daily200Reclaim: wm.daily200Reclaim||false,
+              weeklyJAXRecent: wm.weeklyJAXRecent||false,
+            });
+            renderDailyTriggers(fired);
+          }
+        }
+      }catch(e){}
+
+      done++;
+      if(i < chunk.length-1) await sleep(DELAY);
+    }
+  }
+
+  await Promise.all(chunks.map((chunk,ki)=>dtWorker(ki,chunk)));
+  clearInterval(progInterval);
+
+  progPct.textContent  = "100%";
+  progFill.style.width = "100%";
+  progMsg.textContent  = fired.length
+    ? "✅ Done — "+fired.length+" green arrows fired"
+    : "✅ Done — no green arrows fired today";
+  timeEl.textContent = "Last checked: "+new Date().toLocaleTimeString();
+
+  // Save to Firebase for phone access
+  if(fired.length) fbSafeSave("daily_triggers", {data:fired, time:new Date().toISOString()});
+
+  btn.disabled = false;
+  prog.style.display = "none";
+}
+
+function renderDailyTriggers(fired){
+  const results = document.getElementById("dt-results");
+  if(!fired.length){
+    results.innerHTML = '<div class="conf-empty"><span class="conf-empty-icon">🔍</span>No green arrows fired yet.</div>';
+    return;
+  }
+
+  // Sort — today's fires first, then by bull score
+  const sorted = [...fired].sort((a,b)=>{
+    if(a.firedToday && !b.firedToday) return -1;
+    if(!a.firedToday && b.firedToday) return 1;
+    return b.bullScore - a.bullScore;
+  });
+
+  results.innerHTML = sorted.map(s=>{
+    const urgency  = s.firedToday ? "🔥 FIRED TODAY" : "⚡ FIRED YESTERDAY";
+    const urgClr   = s.firedToday ? "var(--green2)" : "var(--yellow)";
+    const tierClr  = s.tier==="A++"?"#fff":s.tier==="TIER1"?"var(--green2)":s.tier==="TIER2"?"var(--green)":"var(--muted2)";
+    const badges   = [
+      s.weeklyJAXRecent ? "📅 WK JAX 🔥" : "",
+      s.daily200Reclaim ? "📡 200EMA" : "",
+      s.h4Bullish       ? "⭐ 4H BULL" : "",
+    ].filter(Boolean).join(" · ");
+
+    return `<div style="background:#0a1f0a;border:1px solid #1a4a1a;border-left:3px solid ${urgClr};border-radius:4px;padding:10px 14px;margin-bottom:8px;cursor:pointer"
+      onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <span style="font-size:15px;font-weight:700;color:#fff;font-family:var(--mono)">${s.sym}</span>
+        <span style="font-size:10px;font-weight:700;color:${urgClr};letter-spacing:1px">${urgency}</span>
+        <span style="font-size:9px;color:${tierClr};margin-left:auto;font-family:var(--mono)">${s.tier}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px">
+        <div style="background:#0d1f0d;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2)">PRICE</div>
+          <div style="font-size:13px;font-weight:700;color:var(--green2)">$${s.price.toFixed(2)}</div>
+        </div>
+        <div style="background:#0d1f0d;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2)">BULL SCORE</div>
+          <div style="font-size:13px;font-weight:700;color:#fff">${s.bullScore}/5</div>
+        </div>
+        <div style="background:#0d1f0d;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2)">D-RSI</div>
+          <div style="font-size:13px;font-weight:700;color:${s.rsi<60?"var(--green2)":s.rsi<70?"var(--yellow)":"var(--red)"}">${s.rsi.toFixed(0)}</div>
+        </div>
+        <div style="background:#0d1f0d;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2)">WK FLIP</div>
+          <div style="font-size:13px;font-weight:700;color:var(--muted2)">${s.weeksAgo===0?"THIS WK":s.weeksAgo+"wk ago"}</div>
+        </div>
+      </div>
+      ${badges?`<div style="font-size:9px;color:var(--muted2);font-family:var(--mono)">${badges}</div>`:""}
+    </div>`;
+  }).join("");
 }
 
 function stopWeeklyMonitor(){ wmStopReq = true; }
