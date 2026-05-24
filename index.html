@@ -4133,6 +4133,32 @@ async function startWeeklyMonitor(){
         const weeklyStillBullish = lastHistory && lastHistory.dir === 1;
         if(!weeklyStillBullish){ done++; await sleep(DELAY); continue; }
 
+        // ── Step 3b: Weekly JAX check ─────────────────────────────────────
+        // Weekly green arrow = institutional momentum confirmation
+        // IONQ, CDNS, QUBT all fired weekly JAX on April 13th before the big move
+        let weeklyJAX = false, weeklyJAXRecent = false, weeklyBullScore = 0;
+        try{
+          if(wk.closes.length >= 20){
+            const wkJax = calcJAXPRO(wk.closes, wk.highs, wk.lows);
+            if(wkJax){
+              weeklyJAX       = wkJax.greenArrow;
+              weeklyBullScore = wkJax.bullScore;
+              // Check if green arrow fired within last 3 weekly bars
+              const recentBars = 3;
+              let recentFired  = false;
+              for(let rb = 0; rb < recentBars && rb < wk.closes.length; rb++){
+                const sliced = calcJAXPRO(
+                  wk.closes.slice(0, wk.closes.length - rb),
+                  wk.highs.slice(0, wk.closes.length - rb),
+                  wk.lows.slice(0, wk.closes.length - rb)
+                );
+                if(sliced && sliced.greenArrow){ recentFired = true; break; }
+              }
+              weeklyJAXRecent = recentFired;
+            }
+          }
+        }catch(e){}
+
         // ── Step 4: 4H check — is 4H trail currently bullish? ────────────────
         // Backtest validated: weekly bull + 4H flip = 96% win rate (24/25 signals)
         let h4Bullish = false, h4Trail = 0, h4FlipRecent = false;
@@ -4148,9 +4174,10 @@ async function startWeeklyMonitor(){
           }
         }catch(e){}
 
-        // ── Step 5: Daily JAX check ───────────────────────────────────────
+        // ── Step 5: Daily JAX + 200 EMA check ────────────────────────────
         let dailyJAX = false, dailyBullScore = 0, dailyTrail = 0;
         let rsiVal = 0, pctHiVal = 0;
+        let daily200EMA = 0, dailyAbove200 = false, daily200Reclaim = false;
         try{
           const dy = await fetchCandlesWithKey(sym, keyIdx);
           if(dy && dy.closes.length >= 70){
@@ -4160,11 +4187,39 @@ async function startWeeklyMonitor(){
               dailyBullScore = jax.bullScore;
               dailyTrail     = jax.trailVal;
             }
-            rsiVal  = calcRSI(dy.closes, 14);
+            rsiVal   = calcRSI(dy.closes, 14);
             const high52 = Math.max(...dy.highs);
             pctHiVal = ((dy.closes[dy.closes.length-1]-high52)/high52)*100;
+
+            // 200 EMA on daily
+            if(dy.closes.length >= 202){
+              daily200EMA   = calcEMA(dy.closes, 200);
+              const cur     = dy.closes[dy.closes.length-1];
+              dailyAbove200 = cur > daily200EMA;
+              // Fresh reclaim = price crossed above 200 EMA within last 10 bars
+              const lookback = dy.closes.slice(-12);
+              let crossedAbove = false;
+              for(let li = 1; li < lookback.length; li++){
+                const emaHere = calcEMA(dy.closes.slice(0, dy.closes.length - lookback.length + li), 200);
+                const emaPrev = calcEMA(dy.closes.slice(0, dy.closes.length - lookback.length + li - 1), 200);
+                if(lookback[li] > emaHere && lookback[li-1] < emaPrev){ crossedAbove = true; break; }
+              }
+              daily200Reclaim = dailyAbove200 && crossedAbove;
+            }
           }
         }catch(e){}
+
+        // ── Step 5b: 4H 200 EMA check ────────────────────────────────────
+        let h4_200EMA = 0, h4Above200 = false;
+        if(h4Trail > 0){
+          try{
+            const h4b = await fetch4HCandles(sym, keyIdx);
+            if(h4b && h4b.closes.length >= 202){
+              h4_200EMA  = calcEMA(h4b.closes, 200);
+              h4Above200 = h4b.closes[h4b.closes.length-1] > h4_200EMA;
+            }
+          }catch(e){}
+        }
 
         // ── Step 6: Live quote ────────────────────────────────────────────
         let price = wk.closes[wk.closes.length-1], change = 0;
@@ -4173,18 +4228,43 @@ async function startWeeklyMonitor(){
           if(q && q.price){ price = q.price; change = q.changePct||0; }
         }catch(e){}
 
-        // ── Step 7: Build result ──────────────────────────────────────────
-        // Priority tiers based on backtest validation:
-        // TIER 1: Weekly bull + 4H bull + 4H just flipped = ENTER NOW (96% win rate)
-        // TIER 2: Weekly bull + 4H bull (established) = STRONG SETUP
-        // TIER 3: Weekly bull + Daily JAX = HIGH CONVICTION
-        // TIER 4: Weekly bull only = WATCH
-        const tier1 = weeklyStillBullish && h4Bullish && h4FlipRecent;
-        const tier2 = weeklyStillBullish && h4Bullish && !h4FlipRecent;
-        const tier3 = weeklyStillBullish && dailyJAX;
-        const bothAligned = tier1 || tier2 || tier3; // any high conviction signal
-        const isFresh      = weeksAgo === 0;
-        const isRecent     = weeksAgo <= 1;
+        // ── Step 7: A+ Quality Filters ────────────────────────────────────
+        // Derived from NVTS/CRDO (good entries) vs BE/SMTC (extended) chart analysis
+        // FILTER 1: Price vs 4H trail <= 20% above — filters extended breakouts
+        const pctAbove4H = h4Trail > 0 ? ((price - h4Trail) / h4Trail) * 100 : 0;
+        const f_notExtended = h4Trail === 0 || pctAbove4H <= 20;
+        // FILTER 2: Weekly RSI <= 65 — room to run, not overbought
+        const weeklyRsi = calcRSI(wk.closes, 14);
+        const f_weeklyRsiOk = weeklyRsi === 0 || weeklyRsi <= 65;
+        // FILTER 3: Daily RSI <= 70 — not exhausted on daily
+        const f_dailyRsiOk = rsiVal === 0 || rsiVal <= 70;
+        // FILTER 4: Flip age <= 3 weeks — fresh signal only
+        const f_freshFlip = weeksAgo <= 3;
+        // All filters must pass for A+ quality
+        const isAPlus = f_notExtended && f_weeklyRsiOk && f_dailyRsiOk && f_freshFlip;
+
+        if(!isAPlus){
+          const reasons = [];
+          if(!f_notExtended) reasons.push("extended "+pctAbove4H.toFixed(0)+"% above 4H trail");
+          if(!f_weeklyRsiOk) reasons.push("weekly RSI "+weeklyRsi.toFixed(0)+" > 65");
+          if(!f_dailyRsiOk)  reasons.push("daily RSI "+rsiVal.toFixed(0)+" > 70");
+          if(!f_freshFlip)   reasons.push("flip "+weeksAgo+" wks ago > 3");
+          logWM("⚠️ FILTERED "+sym+" — "+reasons.join(" | "),"");
+          done++; if(i<tickerChunk.length-1) await sleep(DELAY); continue;
+        }
+
+        // Priority tiers:
+        // A++: Weekly bull + weekly JAX + 4H flip + 200 EMA reclaim = HIGHEST CONVICTION
+        // TIER 1: Weekly bull + 4H just flipped = 96% win rate
+        // TIER 2: Weekly bull + 4H established bullish
+        // TIER 3: Weekly bull + weekly JAX recent OR daily JAX OR 200 EMA reclaim
+        const tierApp = weeklyStillBullish && h4Bullish && h4FlipRecent && (daily200Reclaim || weeklyJAXRecent);
+        const tier1   = weeklyStillBullish && h4Bullish && h4FlipRecent && !tierApp;
+        const tier2   = weeklyStillBullish && h4Bullish && !h4FlipRecent;
+        const tier3   = weeklyStillBullish && (dailyJAX || daily200Reclaim || weeklyJAXRecent) && !h4Bullish;
+        const bothAligned = tierApp || tier1 || tier2 || tier3;
+        const isFresh  = weeksAgo === 0;
+        const isRecent = weeksAgo <= 1;
 
         const result = {
           sym, price, change,
@@ -4195,7 +4275,11 @@ async function startWeeklyMonitor(){
           weeklyBullish:   weeklyStillBullish,
           weeklyTrail:     lastFlip.trailVal,
           totalFlips:      flips.length,
-          // 4H signal — backtest validated 96% win rate
+          // Weekly JAX
+          weeklyJAX,
+          weeklyJAXRecent,
+          weeklyBullScore,
+          // 4H signal
           h4Bullish,
           h4Trail,
           h4FlipRecent,
@@ -4203,13 +4287,21 @@ async function startWeeklyMonitor(){
           dailyJAX,
           dailyBullScore,
           dailyTrail,
+          // 200 EMA signals
+          daily200EMA,
+          dailyAbove200,
+          daily200Reclaim,
+          h4_200EMA,
+          h4Above200,
           // Tiers
-          tier1, tier2, tier3,
+          tierApp, tier1, tier2, tier3,
           bothAligned,
           isFresh, isRecent,
           // Indicators
-          rsi: rsiVal,
-          pctHi: pctHiVal,
+          rsi:        rsiVal,
+          weeklyRsi,
+          pctAbove4H,
+          pctHi:      pctHiVal,
         };
 
         wmResults.push(result);
@@ -4229,11 +4321,12 @@ async function startWeeklyMonitor(){
         renderWeeklyMonitor();
         document.getElementById("wm-filterBar").style.display = "flex";
 
-        const label = tier1?"⭐ ENTER NOW":tier2?"🟢 4H BULLISH":tier3?"🟣 JAX ALIGNED":isFresh?"🔔 FRESH FLIP":"📅 WEEKLY";
+        const label = tierApp?"⭐⭐ A++ ENTER NOW":tier1?"⭐ ENTER NOW":tier2?"🟢 4H BULLISH":tier3?"🟣 JAX/EMA":isFresh?"🔔 FRESH FLIP":"📅 WEEKLY";
         const ageStr = weeksAgo===0?"THIS WEEK":weeksAgo===1?"1 wk ago":weeksAgo+" wks ago";
         logWM(label+" "+sym+" $"+price.toFixed(2)+" · flip "+ageStr+" at $"+lastFlip.flipPrice.toFixed(2)
           +(h4Bullish?" | ⭐ 4H BULL"+(h4FlipRecent?" JUST FLIPPED":""):"")
-          +(dailyJAX?" | 🟢 JAX bull "+dailyBullScore+"/5":"")
+          +(weeklyJAXRecent?" | 📅 WK JAX 🔥":"")+(dailyJAX?" | 🟢 D-JAX "+dailyBullScore+"/5":"")
+          +(daily200Reclaim?" | 📡 200EMA RECLAIM":"")+(dailyAbove200&&!daily200Reclaim?" | 📡 above 200EMA":"")
           +(rsiVal>0?" | RSI "+rsiVal.toFixed(0):""), tier1||tier2?"ok":tier3?"info":"");
 
         // Notification for both aligned
@@ -4340,11 +4433,11 @@ function renderWeeklyMonitor(){
   }
 
   grid.innerHTML = f.map((s,i)=>{
-    const cardCls = s.tier1?"wm-card wm-fresh":s.tier2?"wm-card wm-fresh":s.tier3?"wm-card wm-recent":s.isFresh?"wm-card wm-recent":"wm-card wm-old";
+    const cardCls = s.tierApp?"wm-card wm-fresh":s.tier1?"wm-card wm-fresh":s.tier2?"wm-card wm-fresh":s.tier3?"wm-card wm-recent":s.isFresh?"wm-card wm-recent":"wm-card wm-old";
     const ageStr  = s.weeksAgo===0?"THIS WEEK":s.weeksAgo===1?"1 WEEK AGO":s.weeksAgo+" WEEKS AGO";
     const ageClr  = s.weeksAgo===0?"var(--green2)":s.weeksAgo===1?"var(--blue)":"var(--yellow)";
-    const badgeLabel = s.tier1?"⭐ ENTER NOW":s.tier2?"🟢 4H BULLISH":s.tier3?"🟣 JAX ALIGNED":s.isFresh?"🔔 FRESH FLIP":"📅 WEEKLY";
-    const badgeCls   = s.tier1?"fresh":s.tier2?"fresh":s.tier3?"recent":s.isFresh?"recent":"old";
+    const badgeLabel = s.tierApp?"⭐⭐ A++ ENTER NOW":s.tier1?"⭐ ENTER NOW":s.tier2?"🟢 4H BULLISH":s.tier3?"🟣 JAX/EMA ALIGNED":s.isFresh?"🔔 FRESH FLIP":"📅 WEEKLY";
+    const badgeCls   = s.tierApp?"fresh":s.tier1?"fresh":s.tier2?"fresh":s.tier3?"recent":s.isFresh?"recent":"old";
 
     // Signal pills — tier system
     const wkPill  = `<div class="wm-sig wk-on active">📅 WEEKLY<br><span style="font-size:9px">TRAIL BULL</span></div>`;
@@ -4354,6 +4447,12 @@ function renderWeeklyMonitor(){
     const dyPill  = s.dailyJAX
       ? `<div class="wm-sig dy-on active">🟢 DAILY JAX<br><span style="font-size:9px">BULL ${s.dailyBullScore}/5</span></div>`
       : `<div class="wm-sig off">🟢 DAILY JAX<br><span style="font-size:9px">${s.dailyBullScore>0?s.dailyBullScore+"/5":"—"}</span></div>`;
+    const wkJaxPill = s.weeklyJAX
+      ? `<div class="wm-sig dy-on active" style="background:rgba(255,215,0,0.08);color:var(--yellow)">📅 WK JAX${s.weeklyJAXRecent?" 🔥":""}<br><span style="font-size:9px">${s.weeklyJAXRecent?"RECENT":"ACTIVE"} ${s.weeklyBullScore}/5</span></div>`
+      : `<div class="wm-sig off">📅 WK JAX<br><span style="font-size:9px">—</span></div>`;
+    const emaPill = s.dailyAbove200
+      ? `<div class="wm-sig dy-on active" style="background:rgba(100,181,246,0.08);color:#64B5F6">📡 200 EMA${s.daily200Reclaim?" 🔥":""}<br><span style="font-size:9px">${s.daily200Reclaim?"FRESH RECLAIM":"ABOVE"}</span></div>`
+      : `<div class="wm-sig off">📡 200 EMA<br><span style="font-size:9px">BELOW</span></div>`;
 
     // Detail tags
     const tags = [];
@@ -4361,7 +4460,13 @@ function renderWeeklyMonitor(){
     tags.push(`<span class="wm-tag blue">Wk flip $${s.weeklyFlipPrice.toFixed(2)}</span>`);
     if(s.h4Bullish) tags.push(`<span class="wm-tag green">⭐ 4H trail bull${s.h4FlipRecent?" · just flipped":""}</span>`);
     if(s.h4Trail>0) tags.push(`<span class="wm-tag">4H trail $${s.h4Trail.toFixed(2)}</span>`);
-    if(s.rsi>0) tags.push(`<span class="wm-tag ${s.rsi<45?"green":s.rsi<65?"green":""}">RSI ${s.rsi.toFixed(0)}</span>`);
+    if(s.rsi>0) tags.push(`<span class="wm-tag ${s.rsi<=65?"green":s.rsi<=70?"":""}" style="${s.rsi>70?"color:var(--red)":""}">D-RSI ${s.rsi.toFixed(0)}</span>`);
+    if(s.weeklyJAXRecent) tags.push(`<span class="wm-tag" style="color:var(--yellow)">📅 Weekly JAX fired 🔥 bull${s.weeklyBullScore}/5</span>`);
+    else if(s.weeklyJAX) tags.push(`<span class="wm-tag" style="color:var(--yellow)">📅 Weekly JAX active bull${s.weeklyBullScore}/5</span>`);
+    if(s.daily200EMA>0) tags.push(`<span class="wm-tag" style="color:${s.dailyAbove200?"#64B5F6":"var(--muted2)"}">D-200EMA $${s.daily200EMA.toFixed(2)}${s.daily200Reclaim?" 🔥 RECLAIM":s.dailyAbove200?" ✓":""}</span>`);
+    if(s.h4_200EMA>0)   tags.push(`<span class="wm-tag" style="color:${s.h4Above200?"#64B5F6":"var(--muted2)"}">4H-200EMA ${s.h4Above200?"above":"below"}</span>`);
+    if(s.weeklyRsi>0) tags.push(`<span class="wm-tag" style="${s.weeklyRsi>65?"color:var(--red)":"color:var(--green2)"}">W-RSI ${s.weeklyRsi.toFixed(0)}</span>`);
+    if(s.pctAbove4H>0) tags.push(`<span class="wm-tag" style="${s.pctAbove4H>15?"color:var(--yellow)":"color:var(--green2)"}">+${s.pctAbove4H.toFixed(0)}% above 4H trail</span>`);
     if(s.pctHi<-20) tags.push(`<span class="wm-tag blue">📉 ${s.pctHi.toFixed(0)}% off hi</span>`);
     if(s.dailyJAX) tags.push(`<span class="wm-tag green">🟢 Daily arrow active</span>`);
     if(s.dailyTrail>0) tags.push(`<span class="wm-tag">Daily trail $${s.dailyTrail.toFixed(2)}</span>`);
@@ -4382,7 +4487,7 @@ function renderWeeklyMonitor(){
         </div>
       </div>
       <div class="wm-signals">
-        ${wkPill}${h4Pill}${dyPill}
+        ${wkPill}${wkJaxPill}${h4Pill}${dyPill}${emaPill}
       </div>
       <div class="wm-details">
         <div class="wm-detail-row">${tags.join("")}</div>
@@ -4519,10 +4624,16 @@ function buildScannerContext(data){
   const wm = (data.weekly_monitor||[]);
   const t1  = wm.filter(r=>r.tier1);
   const t2  = wm.filter(r=>r.tier2&&!r.tier1);
+  const t3  = wm.filter(r=>r.tier3&&!r.tier1&&!r.tier2);
   if(wm.length){
-    sections.push(`WEEKLY MONITOR (${wm.length} signals):
-⭐ ENTER NOW (tier1, 96% win rate): ${t1.map(r=>r.sym+"@$"+r.price?.toFixed(2)).join(", ")||"none"}
-🟢 4H BULLISH (tier2): ${t2.map(r=>r.sym+"@$"+r.price?.toFixed(2)).join(", ")||"none"}`);
+    const fmt = r => `${r.sym}@$${r.price?.toFixed(2)} (W-RSI:${r.weeklyRsi?.toFixed(0)||"?"} D-RSI:${r.rsi?.toFixed(0)||"?"} +${r.pctAbove4H?.toFixed(0)||"?"}%above4H flip${r.weeksAgo}wkAgo${r.weeklyJAXRecent?" 📅WkJAX🔥":""}${r.daily200Reclaim?" 📡200EMA-RECLAIM":r.dailyAbove200?" 📡above200EMA":""})`;
+    sections.push(`WEEKLY MONITOR — ALL PASSED A+ FILTERS (${wm.length} signals):
+⭐⭐ A++ ENTER NOW (weekly+4H flip+200EMA reclaim): ${(wm.filter(r=>r.tierApp)).map(fmt).join(", ")||"none"}
+⭐ TIER 1 ENTER NOW (96% win rate): ${t1.map(fmt).join(", ")||"none"}
+🟢 TIER 2 4H BULLISH: ${t2.map(fmt).join(", ")||"none"}
+🟣 TIER 3 JAX ALIGNED: ${t3.map(fmt).join(", ")||"none"}`);
+  } else {
+    sections.push("WEEKLY MONITOR: No signals found today — market may lack setups.");
   }
 
   // Pulse — what's moving today
@@ -4645,16 +4756,43 @@ async function runMorningBrief(){
     const jnlCtx  = buildJournalContext(data.journal);
     const sess    = getMarketSession();
 
-    const system = `You are a professional trading advisor. Respond ONLY with valid JSON, no markdown, no explanation, no preamble.
+    const system = `You are a professional trading advisor and technical analyst. Respond ONLY with valid JSON, no markdown, no explanation, no preamble.
 The trader has $${account} account, ${risk}% risk per trade ($${riskAmt.toFixed(0)} max risk), max ${maxT} trades.
 Market session: ${sess.toUpperCase()}.
 
-Rules:
-- Weekly Monitor TIER 1 = highest conviction, always prioritize
-- Position size = risk amount / (entry - stop) = shares
-- Be honest if signals are weak
+YOUR A+ SETUP RULES (derived from backtested winning trades NVTS, CRDO vs filtered-out BE, SMTC):
+1. Weekly trail must be BULLISH (green trail flipped from bearish)
+2. Weekly flip must be RECENT (within 3 weeks) — not an old flip that already ran
+3. Weekly RSI must be <= 65 — room to run, not overbought
+4. Daily RSI must be <= 70 — momentum healthy, not exhausted
+5. Price must be within 20% of the 4H trail stop — not an extended breakout
+6. 4H trail must ALSO be bullish for highest conviction (TIER 1/2)
+7. Daily green arrow (JAX) firing = additional confirmation (TIER 3)
+8. Weekly green arrow (JAX) firing within last 3 weeks = INSTITUTIONAL momentum signal — IONQ, CDNS, QUBT all fired this on April 13th before major moves. When weekly JAX fires AND 4H confirms = A++
 
-Return this exact JSON structure:
+TIER SYSTEM (priority order):
+- A++ ⭐⭐ ENTER NOW: Weekly bull + 4H just flipped + daily 200 EMA fresh reclaim = HIGHEST CONVICTION
+- TIER 1 ⭐ ENTER NOW: Weekly bull + 4H just flipped bullish = 96% win rate
+- TIER 2 🟢 4H BULLISH: Weekly bull + 4H established bullish = strong setup
+- TIER 3 🟣 JAX/EMA: Weekly bull + daily JAX or 200 EMA reclaim, 4H not yet confirmed
+- WATCHING: Weekly bull only, nothing else confirmed yet
+
+ENTRY RULES:
+- Only recommend TIER 1 or TIER 2 as immediate entries
+- TIER 3 = enter on pullback to daily trail only
+- Position size = $${riskAmt.toFixed(0)} risk / (entry - stop) = shares
+- Stop = just below the 4H trail stop value
+- Target = 2-3x the risk distance minimum
+- If no TIER 1/2 signals today = say so clearly, recommend WATCHING list
+
+WHAT TO AVOID:
+- Any stock where price is >20% above 4H trail (extended, chasing)
+- Weekly RSI > 65 (late stage, momentum fading)
+- Daily RSI > 70 (short term overbought)
+- Weekly flip older than 3 weeks without a pullback re-entry setup
+- Stocks showing RSI Bear divergence on weekly or daily
+
+Return ONLY this exact JSON structure (no other text):
 {
   "context": "one sentence market context",
   "confidence": "X/10 — one sentence explanation",
@@ -4662,17 +4800,16 @@ Return this exact JSON structure:
   "trades": [
     {
       "sym": "TICKER",
-      "action": "ENTER" or "WATCH" or "SMALL SIZE",
+      "action": "ENTER or WATCH or SMALL SIZE",
       "entry": 123.45,
       "stop": 120.00,
       "target": 135.00,
       "shares": 12,
-      "size_pct": 2,
-      "win_rate_note": "your weekly+4H trades win 89%",
-      "notes": "extra context if needed"
+      "win_rate_note": "weekly+4H trades win 96%",
+      "notes": "tier, RSI values, distance from trail"
     }
   ],
-  "recommendation": "bold final recommendation paragraph with key reasoning"
+  "recommendation": "final recommendation with key reasoning"
 }`;
 
     const user = `Here is today's scanner data and my trading history. Give me my morning brief with up to ${maxT} trades.
