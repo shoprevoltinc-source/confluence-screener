@@ -4847,17 +4847,40 @@ YESTERDAY (still valid): ${yest.map(r=>`${r.sym}@$${r.price?.toFixed(2)} bull${r
 ${pulse.map(r=>`${r.sym} ${r.changePct>=0?"▲":"▼"}${Math.abs(r.changePct||0).toFixed(1)}%${r.weeklyMatch?" 🟣WEEKLY":""}`).join(", ")}`);
   }
 
-  // Confluence
-  const conf = (data.confluence||[]).sort((a,b)=>b.confScore-a.confScore).slice(0,5);
+  // Confluence — enriched with pillars, price, RSI, cross-ref with weekly
+  const conf = (data.confluence||[]).sort((a,b)=>b.confScore-a.confScore||b.absChange-a.absChange).slice(0,8);
   if(conf.length){
-    sections.push(`CONFLUENCE (${data.confluence?.length||0} total):
-Top: ${conf.map(r=>r.sym+" "+r.confScore+"/4").join(", ")}`);
+    const wmSyms = new Set((data.weekly_monitor||[]).map(r=>r.sym));
+    const fmtConf = r => {
+      const pillars = [
+        r.pillars?.move     ? "MOVE"     : "",
+        r.pillars?.trend    ? "TREND"    : "",
+        r.pillars?.jax      ? "JAX"      : "",
+        r.pillars?.momentum ? "MOMENTUM" : ""
+      ].filter(Boolean).join("+");
+      const cross = wmSyms.has(r.sym) ? " ⭐ALSO-ON-WEEKLY" : "";
+      return `${r.sym}@$${r.price?.toFixed(2)} ${r.confScore}/4[${pillars}] RSI${r.rsi?.toFixed(0)||"?"} ${r.change>=0?"+":""}${r.change?.toFixed(1)||"?"}%${cross}`;
+    };
+    const full   = conf.filter(r=>r.confScore===4);
+    const strong = conf.filter(r=>r.confScore===3);
+    sections.push(`CONFLUENCE SCANNER:
+4/4 FULL (enter if RSI<70): ${full.map(fmtConf).join(", ")||"none"}
+3/4 STRONG: ${strong.map(fmtConf).join(", ")||"none"}`);
   }
 
-  // JAX
-  const jax = (data.jax_scan||[]).filter(r=>r.greenArrow).slice(0,5);
+  // JAX Scanner — enriched, cross-ref with weekly watchlist
+  const jax = (data.jax_scan||[]).filter(r=>r.greenArrow).slice(0,8);
   if(jax.length){
-    sections.push(`JAX GREEN ARROWS: ${jax.map(r=>r.sym+" bull"+r.bullScore+"/5").join(", ")}`);
+    const wmSyms = new Set((data.weekly_monitor||[]).map(r=>r.sym));
+    const fmtJAX = r => {
+      const cross = wmSyms.has(r.sym) ? " ⭐ALSO-ON-WEEKLY" : "";
+      return `${r.sym}@$${r.price?.toFixed(2)} bull${r.bullScore}/5 RSI${r.rsi?.toFixed(0)||"?"}${r.jaxUtBuy?" UTBuy":""}${r.jaxStFlip?" STFlip":""}${cross}`;
+    };
+    const weeklyAlso = jax.filter(r=>wmSyms.has(r.sym));
+    const jaxOnly    = jax.filter(r=>!wmSyms.has(r.sym));
+    sections.push(`JAX GREEN ARROWS:
+ON WEEKLY WATCHLIST (highest conviction): ${weeklyAlso.map(fmtJAX).join(", ")||"none"}
+JAX ONLY: ${jaxOnly.map(fmtJAX).join(", ")||"none"}`);
   }
 
   // Catalyst
@@ -5004,12 +5027,27 @@ ENTRY RULES:
 - Target = 2-3x the risk distance minimum
 - If no TIER 1/2 signals today = say so clearly, recommend WATCHING list
 
+CROSS-REFERENCE RULES (highest conviction combos):
+- Stock on WEEKLY WATCHLIST + JAX green arrow fired today = treat as Daily Trigger priority
+- Stock on WEEKLY WATCHLIST + CONFLUENCE 4/4 = A++ entry, take immediately
+- Stock on WEEKLY WATCHLIST + CONFLUENCE 3/4 + RSI < 65 = strong entry
+- JAX only (not on weekly) = wait for pullback, smaller size 0.5%
+- CONFLUENCE only (not on weekly) = secondary trade, only if slots 1+2 empty
+
+POSITION SIZING BY CONVICTION:
+- Daily Trigger fired today + Weekly = full 1% risk
+- A++ or TIER 1 Weekly = full 1% risk  
+- TIER 2 Weekly or Confluence 4/4 + Weekly = 0.75% risk
+- JAX only or Confluence without weekly = 0.5% risk
+- Never exceed max trades regardless of signals
+
 WHAT TO AVOID:
 - Any stock where price is >20% above 4H trail (extended, chasing)
 - Weekly RSI > 65 (late stage, momentum fading)
 - Daily RSI > 70 (short term overbought)
 - Weekly flip older than 3 weeks without a pullback re-entry setup
 - Stocks showing RSI Bear divergence on weekly or daily
+- Filling trade slots with weak signals just to reach max trades — quality over quantity
 
 Return ONLY this exact JSON structure (no other text):
 {
