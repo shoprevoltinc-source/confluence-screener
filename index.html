@@ -5167,7 +5167,11 @@ ${jnlCtx}`;
       body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(raw)}</div>`;
       document.getElementById("agent-brief-time").textContent = new Date().toLocaleTimeString();
       document.getElementById("agent-lastrun").textContent = "Last brief: "+new Date().toLocaleTimeString();
-      try{ localStorage.setItem("cs_agent_brief", JSON.stringify({text:raw, html:body.innerHTML, time:new Date().toISOString(), isJson:false})); }catch(e){}
+      try{
+        const briefData = {text:raw, html:body.innerHTML, time:new Date().toISOString(), isJson:false};
+        localStorage.setItem("cs_agent_brief", JSON.stringify(briefData));
+        fbSafeSave("agent_brief", briefData);
+      }catch(e){}
       btn.disabled = false;
       return;
     }
@@ -5242,14 +5246,11 @@ ${jnlCtx}`;
     document.getElementById("agent-brief-time").textContent = new Date().toLocaleTimeString();
     document.getElementById("agent-lastrun").textContent = "Last brief: "+new Date().toLocaleTimeString();
 
-    // Save both raw text AND rendered HTML so tab switching restores perfectly
+    // Save both raw text AND rendered HTML — localStorage for speed, Firebase for cross-device sync
     try{
-      localStorage.setItem("cs_agent_brief", JSON.stringify({
-        text: raw,
-        html: body.innerHTML,
-        time: new Date().toISOString(),
-        isJson: true
-      }));
+      const briefData = { text: raw, html: body.innerHTML, time: new Date().toISOString(), isJson: true };
+      localStorage.setItem("cs_agent_brief", JSON.stringify(briefData));
+      fbSafeSave("agent_brief", briefData);
     }catch(e){}
 
   }catch(e){
@@ -5528,27 +5529,58 @@ ${buildScannerContext(data)}`;
 // ── Load saved agent brief on startup ─────────────────────
 // ── Load saved agent brief on startup / tab switch ────────
 function loadAgent(){
-  try{
-    const saved = localStorage.getItem("cs_agent_brief");
-    if(saved){
-      const { text, html, time, isJson } = JSON.parse(saved);
-      const body   = document.getElementById("agent-brief-body");
-      const timeEl = document.getElementById("agent-brief-time");
-      const lastRun = document.getElementById("agent-lastrun");
-      if(body){
-        if(html){
-          // Restore the full rendered HTML — cards, colors, everything
-          body.innerHTML = html;
-        } else if(isJson){
-          body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--muted2);padding:10px">📋 Last brief from ${new Date(time).toLocaleTimeString()} — tap MORNING BRIEF to refresh.</div>`;
-        } else {
-          body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(text)}</div>`;
-        }
-      }
-      if(timeEl)  timeEl.textContent = new Date(time).toLocaleTimeString();
-      if(lastRun) lastRun.textContent = "Last brief: "+new Date(time).toLocaleTimeString();
+  if(typeof window.fbLoad !== "function"){
+    // Firebase not ready yet — wait for it
+    document.addEventListener("firebaseReady", loadAgent, {once:true});
+    return;
+  }
+  const body   = document.getElementById("agent-brief-body");
+  const timeEl = document.getElementById("agent-brief-time");
+  const lastRun= document.getElementById("agent-lastrun");
+
+  // Try Firebase first for cross-device sync, fall back to localStorage
+  window.fbLoad("agent_brief").then(fb=>{
+    const fbData   = fb ? fb.data : null;
+    const lsRaw    = localStorage.getItem("cs_agent_brief");
+    const lsData   = lsRaw ? JSON.parse(lsRaw) : null;
+
+    // Use whichever is more recent
+    let saved = null;
+    if(fbData && lsData){
+      saved = new Date(fbData.time) > new Date(lsData.time) ? fbData : lsData;
+    } else {
+      saved = fbData || lsData;
     }
-  }catch(e){}
+
+    if(saved && body){
+      if(saved.html){
+        body.innerHTML = saved.html;
+      } else if(saved.isJson){
+        body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--muted2);padding:10px">📋 Last brief from ${new Date(saved.time).toLocaleTimeString()} — tap MORNING BRIEF to refresh.</div>`;
+      } else {
+        body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(saved.text)}</div>`;
+      }
+      if(timeEl)  timeEl.textContent  = new Date(saved.time).toLocaleTimeString();
+      if(lastRun) lastRun.textContent = "Last brief: "+new Date(saved.time).toLocaleTimeString();
+      // Sync to localStorage if Firebase had newer data
+      if(fbData && saved === fbData){
+        try{ localStorage.setItem("cs_agent_brief", JSON.stringify(fbData)); }catch(e){}
+      }
+    }
+  }).catch(()=>{
+    // Firebase failed — fall back to localStorage only
+    try{
+      const lsRaw = localStorage.getItem("cs_agent_brief");
+      if(!lsRaw) return;
+      const saved = JSON.parse(lsRaw);
+      if(body){
+        if(saved.html) body.innerHTML = saved.html;
+        else body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(saved.text||"")}</div>`;
+      }
+      if(timeEl)  timeEl.textContent  = new Date(saved.time).toLocaleTimeString();
+      if(lastRun) lastRun.textContent = "Last brief: "+new Date(saved.time).toLocaleTimeString();
+    }catch(e){}
+  });
 
   // Update stats on load
   document.addEventListener("firebaseReady", async()=>{
