@@ -1,0 +1,29 @@
+name: JAX Scanner — 12pm & 3:30pm ET
+
+on:
+  schedule:
+    # 12:00pm ET = 16:00 UTC (EDT)
+    - cron: '0 16 * * 1-5'
+    # 3:30pm ET = 19:30 UTC (EDT)
+    - cron: '30 19 * * 1-5'
+  workflow_dispatch: # manual trigger from GitHub Actions tab
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run JAX Scanner
+        env:
+          TD_KEYS: ${{ secrets.TD_KEYS }}
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+        run: node jax-scanner.js
