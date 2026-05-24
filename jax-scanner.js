@@ -255,8 +255,14 @@ async function fetchCandles(sym, keyIndex){
 async function saveToFirebase(key, data){
   const url = `${FIREBASE_URL}/screener/${key}.json`;
   console.log(`💾 Saving to Firebase: ${FIREBASE_URL}/screener/${key}.json`);
+  // fbLoad does JSON.parse(val.data) so data must be a stringified JSON string
+  const payload = {
+    data:      JSON.stringify(data),
+    savedAt:   new Date().toISOString(),
+    device:    'github-action'
+  };
   try{
-    const result = await httpRequest(url, 'PUT', { data, savedAt: new Date().toISOString(), device: 'github-action' });
+    const result = await httpRequest(url, 'PUT', payload);
     console.log(`✅ Firebase save response:`, JSON.stringify(result).substring(0, 200));
   }catch(e){
     console.error(`❌ Firebase save failed:`, e.message);
