@@ -4801,12 +4801,28 @@ async function gatherAllData(){
       data[key] = fb ? fb.data : [];
     }catch(e){ data[key] = []; }
   }));
+  // Daily triggers has nested structure — fbSafeSave wraps it as fb.data = {data:[], time:""}
+  try{
+    const dt = await window.fbLoad("daily_triggers");
+    data.daily_triggers = (dt && dt.data) ? dt.data : null;
+  }catch(e){ data.daily_triggers = null; }
   return data;
 }
 
 // ── Build scanner context string for Claude ───────────────
 function buildScannerContext(data){
   const sections = [];
+
+  // Daily Trigger — highest priority, green arrows fired today on watchlist
+  const dt = data.daily_triggers;
+  if(dt && dt.data && dt.data.length){
+    const fired = dt.data;
+    const today = fired.filter(r=>r.firedToday);
+    const yest  = fired.filter(r=>!r.firedToday);
+    sections.push(`🔥 DAILY TRIGGER — GREEN ARROWS FIRED ON WEEKLY WATCHLIST:
+TODAY (enter immediately): ${today.map(r=>`${r.sym}@$${r.price?.toFixed(2)} bull${r.bullScore}/5 RSI${r.rsi?.toFixed(0)} ${r.tier}`).join(", ")||"none"}
+YESTERDAY (still valid): ${yest.map(r=>`${r.sym}@$${r.price?.toFixed(2)} bull${r.bullScore}/5 ${r.tier}`).join(", ")||"none"}`);
+  }
 
   // Weekly monitor — most important
   const wm = (data.weekly_monitor||[]);
@@ -4842,6 +4858,12 @@ Top: ${conf.map(r=>r.sym+" "+r.confScore+"/4").join(", ")}`);
   const jax = (data.jax_scan||[]).filter(r=>r.greenArrow).slice(0,5);
   if(jax.length){
     sections.push(`JAX GREEN ARROWS: ${jax.map(r=>r.sym+" bull"+r.bullScore+"/5").join(", ")}`);
+  }
+
+  // Catalyst
+  const cat = (data.catalyst||[]).slice(0,5);
+  if(cat.length){
+    sections.push(`CATALYST (ATR coil + volume + earnings): ${cat.map(r=>r.sym+(r.earningsDate?" E:"+r.earningsDate:"")).join(", ")}`);
   }
 
   // Recovery
@@ -4957,6 +4979,15 @@ YOUR A+ SETUP RULES (derived from backtested winning trades NVTS, CRDO vs filter
 6. 4H trail must ALSO be bullish for highest conviction (TIER 1/2)
 7. Daily green arrow (JAX) firing = additional confirmation (TIER 3)
 8. Weekly green arrow (JAX) firing within last 3 weeks = INSTITUTIONAL momentum signal — IONQ, CDNS, QUBT all fired this on April 13th before major moves. When weekly JAX fires AND 4H confirms = A++
+
+DATA SOURCES PRIORITY (highest to lowest):
+1. 🔥 DAILY TRIGGER — green arrow fired TODAY on a weekly watchlist stock = IMMEDIATE ENTRY
+2. ⭐⭐ A++ weekly signal — weekly flip + 4H flip + 200EMA reclaim
+3. ⭐ TIER 1 weekly — weekly flip + 4H just flipped
+4. 🟢 TIER 2 weekly — weekly flip + 4H established
+5. JAX scanner green arrows — daily signal only
+6. Pulse movers crossing weekly signals
+7. Confluence, Recovery, Catalyst — secondary confirmation only
 
 TIER SYSTEM (priority order):
 - A++ ⭐⭐ ENTER NOW: Weekly bull + 4H just flipped + daily 200 EMA fresh reclaim = HIGHEST CONVICTION
