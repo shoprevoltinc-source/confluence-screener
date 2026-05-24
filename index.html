@@ -5355,44 +5355,81 @@ async function confirmEntry(){
       if(e.status==="loss") srcStats[s].l++;
     });
 
+    // Find sym in cron alerts too
+    const cronData   = data.jax_cron_alerts;
+    const inCron     = cronData && cronData.data ? cronData.data.find(r=>r.sym===sym) : null;
+
+    // Calculate conviction score using same system as Morning Brief
+    let score = 0;
+    const scoreBreakdown = [];
+    if(inWeekly){
+      score += 3; scoreBreakdown.push("+3 weekly watchlist");
+      if(inWeekly.weeklyJAXRecent){ score += 2; scoreBreakdown.push("+2 weekly JAX fired"); }
+      if(inWeekly.daily200Reclaim){ score += 1; scoreBreakdown.push("+1 200EMA reclaim"); }
+      if(inWeekly.h4FlipRecent)   { score += 1; scoreBreakdown.push("+1 4H just flipped"); }
+    }
+    if(inCron){ score += 2; scoreBreakdown.push("+2 green arrow today (auto-scan)"); }
+    else if(inJAX){ score += 1; scoreBreakdown.push("+1 green arrow (JAX)"); }
+    if(inJAX && inJAX.bullScore >= 4){ score += 2; scoreBreakdown.push("+2 bull "+inJAX.bullScore+"/5"); }
+    else if(inJAX && inJAX.bullScore === 3){ score += 1; scoreBreakdown.push("+1 bull 3/5"); }
+    if(inConf && inConf.confScore === 4){ score += 1; scoreBreakdown.push("+1 confluence 4/4"); }
+    if(inCatalyst && inCatalyst.atrCoiling){ score += 1; scoreBreakdown.push("+1 catalyst coil"); }
+    if(!inWeekly){ score -= 2; scoreBreakdown.push("-2 not on weekly watchlist"); }
+    const rsi = inWeekly?.rsi || inJAX?.rsi14 || 0;
+    if(rsi > 70){ score -= 2; scoreBreakdown.push("-2 RSI "+rsi.toFixed(0)+" overbought"); }
+    else if(rsi > 65){ score -= 1; scoreBreakdown.push("-1 RSI "+rsi.toFixed(0)+" elevated"); }
+
+    const scoreGrade = score >= 8 ? "A++ 🔥" : score >= 6 ? "A+" : score >= 4 ? "A" : score >= 2 ? "WATCH" : "SKIP";
+
     const symCtx = [
-      inWeekly ? `Weekly Monitor: TIER${inWeekly.tier1?"1 ⭐ ENTER NOW":inWeekly.tier2?"2 🟢 4H BULL":"3"} | flip ${inWeekly.weeksAgo}wk ago at $${inWeekly.weeklyFlipPrice?.toFixed(2)} | 4H ${inWeekly.h4Bullish?"bullish":"bearish"}` : "Weekly Monitor: NOT FOUND",
-      inJAX     ? `JAX: GREEN ARROW | bull score ${inJAX.bullScore}/5 | trail $${inJAX.trailVal?.toFixed(2)}` : "JAX: no signal",
-      inConf    ? `Confluence: ${inConf.confScore}/4 | ${Object.entries(inConf.pillars||{}).filter(([,v])=>v).map(([k])=>k).join("+")}` : "Confluence: not in scan",
-      inPulse   ? `Pulse: moving ${inPulse.changePct>=0?"▲":"▼"}${Math.abs(inPulse.changePct||0).toFixed(1)}% today` : "Pulse: not moving today",
-      inRecovery? `Recovery: ${inRecovery.score}/6${inRecovery.c7?" +C7 deep bounce":""}` : "",
-      inCatalyst? `Catalyst: heat ${inCatalyst.heat} | ${inCatalyst.status}` : "",
-      openPos   ? `⚠️ ALREADY OPEN POSITION: entered $${parseFloat(openPos.price).toFixed(2)}` : "",
-      symHistory.length ? `Trade history: ${symHistory.filter(e=>e.status==="win").length}W/${symHistory.filter(e=>e.status==="loss").length}L on ${sym}` : "No history on this stock",
+      `CONVICTION SCORE: ${score}/10 — ${scoreGrade}`,
+      `Score breakdown: ${scoreBreakdown.join(", ")}`,
+      "",
+      inWeekly  ? `✅ Weekly Monitor: TIER${inWeekly.tier1?"1 ⭐":inWeekly.tier2?"2 🟢":"3"} | flip ${inWeekly.weeksAgo}wk ago at $${inWeekly.weeklyFlipPrice?.toFixed(2)} | 4H ${inWeekly.h4Bullish?"bullish ✅":"bearish ❌"} | W-RSI ${inWeekly.weeklyRsi?.toFixed(0)} | D-RSI ${inWeekly.rsi?.toFixed(0)}` : "❌ Weekly Monitor: NOT on watchlist",
+      inCron    ? `✅ AUTO-SCAN: Green arrow fired TODAY | bull ${inCron.bullScore}/5 | RSI ${inCron.rsi?.toFixed(0)}` : "",
+      inJAX     ? `✅ JAX: Green arrow | bull score ${inJAX.bullScore}/5 | trail $${inJAX.trailVal?.toFixed(2)}` : "❌ JAX: no green arrow",
+      inConf    ? `✅ Confluence: ${inConf.confScore}/4 | pillars: ${Object.entries(inConf.pillars||{}).filter(([,v])=>v).map(([k])=>k.toUpperCase()).join("+")}` : "❌ Confluence: not in scan",
+      inCatalyst? `✅ Catalyst: ATR coiling ${inCatalyst.atrCoiling?"YES":"NO"}` : "",
+      inPulse   ? `📊 Pulse: ${inPulse.changePct>=0?"▲":"▼"}${Math.abs(inPulse.changePct||0).toFixed(1)}% today` : "",
+      openPos   ? `⚠️ ALREADY OPEN: entered $${parseFloat(openPos.price).toFixed(2)}` : "No open position",
+      symHistory.length ? `History: ${symHistory.filter(e=>e.status==="win").length}W/${symHistory.filter(e=>e.status==="loss").length}L on ${sym}` : "No history on this stock",
     ].filter(Boolean).join("\n");
 
-    const winRateCtx = Object.entries(srcStats).map(([s,v])=>`${s}: ${v.w+v.l>0?Math.round(v.w/(v.w+v.l)*100)+"%":"—"}`).join(", ");
+    const winRateCtx = Object.entries(srcStats).map(([s,v])=>`${s}: ${v.w+v.l>0?Math.round(v.w/(v.w+v.l)*100)+"%":"—"} (${v.w+v.l} trades)`).join(", ");
 
-    const system = `You are a professional trading advisor. Be direct. Give a clear YES or NO on this trade entry with brief reasoning. Under 150 words total.`;
-    const user   = `Should I enter ${sym} at $${price>0?"$"+price.toFixed(2):"current price"}?
+    const system = `You are a professional trading advisor using a proven conviction scoring system.
+Score: ${score}/10 — ${scoreGrade}
+Rules:
+- Score 8-10 = YES, full 1% risk
+- Score 6-7 = YES, 0.75% risk  
+- Score 4-5 = YES, 0.5% risk
+- Score 2-3 = WAIT for better entry
+- Score 0-1 = NO
+Be direct. Under 200 words. Lead with YES/NO/WAIT.`;
 
-SCANNER DATA FOR ${sym}:
+    const user = `Should I enter ${sym} at ${price>0?"$"+price.toFixed(2):"current price"}?
+
 ${symCtx}
 
-MY OVERALL WIN RATES BY SOURCE:
-${winRateCtx}
+MY WIN RATES: ${winRateCtx}
+Account: $${account} | Max risk: $${riskAmt.toFixed(0)}
 
-Account: $${account} | Risk per trade: $${riskAmt.toFixed(0)}
+Give: decision, one-line reason, stop level, target, exact shares, confidence.`;
 
-Answer: YES/NO/WAIT, then:
-- One line why
-- Stop level suggestion
-- Target suggestion  
-- Exact share count based on my risk
-- Confidence: HIGH/MEDIUM/LOW`;
-
-    const response = await callClaude(system, user, 300);
+    const response = await callClaude(system, user, 400);
     const isYes    = response.toLowerCase().startsWith("yes");
     const isNo     = response.toLowerCase().startsWith("no");
+    const isWait   = response.toLowerCase().startsWith("wait");
     const clr      = isYes?"var(--green2)":isNo?"var(--red)":"var(--yellow)";
+    const scoreClr = score>=8?"#00E676":score>=6?"var(--green2)":score>=4?"var(--yellow)":"var(--red)";
 
-    body.innerHTML = `<div style="font-family:var(--mono);font-size:13px;line-height:1.8;color:${clr};font-weight:700;margin-bottom:6px">${response.split("\n")[0]}</div>
-<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(response.split("\n").slice(1).join("\n"))}</div>`;
+    body.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="font-family:var(--mono);font-size:15px;font-weight:700;color:${clr}">${response.split("\n")[0]}</div>
+        <div style="font-family:var(--mono);font-size:11px;font-weight:700;color:${scoreClr};padding:2px 8px;background:rgba(0,0,0,0.3);border-radius:3px">${score}/10 ${scoreGrade}</div>
+      </div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);margin-bottom:8px">${scoreBreakdown.join(" · ")}</div>
+      <div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(response.split("\n").slice(1).join("\n"))}</div>`;
 
   }catch(e){
     body.innerHTML = `<div class="agent-output" style="color:var(--red)">Error: ${e.message}</div>`;
