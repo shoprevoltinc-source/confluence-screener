@@ -4712,19 +4712,21 @@ async function loadCronAlerts(){
     if(!fb || !fb.data) return;
     const alerts = fb.data;
     if(!alerts.data || !alerts.data.length) return;
-    const fired  = alerts.data;
-    const banner = document.getElementById("cron-alert-banner");
-    const count  = document.getElementById("cron-alert-count");
-    const time   = document.getElementById("cron-alert-time");
-    const tickers= document.getElementById("cron-alert-tickers");
-    const checked = new Date(alerts.time);
+    const fired   = alerts.data;
+    const banner  = document.getElementById("cron-alert-banner");
+    const count   = document.getElementById("cron-alert-count");
+    const time    = document.getElementById("cron-alert-time");
+    const tickers = document.getElementById("cron-alert-tickers");
+    if(!banner) return;
+    // Show results from last 72 hours (covers weekend + Monday morning)
+    const checked  = new Date(alerts.time);
     const hoursAgo = (Date.now() - checked.getTime()) / (1000*60*60);
-    if(hoursAgo > 6) return;
+    if(hoursAgo > 72) return;
     banner.style.display = "block";
     count.textContent    = fired.length + " green arrow" + (fired.length>1?"s":"") + " fired";
-    time.textContent     = "Auto-scan at " + alerts.checkTime;
+    time.textContent     = "Auto-scan: " + checked.toLocaleDateString() + " " + (alerts.checkTime||checked.toLocaleTimeString());
     tickers.textContent  = fired.map(r=>`${r.sym} $${r.price?.toFixed(2)} bull${r.bullScore}/5`).join(" · ");
-  }catch(e){}
+  }catch(e){ console.warn("loadCronAlerts error:", e); }
 }
 
 function showCronAlerts(){
@@ -7650,6 +7652,11 @@ try{
   const el = document.getElementById("key-info-display");
   if(el) el.textContent = nk+"× keys · "+(nk*8)+" credits/min · parallel";
 }catch(e){}
+
+// Load cron alerts on startup — wait for Firebase to be ready
+document.addEventListener("firebaseReady", ()=>{
+  try{ loadCronAlerts(); }catch(e){}
+});
 
 function toggleAccordion(bodyId, arrowId){
   const body = document.getElementById(bodyId);
