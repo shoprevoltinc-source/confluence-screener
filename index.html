@@ -1568,7 +1568,7 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <span class="k" id="ks2">K3</span>
   <span class="k" id="ks3">K4</span>
   <span class="k" id="ks4">K5</span>
-  <span class="key-info">5 keys · 40 credits/min · parallel</span>
+  <span class="key-info" id="key-info-display">7 keys · 56 credits/min · parallel</span>
 </div>
 
 <div class="prog-wrap" id="r-prog">
@@ -7643,6 +7643,13 @@ loadPulseAlerts();
 loadAgent();
 // Auto-load calendar on startup
 setTimeout(()=>{ try{ loadCalendar(); }catch(e){} }, 2000);
+
+// Update key count display dynamically
+try{
+  const nk = TD_KEYS.filter(Boolean).length;
+  const el = document.getElementById("key-info-display");
+  if(el) el.textContent = nk+"× keys · "+(nk*8)+" credits/min · parallel";
+}catch(e){}
 
 function toggleAccordion(bodyId, arrowId){
   const body = document.getElementById(bodyId);
