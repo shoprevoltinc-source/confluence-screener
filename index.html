@@ -2898,29 +2898,26 @@ const SECTORS = {
 
 // Full catalyst + mid-cap universe — $2-$250
 // Merged: small-cap catalysts + mid-cap momentum + all sectors
-const SMALLCAP = [...new Set([
-  "MRAM", "KTOS", "AVAV", "RCAT", "ACHR", "JOBY", "ASTS", "LUNR", "RDW", "SPIR",
-  "BBAI", "CDRE", "QUBT", "IONQ", "RGTI", "SOUN", "ARQQ", "QBTS", "VRNT", "MGNX",
-  "RXRX", "DNLI", "BEAM", "EDIT", "CRSP", "NTLA", "VERV", "NUVL", "ALLO", "HIMS",
-  "OCGN", "NVAX", "VXRT", "INO", "PSNL", "BLUE", "ARVN", "PRTA", "IMVT", "KYMR",
-  "PTGX", "RCKT", "SAGE", "TGTX", "IOVA", "APLS", "FOLD", "DAWN", "YMAB", "NVTS",
-  "AMPX", "SMTC", "AAOI", "COHU", "FORM", "ONTO", "ACMR", "PLAB", "DIOD", "VIAV",
-  "POWI", "AEVA", "LAZR", "MVIS", "OUST", "WOLF", "AMBA", "SLAB", "BLNK", "CHPT",
-  "EVGO", "STEM", "ARRY", "NOVA", "SHLS", "FLNC", "BLDP", "FCEL", "PLUG", "RUN",
-  "CSIQ", "DQ", "JKS", "BE", "CWEN", "GPRE", "AMRC", "VNET", "CLSK", "IREN",
-  "HUT", "MARA", "SOFI", "HOOD", "AFRM", "UPST", "DAVE", "MQ", "LMND", "ROOT",
-  "DKNG", "PENN", "RBLX", "MSTR", "CIFR", "RIOT", "FOUR", "RELY", "CRWD", "DDOG",
-  "ZS", "GTLB", "BILL", "DOCS", "BRZE", "CFLT", "ASAN", "SMAR", "WEAV", "ALKT",
-  "JAMF", "TASK", "SPSC", "TDOC", "ACCD", "PRVA", "GDRX", "PGNY", "TMDX", "NVCR",
-  "MRCY", "GEVO", "CLNE", "REGI", "AXON", "SITM", "NXPI", "AMKR", "NVRO", "FATE",
-  "DISH", "LUMN", "VSAT", "IRDM", "GSAT", "SHEN", "IDT", "OOMA", "GOGO", "AVNW",
-  "CLFD", "LITE", "CIEN", "INFN", "CRDO", "POET", "ANGO", "ADTN", "CASA", "DZSI",
-  "FYBR", "CALX", "COMM", "IIVI", "NTGR", "TMUS", "SATS", "SPOK", "LPSN", "MTTR",
-  "CEVA", "DRS", "CACI", "SAIC", "BWXT", "HWM", "TDG", "LILM", "SEMR", "ONEM",
-  "CANO", "TALK", "ALHC", "CERT", "XERS", "INVA", "LUNG", "LDOS", "PANW", "SNOW",
-  "MDB", "NET", "TEAM", "HUBS", "ZI", "INSP", "IRTC", "OMCL", "NTRA", "RGEN",
-  "PAYC", "PAYO"
-])];
+const SMALLCAP = ["MRAM", "KTOS", "AVAV", "RCAT", "ACHR", "JOBY", "ASTS", "LUNR", "RDW", "SPIR", 
+  "BBAI", "CDRE", "QUBT", "IONQ", "RGTI", "SOUN", "ARQQ", "QBTS", "VRNT", "MGNX", "RXRX", "DNLI", 
+  "BEAM", "EDIT", "CRSP", "NTLA", "VERV", "NUVL", "ALLO", "HIMS", "OCGN", "NVAX", "VXRT", "INO", 
+  "PSNL", "BLUE", "ARVN", "PRTA", "IMVT", "KYMR", "PTGX", "RCKT", "SAGE", "TGTX", "IOVA", "APLS", 
+  "FOLD", "DAWN", "YMAB", "NVTS", "AMPX", "SMTC", "AAOI", "COHU", "FORM", "ONTO", "ACMR", "PLAB", 
+  "DIOD", "VIAV", "POWI", "AEVA", "LAZR", "MVIS", "OUST", "WOLF", "AMBA", "SLAB", "BLNK", "CHPT", 
+  "EVGO", "STEM", "ARRY", "NOVA", "SHLS", "FLNC", "BLDP", "FCEL", "PLUG", "RUN", "CSIQ", "DQ", 
+  "JKS", "BE", "CWEN", "GPRE", "AMRC", "VNET", "CLSK", "IREN", "HUT", "MARA", "SOFI", "HOOD", 
+  "AFRM", "UPST", "DAVE", "MQ", "LMND", "ROOT", "DKNG", "PENN", "RBLX", "MSTR", "CIFR", "RIOT", 
+  "FOUR", "RELY", "CRWD", "DDOG", "ZS", "GTLB", "BILL", "DOCS", "BRZE", "CFLT", "ASAN", "SMAR", 
+  "WEAV", "ALKT", "JAMF", "TASK", "SPSC", "TDOC", "ACCD", "PRVA", "GDRX", "PGNY", "TMDX", "NVCR", 
+  "MRCY", "GEVO", "CLNE", "REGI", "AXON", "SITM", "NXPI", "AMKR", "NVRO", "FATE", "DISH", "LUMN", 
+  "VSAT", "IRDM", "GSAT", "SHEN", "IDT", "OOMA", "GOGO", "AVNW", "CLFD", "LITE", "CIEN", "INFN", 
+  "CRDO", "POET", "ANGO", "ADTN", "CASA", "DZSI", "FYBR", "CALX", "COMM", "IIVI", "NTGR", "TMUS", 
+  "SATS", "SPOK", "LPSN", "MTTR", "CEVA", "DRS", "CACI", "SAIC", "BWXT", "HWM", "TDG", "LILM", 
+  "SEMR", "ONEM", "CANO", "TALK", "ALHC", "CERT", "XERS", "INVA", "LUNG", "LDOS", "PANW", "SNOW", 
+  "MDB", "NET", "TEAM", "HUBS", "ZI", "INSP", "IRTC", "OMCL", "NTRA", "RGEN", "PAYC", "PAYO", 
+  "SMCI", "AEHR", "ACLS", "UCTT", "KLIC", "KRYS", "VKTX", "ARWR", "EXAS", "RKLB", "DOMO", "TSSI", 
+  "MAXN", "SPWR", "LC", "CACC", "ENVA", "QFIN", "WKHS", "MVST"
+];
 
 // ── State ───────────────────────────────────────────────────
 let rResults=[], cResults=[], stopReq=false, isRunning=false;
