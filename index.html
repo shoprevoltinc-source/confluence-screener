@@ -2142,6 +2142,15 @@ function switchTab(tab){ _doSwitchTab(tab); }
   </div>
   <div id="cron-alert-tickers" style="font-size:10px;color:var(--green2);margin-top:4px;font-family:var(--mono)"></div>
 </div>
+<!-- Weekly Cron Alert Banner — shows when weekly-scanner.js GitHub Action finds signals -->
+<div id="weekly-cron-banner" style="display:none;background:linear-gradient(135deg,#0d1f2b,#1a3a4a);border:1px solid var(--blue);border-radius:4px;padding:10px 14px;margin-bottom:8px;cursor:pointer" onclick="showWeeklyCronAlerts()">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font-size:13px;font-weight:700;color:var(--blue);font-family:var(--mono)">📅 WEEKLY SCAN ALERT</span>
+    <span id="weekly-cron-count" style="font-size:11px;color:#fff;font-family:var(--mono)"></span>
+    <span id="weekly-cron-time" style="font-size:9px;color:var(--muted2);margin-left:auto;font-family:var(--mono)"></span>
+  </div>
+  <div id="weekly-cron-tickers" style="font-size:10px;color:var(--blue);margin-top:4px;font-family:var(--mono)"></div>
+</div>
 <div class="banner green" id="wm-savedBanner" style="display:none"></div>
 
 <!-- Daily Trigger Results -->
@@ -2967,8 +2976,7 @@ function _doSwitchTab(tab){
   } else if(tab==="weekly"){
     document.getElementById("mainSubtitle").textContent="📅 WEEKLY MONITOR · TRAIL FLIP SIGNAL · 77% WIN RATE VALIDATED";
     if(wmResults.length) renderWeeklyMonitor();
-  } else if(tab==="weekly"){
-    loadCronAlerts();
+    loadWeeklyCronAlerts();
   } else if(tab==="agent"){
     document.getElementById("mainSubtitle").textContent="🤖 TRADING AGENT · AI-POWERED DECISION ENGINE";
     loadAgent();
@@ -7800,7 +7808,76 @@ try{
 // Load cron alerts on startup — wait for Firebase to be ready
 document.addEventListener("firebaseReady", ()=>{
   try{ loadCronAlerts(); }catch(e){}
+  try{ loadWeeklyCronAlerts(); }catch(e){}
 });
+
+// ── Load and display Weekly GitHub Action cron alerts ─────────
+async function loadWeeklyCronAlerts(){
+  if(!window.firebaseReady || typeof window.fbLoad !== "function"){
+    document.addEventListener("firebaseReady", ()=>{ try{ loadWeeklyCronAlerts(); }catch(e){} }, {once:true});
+    return;
+  }
+  try{
+    const fb = await window.fbLoad("weekly_cron_alerts");
+    if(!fb || !fb.data) return;
+    const alerts = fb.data;
+    if(!alerts || !alerts.length) return;
+    const banner  = document.getElementById("weekly-cron-banner");
+    const count   = document.getElementById("weekly-cron-count");
+    const time    = document.getElementById("weekly-cron-time");
+    const tickers = document.getElementById("weekly-cron-tickers");
+    if(!banner) return;
+    // Show results from last 7 days (covers full week between Sunday scans)
+    const savedAt  = new Date(fb.savedAt);
+    const hoursAgo = (Date.now() - savedAt.getTime()) / (1000*60*60);
+    if(hoursAgo > 168) return;
+    const appPlus  = alerts.filter(r=>r.tierApp);
+    const jax      = alerts.filter(r=>r.tier1 && !r.tierApp);
+    const oversold = alerts.filter(r=>r.tier2 && !r.tier1 && !r.tierApp);
+    banner.style.display = "block";
+    count.textContent    = alerts.length + " weekly signal" + (alerts.length>1?"s":"") +
+      (appPlus.length  ? " · " + appPlus.length  + " ⭐⭐A++" : "") +
+      (jax.length      ? " · " + jax.length      + " ⭐JAX"  : "") +
+      (oversold.length ? " · " + oversold.length + " 📈oversold" : "");
+    time.textContent     = "Weekly scan: " + savedAt.toLocaleDateString() + " " + savedAt.toLocaleTimeString();
+    // Show top 12 tickers sorted by tier
+    const top = alerts.slice(0, 12);
+    tickers.textContent  = top.map(r=>{
+      const tier = r.tierApp ? "⭐⭐" : r.tier1 ? "⭐" : r.tier2 ? "📈" : "📅";
+      return `${tier}${r.sym}`;
+    }).join(" · ");
+  }catch(e){ console.warn("loadWeeklyCronAlerts error:", e); }
+}
+
+function showWeeklyCronAlerts(){
+  try{
+    window.fbLoad("weekly_cron_alerts").then(fb=>{
+      if(!fb || !fb.data || !fb.data.length) return;
+      const alerts = fb.data;
+      // Inject into weekly monitor results so they appear in the existing table
+      const existing = wmResults.map(r=>r.sym);
+      const newOnes  = alerts.filter(r=>!existing.includes(r.sym)).map(r=>({
+        sym:          r.sym,
+        price:        r.price,
+        weeklyFlip:   true,
+        isFresh:      r.weeksAgo <= 1,
+        flipAge:      r.weeksAgo,
+        weeklyRsi:    r.weeklyRsi,
+        weeklyJAX:    r.weeklyJAXRecent,
+        bothAligned:  r.tierApp || r.tier1,
+        fromCron:     true,
+        tier:         r.tierApp ? "A++" : r.tier1 ? "JAX" : r.tier2 ? "OVERSOLD" : "FLIP",
+        scannedAt:    r.scannedAt
+      }));
+      if(newOnes.length){
+        wmResults = [...newOnes, ...wmResults];
+        renderWeeklyMonitor();
+        const banner = document.getElementById("wm-savedBanner");
+        if(banner){ banner.style.display="block"; banner.textContent="📅 Weekly cron: "+newOnes.length+" new signals merged · "+alerts.length+" total"; }
+      }
+    }).catch(()=>{});
+  }catch(e){}
+}
 
 function toggleAccordion(bodyId, arrowId){
   const body = document.getElementById(bodyId);
