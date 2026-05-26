@@ -59,7 +59,11 @@ function initFirebase(){
       const snap = await db.ref("screener/"+key).once("value");
       if(snap.exists()){
         const val = snap.val();
-        return { data: JSON.parse(val.data), savedAt: val.savedAt, device: val.device };
+        // data field may be a JSON string or already a parsed object/array
+        let parsed;
+        if(typeof val.data === "string"){ try{ parsed = JSON.parse(val.data); }catch(e){ parsed = val.data; } }
+        else { parsed = val.data; }
+        return { data: parsed, savedAt: val.savedAt, device: val.device };
       }
       return null;
     }catch(e){ console.warn("fbLoad failed:", e); return null; }
@@ -4873,7 +4877,7 @@ async function gatherAllData(){
   // Cron alerts from GitHub Action
   try{
     const cron = await window.fbLoad("jax_cron_alerts");
-    data.jax_cron_alerts = (cron && cron.data) ? cron.data : null;
+    data.jax_cron_alerts = (cron && cron.data) ? cron : null;
   }catch(e){ data.jax_cron_alerts = null; }
 
   // Daily triggers has nested structure — fbSafeSave wraps it as fb.data = {data:[], time:""}
@@ -4900,9 +4904,10 @@ RULE: Never reference open positions not listed above. Never assume positions fr
   // GitHub Action Cron Alerts — auto-scan fired green arrows
   const cronAlerts = data.jax_cron_alerts;
   if(cronAlerts && cronAlerts.data && cronAlerts.data.length){
-    const hoursAgo = (Date.now() - new Date(cronAlerts.time).getTime()) / (1000*60*60);
-    if(hoursAgo <= 6){
-      sections.push(`🤖 AUTO-SCAN (${cronAlerts.checkTime} ET — all 658 stocks):
+    const savedAt = cronAlerts.savedAt || cronAlerts.time;
+    const hoursAgo = savedAt ? (Date.now() - new Date(savedAt).getTime()) / (1000*60*60) : 0;
+    if(hoursAgo <= 24){
+      sections.push(`🤖 AUTO-SCAN (all 685 stocks — ${cronAlerts.data.length} green arrows):
 GREEN ARROWS: ${cronAlerts.data.map(r=>`${r.sym}@$${r.price?.toFixed(2)} bull${r.bullScore}/5 RSI${r.rsi?.toFixed(0)}`).join(", ")||"none"}`);
     }
   }
