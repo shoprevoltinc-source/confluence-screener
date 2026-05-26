@@ -19,7 +19,7 @@ const TD_KEYS = (process.env.TD_KEYS || "")
 
 const FIREBASE_DB_URL = (process.env.FIREBASE_DB_URL || "").replace(/\/$/, "");
 
-const SCAN_DELAY_MS   = 1200;  // ms between calls per key (safe under 8 req/min limit)
+const SCAN_DELAY_MS   = 10000; // 10s between calls per key — matches daily scanner, safe under per-key limit
 const FLIP_AGE_MAX    = 3;     // weeks — only recent flips
 const WEEKLY_RSI_MAX  = 70;
 const OVERSOLD_THRESH = 40;    // RSI was below this recently = recovery from oversold
@@ -367,22 +367,34 @@ async function run() {
   );
 
   async function runWorker(keyIdx, chunk) {
+    // Stagger worker starts: key 0 starts immediately, key 1 waits 1.5s, key 2 waits 3s, etc.
+    if (keyIdx > 0) await sleep(keyIdx * 1500);
     for (let i = 0; i < chunk.length; i++) {
       const sym = chunk[i];
-      try {
-        const result = await scanStock(sym, keyIdx);
-        done++;
-        if (result) {
-          results.push(result);
-          const tier = result.tierApp ? "⭐⭐ A++" : result.tier1 ? "⭐ JAX" : result.tier2 ? "📈 OVERSOLD" : "📅 FLIP";
-          console.log(`✅ ${tier} ${sym} | RSI ${result.weeklyRsi} | flip ${result.weeksAgo}w ago | JAX ${result.weeklyJAXRecent ? "🟢" : "—"}`);
-        }
-        if (done % 50 === 0) console.log(`   ... ${done}/${total} scanned, ${results.length} signals`);
-      } catch (e) {
-        done++;
-        if (!e.message.startsWith("SKIP:")) {
-          errors.push({ sym, error: e.message });
-          console.warn(`⚠️  ${sym}: ${e.message}`);
+      let retries = 2;
+      while (retries >= 0) {
+        try {
+          const result = await scanStock(sym, keyIdx);
+          done++;
+          if (result) {
+            results.push(result);
+            const tier = result.tierApp ? "⭐⭐ A++" : result.tier1 ? "⭐ JAX" : result.tier2 ? "📈 OVERSOLD" : "📅 FLIP";
+            console.log(`✅ ${tier} ${sym} | RSI ${result.weeklyRsi} | flip ${result.weeksAgo}w ago | JAX ${result.weeklyJAXRecent ? "🟢" : "—"}`);
+          }
+          if (done % 50 === 0) console.log(`   ... ${done}/${total} scanned, ${results.length} signals`);
+          break; // success — exit retry loop
+        } catch (e) {
+          if (e.message && e.message.includes("credits")) {
+            // Rate limited — wait 60s and retry silently (same as daily scanner)
+            if (retries > 0) { await sleep(60000); retries--; continue; }
+            done++; // exhausted retries — skip silently
+          } else if (e.message && e.message.startsWith("SKIP:")) {
+            done++; break; // invalid symbol — skip silently
+          } else {
+            done++;
+            errors.push({ sym, error: e.message });
+          }
+          break;
         }
       }
       if (i < chunk.length - 1) await sleep(SCAN_DELAY_MS);
