@@ -2142,7 +2142,7 @@ function switchTab(tab){ _doSwitchTab(tab); }
   </div>
   <div id="cron-alert-tickers" style="font-size:10px;color:var(--green2);margin-top:4px;font-family:var(--mono)"></div>
 </div>
-<!-- Weekly Cron Alert Banner — shows when weekly-scanner.js GitHub Action finds signals -->
+<!-- Weekly Cron Alert Banner -->
 <div id="weekly-cron-banner" style="display:none;background:linear-gradient(135deg,#0d1f2b,#1a3a4a);border:1px solid var(--blue);border-radius:4px;padding:10px 14px;margin-bottom:8px;cursor:pointer" onclick="showWeeklyCronAlerts()">
   <div style="display:flex;align-items:center;gap:10px">
     <span style="font-size:13px;font-weight:700;color:var(--blue);font-family:var(--mono)">📅 WEEKLY SCAN ALERT</span>
@@ -2150,6 +2150,18 @@ function switchTab(tab){ _doSwitchTab(tab); }
     <span id="weekly-cron-time" style="font-size:9px;color:var(--muted2);margin-left:auto;font-family:var(--mono)"></span>
   </div>
   <div id="weekly-cron-tickers" style="font-size:10px;color:var(--blue);margin-top:4px;font-family:var(--mono)"></div>
+</div>
+<!-- Weekly Cron Results Panel — shown when banner is tapped -->
+<div id="weekly-cron-panel" style="display:none;margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+    <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--blue);letter-spacing:1px">📅 WEEKLY CANDLE SCAN — ALL 685 STOCKS</span>
+    <span id="weekly-cron-panel-time" style="font-family:var(--mono);font-size:9px;color:var(--muted2)"></span>
+    <button onclick="document.getElementById('weekly-cron-panel').style.display='none'"
+      style="margin-left:auto;background:transparent;border:1px solid var(--muted2);color:var(--muted2);font-family:var(--mono);font-size:8px;padding:3px 8px;cursor:pointer;border-radius:2px">
+      ✕ CLOSE
+    </button>
+  </div>
+  <div id="weekly-cron-results"></div>
 </div>
 <div class="banner green" id="wm-savedBanner" style="display:none"></div>
 
@@ -4876,15 +4888,6 @@ async function gatherAllData(){
 function buildScannerContext(data){
   const sections = [];
 
-  // ── Capital status — FIRST so Claude never hallucinates open positions ──
-  const journal  = Array.isArray(data.journal) ? data.journal : [];
-  const openPos  = journal.filter(e=>e.status==="open"&&e.price);
-  const openList = openPos.map(e=>`${e.sym}@$${parseFloat(e.price).toFixed(2)}`).join(", ");
-  sections.push(`⚠️ ACCOUNT STATUS (DO NOT INFER — USE ONLY THIS):
-Open positions: ${openPos.length > 0 ? openPos.length+" OPEN: "+openList : "0 — NO open positions, ALL trade slots available"}
-Available slots: ${openPos.length > 0 ? Math.max(0, 5 - openPos.length) : "5 of 5"}
-RULE: Never reference open positions that are not listed above. Never assume positions from context.`);
-
   // GitHub Action Cron Alerts — auto-scan fired green arrows
   const cronAlerts = data.jax_cron_alerts;
   if(cronAlerts && cronAlerts.data && cronAlerts.data.length){
@@ -7277,7 +7280,7 @@ async function fetchClosingPrices(){
           entry.status = resultPct >= 0 ? "win" : "loss";
         } else {
           entry.result = "0.00";
-          entry.status = "loss"; // flat close — treat as closed, not open
+          entry.status = "loss"; // flat close — treat as closed not open
         }
         log("📓 "+entry.sym+" → close $"+closePrice.toFixed(2)+" · result "+(resultPct>=0?"+":"")+resultPct.toFixed(2)+"%","ok");
       }
@@ -7820,7 +7823,7 @@ document.addEventListener("firebaseReady", ()=>{
   try{ loadWeeklyCronAlerts(); }catch(e){}
 });
 
-// ── Load and display Weekly GitHub Action cron alerts ─────────
+// ── Weekly cron banner loader ──────────────────────────────
 async function loadWeeklyCronAlerts(){
   if(!window.firebaseReady || typeof window.fbLoad !== "function"){
     document.addEventListener("firebaseReady", ()=>{ try{ loadWeeklyCronAlerts(); }catch(e){} }, {once:true});
@@ -7829,63 +7832,105 @@ async function loadWeeklyCronAlerts(){
   try{
     const fb = await window.fbLoad("weekly_cron_alerts");
     if(!fb || !fb.data) return;
-    const alerts = fb.data;
+    const alerts = typeof fb.data === "string" ? JSON.parse(fb.data) : fb.data;
     if(!alerts || !alerts.length) return;
+    const savedAt  = new Date(fb.savedAt);
+    const hoursAgo = (Date.now() - savedAt.getTime()) / (1000*60*60);
+    if(hoursAgo > 168) return; // older than 7 days — stale
     const banner  = document.getElementById("weekly-cron-banner");
     const count   = document.getElementById("weekly-cron-count");
     const time    = document.getElementById("weekly-cron-time");
     const tickers = document.getElementById("weekly-cron-tickers");
     if(!banner) return;
-    // Show results from last 7 days (covers full week between Sunday scans)
-    const savedAt  = new Date(fb.savedAt);
-    const hoursAgo = (Date.now() - savedAt.getTime()) / (1000*60*60);
-    if(hoursAgo > 168) return;
     const appPlus  = alerts.filter(r=>r.tierApp);
     const jax      = alerts.filter(r=>r.tier1 && !r.tierApp);
     const oversold = alerts.filter(r=>r.tier2 && !r.tier1 && !r.tierApp);
     banner.style.display = "block";
-    count.textContent    = alerts.length + " weekly signal" + (alerts.length>1?"s":"") +
+    count.textContent = alerts.length + " weekly signal" + (alerts.length>1?"s":"") +
       (appPlus.length  ? " · " + appPlus.length  + " ⭐⭐A++" : "") +
       (jax.length      ? " · " + jax.length      + " ⭐JAX"  : "") +
       (oversold.length ? " · " + oversold.length + " 📈oversold" : "");
-    time.textContent     = "Weekly scan: " + savedAt.toLocaleDateString() + " " + savedAt.toLocaleTimeString();
-    // Show top 12 tickers sorted by tier
-    const top = alerts.slice(0, 12);
-    tickers.textContent  = top.map(r=>{
+    time.textContent = "Scanned: " + savedAt.toLocaleDateString() + " " + savedAt.toLocaleTimeString();
+    tickers.textContent = alerts.slice(0,12).map(r=>{
       const tier = r.tierApp ? "⭐⭐" : r.tier1 ? "⭐" : r.tier2 ? "📈" : "📅";
-      return `${tier}${r.sym}`;
+      return tier + r.sym;
     }).join(" · ");
   }catch(e){ console.warn("loadWeeklyCronAlerts error:", e); }
 }
 
+// ── Weekly cron panel — tap banner to expand ───────────────
 function showWeeklyCronAlerts(){
-  try{
-    window.fbLoad("weekly_cron_alerts").then(fb=>{
-      if(!fb || !fb.data || !fb.data.length) return;
-      const alerts = fb.data;
-      // Inject into weekly monitor results so they appear in the existing table
-      const existing = wmResults.map(r=>r.sym);
-      const newOnes  = alerts.filter(r=>!existing.includes(r.sym)).map(r=>({
-        sym:          r.sym,
-        price:        r.price,
-        weeklyFlip:   true,
-        isFresh:      r.weeksAgo <= 1,
-        flipAge:      r.weeksAgo,
-        weeklyRsi:    r.weeklyRsi,
-        weeklyJAX:    r.weeklyJAXRecent,
-        bothAligned:  r.tierApp || r.tier1,
-        fromCron:     true,
-        tier:         r.tierApp ? "A++" : r.tier1 ? "JAX" : r.tier2 ? "OVERSOLD" : "FLIP",
-        scannedAt:    r.scannedAt
-      }));
-      if(newOnes.length){
-        wmResults = [...newOnes, ...wmResults];
-        renderWeeklyMonitor();
-        const banner = document.getElementById("wm-savedBanner");
-        if(banner){ banner.style.display="block"; banner.textContent="📅 Weekly cron: "+newOnes.length+" new signals merged · "+alerts.length+" total"; }
-      }
-    }).catch(()=>{});
-  }catch(e){}
+  const panel = document.getElementById("weekly-cron-panel");
+  if(!panel) return;
+  // Toggle
+  if(panel.style.display === "block"){ panel.style.display = "none"; return; }
+  panel.style.display = "block";
+  const resultsEl = document.getElementById("weekly-cron-results");
+  resultsEl.innerHTML = '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:10px">Loading...</div>';
+
+  window.fbLoad("weekly_cron_alerts").then(fb=>{
+    if(!fb || !fb.data){ resultsEl.innerHTML = '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:10px">No data found.</div>'; return; }
+    const alerts = typeof fb.data === "string" ? JSON.parse(fb.data) : fb.data;
+    const timeEl = document.getElementById("weekly-cron-panel-time");
+    if(timeEl) timeEl.textContent = new Date(fb.savedAt).toLocaleString();
+    resultsEl.innerHTML = renderWeeklyCronCards(alerts);
+  }).catch(()=>{ resultsEl.innerHTML = '<div style="color:var(--red);font-family:var(--mono);font-size:11px;padding:10px">Error loading data.</div>'; });
+}
+
+function renderWeeklyCronCards(alerts){
+  if(!alerts || !alerts.length) return '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:10px">No signals found.</div>';
+  return alerts.map(s=>{
+    const tierLabel = s.tierApp ? "⭐⭐ A++ FRESH FLIP + JAX" : s.tier1 ? "⭐ JAX RECENT" : s.tier2 ? "📈 OVERSOLD RECOVERY" : "📅 TRAIL FLIP";
+    const tierClr   = s.tierApp ? "var(--green2)" : s.tier1 ? "var(--blue)" : s.tier2 ? "var(--yellow)" : "var(--muted2)";
+    const rsiClr    = s.weeklyRsi < 55 ? "var(--green2)" : s.weeklyRsi < 65 ? "var(--blue)" : s.weeklyRsi < 70 ? "var(--yellow)" : "var(--red)";
+    const flipStr   = s.weeksAgo === 0 ? "THIS WEEK" : s.weeksAgo === 1 ? "1 WK AGO" : s.weeksAgo + " WKS AGO";
+    const flipClr   = s.weeksAgo === 0 ? "var(--green2)" : s.weeksAgo === 1 ? "var(--blue)" : "var(--yellow)";
+    const badges    = [
+      s.weeklyJAXRecent  ? "🟢 WK JAX FIRED" : "",
+      s.cameFromOversold ? "💹 FROM OVERSOLD" : "",
+    ].filter(Boolean).join(" · ");
+
+    return `<div style="background:#0a1525;border:1px solid #1a3a4a;border-left:3px solid ${tierClr};border-radius:4px;padding:10px 14px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <span style="font-size:15px;font-weight:700;color:#fff;font-family:var(--mono);cursor:pointer"
+          onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">${s.sym}</span>
+        <span style="font-size:10px;font-weight:700;color:${tierClr};letter-spacing:1px">${tierLabel}</span>
+        <button onclick="event.stopPropagation();logToJournal({sym:'${s.sym}',price:${s.price},score:'W',source:'weekly-scan',session:getMarketSession(),greenArrow:${s.weeklyJAXRecent},tradeType:'Swing'})"
+          style="margin-left:auto;background:#0d1f2b;border:1px solid var(--blue);color:var(--blue);font-family:var(--mono);font-size:8px;padding:3px 8px;cursor:pointer;border-radius:2px;letter-spacing:1px">
+          📓 LOG
+        </button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px">
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2)">PRICE</div>
+          <div style="font-size:13px;font-weight:700;color:var(--green2)">$${parseFloat(s.price).toFixed(2)}</div>
+        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2)">WK RSI</div>
+          <div style="font-size:13px;font-weight:700;color:${rsiClr}">${s.weeklyRsi}</div>
+        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2)">BULL SCORE</div>
+          <div style="font-size:13px;font-weight:700;color:#fff">${s.weeklyBullScore}/5</div>
+        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2)">WK FLIP</div>
+          <div style="font-size:13px;font-weight:700;color:${flipClr}">${flipStr}</div>
+        </div>
+      </div>
+      ${badges ? `<div style="font-size:9px;color:var(--muted2);font-family:var(--mono)">${badges}</div>` : ""}
+    </div>`;
+  }).join("");
+}
+
+// ── Account status injected first in scanner context ───────
+const _origBuildScannerContext = buildScannerContext;
+function buildScannerContext(data){
+  const journal  = Array.isArray(data.journal) ? data.journal : [];
+  const openPos  = journal.filter(e=>e.status==="open"&&e.price);
+  const openList = openPos.map(e=>`${e.sym}@$${parseFloat(e.price).toFixed(2)}`).join(", ");
+  const acctStatus = `⚠️ ACCOUNT STATUS (DO NOT INFER — USE ONLY THIS):\nOpen positions: ${openPos.length > 0 ? openPos.length+" OPEN: "+openList : "0 — NO open positions, ALL trade slots available"}\nAvailable slots: ${openPos.length > 0 ? Math.max(0, 5 - openPos.length) : "5 of 5"}\nRULE: Never reference open positions not listed above. Never assume positions from context.`;
+  return acctStatus + "\n\n" + _origBuildScannerContext(data);
 }
 
 function toggleAccordion(bodyId, arrowId){
