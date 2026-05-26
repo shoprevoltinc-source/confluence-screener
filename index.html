@@ -4876,6 +4876,15 @@ async function gatherAllData(){
 function buildScannerContext(data){
   const sections = [];
 
+  // ── Capital status — FIRST so Claude never hallucinates open positions ──
+  const journal  = Array.isArray(data.journal) ? data.journal : [];
+  const openPos  = journal.filter(e=>e.status==="open"&&e.price);
+  const openList = openPos.map(e=>`${e.sym}@$${parseFloat(e.price).toFixed(2)}`).join(", ");
+  sections.push(`⚠️ ACCOUNT STATUS (DO NOT INFER — USE ONLY THIS):
+Open positions: ${openPos.length > 0 ? openPos.length+" OPEN: "+openList : "0 — NO open positions, ALL trade slots available"}
+Available slots: ${openPos.length > 0 ? Math.max(0, 5 - openPos.length) : "5 of 5"}
+RULE: Never reference open positions that are not listed above. Never assume positions from context.`);
+
   // GitHub Action Cron Alerts — auto-scan fired green arrows
   const cronAlerts = data.jax_cron_alerts;
   if(cronAlerts && cronAlerts.data && cronAlerts.data.length){
