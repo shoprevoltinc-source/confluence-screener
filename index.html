@@ -7277,7 +7277,7 @@ async function fetchClosingPrices(){
           entry.status = resultPct >= 0 ? "win" : "loss";
         } else {
           entry.result = "0.00";
-          entry.status = "open";
+          entry.status = "loss"; // flat close — treat as closed, not open
         }
         log("📓 "+entry.sym+" → close $"+closePrice.toFixed(2)+" · result "+(resultPct>=0?"+":"")+resultPct.toFixed(2)+"%","ok");
       }
