@@ -59,7 +59,6 @@ function initFirebase(){
       const snap = await db.ref("screener/"+key).once("value");
       if(snap.exists()){
         const val = snap.val();
-        // data field may be a JSON string or already a parsed object/array
         let parsed;
         if(typeof val.data === "string"){ try{ parsed = JSON.parse(val.data); }catch(e){ parsed = val.data; } }
         else { parsed = val.data; }
@@ -2155,15 +2154,13 @@ function switchTab(tab){ _doSwitchTab(tab); }
   </div>
   <div id="weekly-cron-tickers" style="font-size:10px;color:var(--blue);margin-top:4px;font-family:var(--mono)"></div>
 </div>
-<!-- Weekly Cron Results Panel — shown when banner is tapped -->
+<!-- Weekly Cron Results Panel -->
 <div id="weekly-cron-panel" style="display:none;margin-bottom:12px">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
     <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--blue);letter-spacing:1px">📅 WEEKLY CANDLE SCAN — ALL 685 STOCKS</span>
     <span id="weekly-cron-panel-time" style="font-family:var(--mono);font-size:9px;color:var(--muted2)"></span>
     <button onclick="document.getElementById('weekly-cron-panel').style.display='none'"
-      style="margin-left:auto;background:transparent;border:1px solid var(--muted2);color:var(--muted2);font-family:var(--mono);font-size:8px;padding:3px 8px;cursor:pointer;border-radius:2px">
-      ✕ CLOSE
-    </button>
+      style="margin-left:auto;background:transparent;border:1px solid var(--muted2);color:var(--muted2);font-family:var(--mono);font-size:8px;padding:3px 8px;cursor:pointer;border-radius:2px">✕ CLOSE</button>
   </div>
   <div id="weekly-cron-results"></div>
 </div>
@@ -4840,7 +4837,7 @@ async function callClaude(systemPrompt, userPrompt, maxTokens=1500){
   const response = await fetch(workerUrl+"/claude", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ system: systemPrompt, user: userPrompt, max_tokens: maxTokens })
+    body: JSON.stringify({ system: systemPrompt, user: userPrompt, max_tokens: maxTokens, temperature: 0.1 })
   });
   const data = await response.json();
   if(data.error) throw new Error(data.error.message);
@@ -4877,7 +4874,7 @@ async function gatherAllData(){
   // Cron alerts from GitHub Action
   try{
     const cron = await window.fbLoad("jax_cron_alerts");
-    data.jax_cron_alerts = (cron && cron.data) ? cron : null;
+    data.jax_cron_alerts = (cron && cron.data) ? cron.data : null;
   }catch(e){ data.jax_cron_alerts = null; }
 
   // Daily triggers has nested structure — fbSafeSave wraps it as fb.data = {data:[], time:""}
@@ -4892,7 +4889,7 @@ async function gatherAllData(){
 function buildScannerContext(data){
   const sections = [];
 
-  // ── Account status — FIRST so Claude never hallucinates open positions ──
+  // ── Account status FIRST — prevents open position hallucinations ──
   const journal  = Array.isArray(data.journal) ? data.journal : [];
   const openPos  = journal.filter(e=>e.status==="open"&&e.price);
   const openList = openPos.map(e=>`${e.sym}@$${parseFloat(e.price).toFixed(2)}`).join(", ");
@@ -4904,10 +4901,10 @@ RULE: Never reference open positions not listed above. Never assume positions fr
   // GitHub Action Cron Alerts — auto-scan fired green arrows
   const cronAlerts = data.jax_cron_alerts;
   if(cronAlerts && cronAlerts.data && cronAlerts.data.length){
-    const savedAt = cronAlerts.savedAt || cronAlerts.time;
+    const savedAt  = cronAlerts.savedAt || cronAlerts.time;
     const hoursAgo = savedAt ? (Date.now() - new Date(savedAt).getTime()) / (1000*60*60) : 0;
     if(hoursAgo <= 24){
-      sections.push(`🤖 AUTO-SCAN (all 685 stocks — ${cronAlerts.data.length} green arrows):
+      sections.push(`🤖 AUTO-SCAN (all 685 stocks):
 GREEN ARROWS: ${cronAlerts.data.map(r=>`${r.sym}@$${r.price?.toFixed(2)} bull${r.bullScore}/5 RSI${r.rsi?.toFixed(0)}`).join(", ")||"none"}`);
     }
   }
@@ -7002,7 +6999,7 @@ function logToJournal(entry){
     target1: entry.target1||"",
     target2: entry.target2||"",
     notes: entry.notes||"",
-    result: "", status: "open",
+    result: "", status: "tracking",
     loggedAt: new Date().toISOString()
   });
   saveJournal();
@@ -7043,7 +7040,7 @@ function updateResult(id, val){
     entry.status = pct > 0 ? "win" : pct < 0 ? "loss" : "open";
   } else {
     entry.result = val;
-    entry.status = "open";
+    // Don't overwrite status — keep whatever it was (tracking, open, win, loss)
   }
   saveJournal();
   renderJournal();
@@ -7837,7 +7834,6 @@ document.addEventListener("firebaseReady", ()=>{
   try{ loadWeeklyCronAlerts(); }catch(e){}
 });
 
-// ── Weekly cron banner loader ──────────────────────────────
 async function loadWeeklyCronAlerts(){
   if(!window.firebaseReady || typeof window.fbLoad !== "function"){
     document.addEventListener("firebaseReady", ()=>{ try{ loadWeeklyCronAlerts(); }catch(e){} }, {once:true});
@@ -7846,11 +7842,11 @@ async function loadWeeklyCronAlerts(){
   try{
     const fb = await window.fbLoad("weekly_cron_alerts");
     if(!fb || !fb.data) return;
-    const alerts = typeof fb.data === "string" ? JSON.parse(fb.data) : fb.data;
+    const alerts = Array.isArray(fb.data) ? fb.data : (typeof fb.data === "string" ? JSON.parse(fb.data) : fb.data);
     if(!alerts || !alerts.length) return;
     const savedAt  = new Date(fb.savedAt);
     const hoursAgo = (Date.now() - savedAt.getTime()) / (1000*60*60);
-    if(hoursAgo > 168) return; // older than 7 days — stale
+    if(hoursAgo > 168) return;
     const banner  = document.getElementById("weekly-cron-banner");
     const count   = document.getElementById("weekly-cron-count");
     const time    = document.getElementById("weekly-cron-time");
@@ -7861,58 +7857,49 @@ async function loadWeeklyCronAlerts(){
     const oversold = alerts.filter(r=>r.tier2 && !r.tier1 && !r.tierApp);
     banner.style.display = "block";
     count.textContent = alerts.length + " weekly signal" + (alerts.length>1?"s":"") +
-      (appPlus.length  ? " · " + appPlus.length  + " ⭐⭐A++" : "") +
-      (jax.length      ? " · " + jax.length      + " ⭐JAX"  : "") +
-      (oversold.length ? " · " + oversold.length + " 📈oversold" : "");
-    time.textContent = "Scanned: " + savedAt.toLocaleDateString() + " " + savedAt.toLocaleTimeString();
+      (appPlus.length  ? " · "+appPlus.length+" ⭐⭐A++"   : "") +
+      (jax.length      ? " · "+jax.length+" ⭐JAX"         : "") +
+      (oversold.length ? " · "+oversold.length+" 📈oversold": "");
+    time.textContent = "Scanned: "+savedAt.toLocaleDateString()+" "+savedAt.toLocaleTimeString();
     tickers.textContent = alerts.slice(0,12).map(r=>{
-      const tier = r.tierApp ? "⭐⭐" : r.tier1 ? "⭐" : r.tier2 ? "📈" : "📅";
-      return tier + r.sym;
+      const tier = r.tierApp?"⭐⭐":r.tier1?"⭐":r.tier2?"📈":"📅";
+      return tier+r.sym;
     }).join(" · ");
-  }catch(e){ console.warn("loadWeeklyCronAlerts error:", e); }
+  }catch(e){ console.warn("loadWeeklyCronAlerts error:",e); }
 }
 
-// ── Weekly cron panel — tap banner to expand ───────────────
 function showWeeklyCronAlerts(){
   const panel = document.getElementById("weekly-cron-panel");
   if(!panel) return;
-  // Toggle
-  if(panel.style.display === "block"){ panel.style.display = "none"; return; }
-  panel.style.display = "block";
+  if(panel.style.display==="block"){ panel.style.display="none"; return; }
+  panel.style.display="block";
   const resultsEl = document.getElementById("weekly-cron-results");
-  resultsEl.innerHTML = '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:10px">Loading...</div>';
-
+  resultsEl.innerHTML='<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:10px">Loading...</div>';
   window.fbLoad("weekly_cron_alerts").then(fb=>{
-    if(!fb || !fb.data){ resultsEl.innerHTML = '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:10px">No data found.</div>'; return; }
-    const alerts = typeof fb.data === "string" ? JSON.parse(fb.data) : fb.data;
+    if(!fb||!fb.data){ resultsEl.innerHTML='<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:10px">No data.</div>'; return; }
+    const alerts = Array.isArray(fb.data)?fb.data:(typeof fb.data==="string"?JSON.parse(fb.data):fb.data);
     const timeEl = document.getElementById("weekly-cron-panel-time");
     if(timeEl) timeEl.textContent = new Date(fb.savedAt).toLocaleString();
     resultsEl.innerHTML = renderWeeklyCronCards(alerts);
-  }).catch(()=>{ resultsEl.innerHTML = '<div style="color:var(--red);font-family:var(--mono);font-size:11px;padding:10px">Error loading data.</div>'; });
+  }).catch(()=>{ resultsEl.innerHTML='<div style="color:var(--red);font-family:var(--mono);font-size:11px;padding:10px">Error loading data.</div>'; });
 }
 
 function renderWeeklyCronCards(alerts){
-  if(!alerts || !alerts.length) return '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:10px">No signals found.</div>';
+  if(!alerts||!alerts.length) return '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:10px">No signals.</div>';
   return alerts.map(s=>{
-    const tierLabel = s.tierApp ? "⭐⭐ A++ FRESH FLIP + JAX" : s.tier1 ? "⭐ JAX RECENT" : s.tier2 ? "📈 OVERSOLD RECOVERY" : "📅 TRAIL FLIP";
-    const tierClr   = s.tierApp ? "var(--green2)" : s.tier1 ? "var(--blue)" : s.tier2 ? "var(--yellow)" : "var(--muted2)";
-    const rsiClr    = s.weeklyRsi < 55 ? "var(--green2)" : s.weeklyRsi < 65 ? "var(--blue)" : s.weeklyRsi < 70 ? "var(--yellow)" : "var(--red)";
-    const flipStr   = s.weeksAgo === 0 ? "THIS WEEK" : s.weeksAgo === 1 ? "1 WK AGO" : s.weeksAgo + " WKS AGO";
-    const flipClr   = s.weeksAgo === 0 ? "var(--green2)" : s.weeksAgo === 1 ? "var(--blue)" : "var(--yellow)";
-    const badges    = [
-      s.weeklyJAXRecent  ? "🟢 WK JAX FIRED" : "",
-      s.cameFromOversold ? "💹 FROM OVERSOLD" : "",
-    ].filter(Boolean).join(" · ");
-
+    const tierLabel = s.tierApp?"⭐⭐ A++ FRESH FLIP + JAX":s.tier1?"⭐ JAX RECENT":s.tier2?"📈 OVERSOLD RECOVERY":"📅 TRAIL FLIP";
+    const tierClr   = s.tierApp?"var(--green2)":s.tier1?"var(--blue)":s.tier2?"var(--yellow)":"var(--muted2)";
+    const rsiClr    = s.weeklyRsi<55?"var(--green2)":s.weeklyRsi<65?"var(--blue)":s.weeklyRsi<70?"var(--yellow)":"var(--red)";
+    const flipStr   = s.weeksAgo===0?"THIS WEEK":s.weeksAgo===1?"1 WK AGO":s.weeksAgo+" WKS AGO";
+    const flipClr   = s.weeksAgo===0?"var(--green2)":s.weeksAgo===1?"var(--blue)":"var(--yellow)";
+    const badges    = [s.weeklyJAXRecent?"🟢 WK JAX FIRED":"", s.cameFromOversold?"💹 FROM OVERSOLD":""].filter(Boolean).join(" · ");
     return `<div style="background:#0a1525;border:1px solid #1a3a4a;border-left:3px solid ${tierClr};border-radius:4px;padding:10px 14px;margin-bottom:8px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
         <span style="font-size:15px;font-weight:700;color:#fff;font-family:var(--mono);cursor:pointer"
           onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">${s.sym}</span>
         <span style="font-size:10px;font-weight:700;color:${tierClr};letter-spacing:1px">${tierLabel}</span>
         <button onclick="event.stopPropagation();logToJournal({sym:'${s.sym}',price:${s.price},score:'W',source:'weekly-scan',session:getMarketSession(),greenArrow:${s.weeklyJAXRecent},tradeType:'Swing'})"
-          style="margin-left:auto;background:#0d1f2b;border:1px solid var(--blue);color:var(--blue);font-family:var(--mono);font-size:8px;padding:3px 8px;cursor:pointer;border-radius:2px;letter-spacing:1px">
-          📓 LOG
-        </button>
+          style="margin-left:auto;background:#0d1f2b;border:1px solid var(--blue);color:var(--blue);font-family:var(--mono);font-size:8px;padding:3px 8px;cursor:pointer;border-radius:2px;letter-spacing:1px">📓 LOG</button>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px">
         <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
@@ -7924,21 +7911,18 @@ function renderWeeklyCronCards(alerts){
           <div style="font-size:13px;font-weight:700;color:${rsiClr}">${s.weeklyRsi}</div>
         </div>
         <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
-          <div style="font-size:8px;color:var(--muted2)">BULL SCORE</div>
+          <div style="font-size:8px;color:var(--muted2)">BULL</div>
           <div style="font-size:13px;font-weight:700;color:#fff">${s.weeklyBullScore}/5</div>
         </div>
         <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
-          <div style="font-size:8px;color:var(--muted2)">WK FLIP</div>
+          <div style="font-size:8px;color:var(--muted2)">FLIP</div>
           <div style="font-size:13px;font-weight:700;color:${flipClr}">${flipStr}</div>
         </div>
       </div>
-      ${badges ? `<div style="font-size:9px;color:var(--muted2);font-family:var(--mono)">${badges}</div>` : ""}
+      ${badges?`<div style="font-size:9px;color:var(--muted2);font-family:var(--mono)">${badges}</div>`:""}
     </div>`;
   }).join("");
 }
-
-
-
 
 function toggleAccordion(bodyId, arrowId){
   const body = document.getElementById(bodyId);
