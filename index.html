@@ -59,10 +59,7 @@ function initFirebase(){
       const snap = await db.ref("screener/"+key).once("value");
       if(snap.exists()){
         const val = snap.val();
-        let parsed;
-        if(typeof val.data === "string"){ try{ parsed = JSON.parse(val.data); }catch(e){ parsed = val.data; } }
-        else { parsed = val.data; }
-        return { data: parsed, savedAt: val.savedAt, device: val.device };
+        return { data: typeof val.data==="string"?JSON.parse(val.data):val.data, savedAt: val.savedAt, device: val.device };
       }
       return null;
     }catch(e){ console.warn("fbLoad failed:", e); return null; }
@@ -73,7 +70,7 @@ function initFirebase(){
       if(snap.exists()){
         try{
           const val = snap.val();
-          callback({ data: JSON.parse(val.data), savedAt: val.savedAt, device: val.device });
+          callback({ data: typeof val.data==="string"?JSON.parse(val.data):val.data, savedAt: val.savedAt, device: val.device });
         }catch(e){}
       }
     });
@@ -7037,10 +7034,10 @@ function updateResult(id, val){
   const pct = parseFloat(val);
   if(!isNaN(pct)){
     entry.result = pct;
-    entry.status = pct > 0 ? "win" : pct < 0 ? "loss" : "open";
+    entry.status = pct > 0 ? "win" : pct < 0 ? "loss" : "loss";
   } else {
     entry.result = val;
-    // Don't overwrite status — keep whatever it was (tracking, open, win, loss)
+    // Don't overwrite status — keep whatever it was
   }
   saveJournal();
   renderJournal();
@@ -7272,10 +7269,11 @@ function renderJournal(){
 let closeAutoTimer = null;
 
 async function fetchClosingPrices(){
-  const openEntries = journalEntries.filter(e=>e.status==="open" && e.price > 0);
+  // Include both open trades AND tracking entries so update price works on all
+  const openEntries = journalEntries.filter(e=>(e.status==="open"||e.status==="tracking") && e.price > 0);
   if(!openEntries.length){ log("Journal: no open entries to update","info"); return; }
 
-  log("📓 Auto-fetching closing prices for "+openEntries.length+" open entries...","info");
+  log("📓 Fetching prices for "+openEntries.length+" entries...","info");
 
   for(const entry of openEntries){
     try{
@@ -7288,22 +7286,26 @@ async function fetchClosingPrices(){
         entry.closedAt   = new Date().toISOString();
         if(Math.abs(resultPct) >= 0.01){
           entry.result = resultPct.toFixed(2);
-          entry.status = resultPct >= 0 ? "win" : "loss";
+          // Only close real trades — tracking entries stay as tracking
+          if(entry.status === "open"){
+            entry.status = resultPct >= 0 ? "win" : "loss";
+          }
         } else {
-          entry.result = "0.00";
-          entry.status = "loss"; // flat close — treat as closed not open
+          // Flat — market closed or holiday — don't change status, just update price
+          entry.closePrice = closePrice;
+          // If it was a real open trade on a holiday, keep it open for next trading day
+          if(entry.status !== "tracking") entry.status = "open";
         }
-        log("📓 "+entry.sym+" → close $"+closePrice.toFixed(2)+" · result "+(resultPct>=0?"+":"")+resultPct.toFixed(2)+"%","ok");
+        log("📓 "+entry.sym+" → $"+closePrice.toFixed(2)+" · "+(Math.abs(resultPct)<0.01?"flat (holiday?)":(resultPct>=0?"+":"")+resultPct.toFixed(2)+"%"),"ok");
       }
-    }catch(e){ log("📓 "+entry.sym+": could not fetch close","warn"); }
+    }catch(e){ log("📓 "+entry.sym+": could not fetch price","warn"); }
     await sleep(300);
   }
 
   saveJournal();
   renderJournal();
-  log("📓 Closing prices updated for "+openEntries.length+" entries","ok");
+  log("📓 Prices updated for "+openEntries.length+" entries","ok");
 
-  // Send notification
   const wins   = journalEntries.filter(e=>e.status==="win").length;
   const losses = journalEntries.filter(e=>e.status==="loss").length;
   sendNotification(
@@ -7842,7 +7844,7 @@ async function loadWeeklyCronAlerts(){
   try{
     const fb = await window.fbLoad("weekly_cron_alerts");
     if(!fb || !fb.data) return;
-    const alerts = Array.isArray(fb.data) ? fb.data : (typeof fb.data === "string" ? JSON.parse(fb.data) : fb.data);
+    const alerts = Array.isArray(fb.data)?fb.data:(typeof fb.data==="string"?JSON.parse(fb.data):fb.data);
     if(!alerts || !alerts.length) return;
     const savedAt  = new Date(fb.savedAt);
     const hoursAgo = (Date.now() - savedAt.getTime()) / (1000*60*60);
@@ -7856,13 +7858,13 @@ async function loadWeeklyCronAlerts(){
     const jax      = alerts.filter(r=>r.tier1 && !r.tierApp);
     const oversold = alerts.filter(r=>r.tier2 && !r.tier1 && !r.tierApp);
     banner.style.display = "block";
-    count.textContent = alerts.length + " weekly signal" + (alerts.length>1?"s":"") +
-      (appPlus.length  ? " · "+appPlus.length+" ⭐⭐A++"   : "") +
-      (jax.length      ? " · "+jax.length+" ⭐JAX"         : "") +
-      (oversold.length ? " · "+oversold.length+" 📈oversold": "");
+    count.textContent = alerts.length+" weekly signal"+(alerts.length>1?"s":"")+
+      (appPlus.length?" · "+appPlus.length+" ⭐⭐A++":"")+
+      (jax.length?" · "+jax.length+" ⭐JAX":"")+
+      (oversold.length?" · "+oversold.length+" 📈oversold":"");
     time.textContent = "Scanned: "+savedAt.toLocaleDateString()+" "+savedAt.toLocaleTimeString();
     tickers.textContent = alerts.slice(0,12).map(r=>{
-      const tier = r.tierApp?"⭐⭐":r.tier1?"⭐":r.tier2?"📈":"📅";
+      const tier=r.tierApp?"⭐⭐":r.tier1?"⭐":r.tier2?"📈":"📅";
       return tier+r.sym;
     }).join(" · ");
   }catch(e){ console.warn("loadWeeklyCronAlerts error:",e); }
@@ -7877,47 +7879,35 @@ function showWeeklyCronAlerts(){
   resultsEl.innerHTML='<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:10px">Loading...</div>';
   window.fbLoad("weekly_cron_alerts").then(fb=>{
     if(!fb||!fb.data){ resultsEl.innerHTML='<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:10px">No data.</div>'; return; }
-    const alerts = Array.isArray(fb.data)?fb.data:(typeof fb.data==="string"?JSON.parse(fb.data):fb.data);
-    const timeEl = document.getElementById("weekly-cron-panel-time");
-    if(timeEl) timeEl.textContent = new Date(fb.savedAt).toLocaleString();
-    resultsEl.innerHTML = renderWeeklyCronCards(alerts);
-  }).catch(()=>{ resultsEl.innerHTML='<div style="color:var(--red);font-family:var(--mono);font-size:11px;padding:10px">Error loading data.</div>'; });
+    const alerts=Array.isArray(fb.data)?fb.data:(typeof fb.data==="string"?JSON.parse(fb.data):fb.data);
+    const timeEl=document.getElementById("weekly-cron-panel-time");
+    if(timeEl) timeEl.textContent=new Date(fb.savedAt).toLocaleString();
+    resultsEl.innerHTML=renderWeeklyCronCards(alerts);
+  }).catch(()=>{ resultsEl.innerHTML='<div style="color:var(--red);font-family:var(--mono);font-size:11px;padding:10px">Error.</div>'; });
 }
 
 function renderWeeklyCronCards(alerts){
   if(!alerts||!alerts.length) return '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:10px">No signals.</div>';
   return alerts.map(s=>{
-    const tierLabel = s.tierApp?"⭐⭐ A++ FRESH FLIP + JAX":s.tier1?"⭐ JAX RECENT":s.tier2?"📈 OVERSOLD RECOVERY":"📅 TRAIL FLIP";
-    const tierClr   = s.tierApp?"var(--green2)":s.tier1?"var(--blue)":s.tier2?"var(--yellow)":"var(--muted2)";
-    const rsiClr    = s.weeklyRsi<55?"var(--green2)":s.weeklyRsi<65?"var(--blue)":s.weeklyRsi<70?"var(--yellow)":"var(--red)";
-    const flipStr   = s.weeksAgo===0?"THIS WEEK":s.weeksAgo===1?"1 WK AGO":s.weeksAgo+" WKS AGO";
-    const flipClr   = s.weeksAgo===0?"var(--green2)":s.weeksAgo===1?"var(--blue)":"var(--yellow)";
-    const badges    = [s.weeklyJAXRecent?"🟢 WK JAX FIRED":"", s.cameFromOversold?"💹 FROM OVERSOLD":""].filter(Boolean).join(" · ");
+    const tierLabel=s.tierApp?"⭐⭐ A++ FRESH FLIP + JAX":s.tier1?"⭐ JAX RECENT":s.tier2?"📈 OVERSOLD RECOVERY":"📅 TRAIL FLIP";
+    const tierClr=s.tierApp?"var(--green2)":s.tier1?"var(--blue)":s.tier2?"var(--yellow)":"var(--muted2)";
+    const rsiClr=s.weeklyRsi<55?"var(--green2)":s.weeklyRsi<65?"var(--blue)":s.weeklyRsi<70?"var(--yellow)":"var(--red)";
+    const flipStr=s.weeksAgo===0?"THIS WEEK":s.weeksAgo===1?"1 WK AGO":s.weeksAgo+" WKS AGO";
+    const flipClr=s.weeksAgo===0?"var(--green2)":s.weeksAgo===1?"var(--blue)":"var(--yellow)";
+    const badges=[s.weeklyJAXRecent?"🟢 WK JAX FIRED":"",s.cameFromOversold?"💹 FROM OVERSOLD":""].filter(Boolean).join(" · ");
     return `<div style="background:#0a1525;border:1px solid #1a3a4a;border-left:3px solid ${tierClr};border-radius:4px;padding:10px 14px;margin-bottom:8px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
         <span style="font-size:15px;font-weight:700;color:#fff;font-family:var(--mono);cursor:pointer"
           onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">${s.sym}</span>
         <span style="font-size:10px;font-weight:700;color:${tierClr};letter-spacing:1px">${tierLabel}</span>
         <button onclick="event.stopPropagation();logToJournal({sym:'${s.sym}',price:${s.price},score:'W',source:'weekly-scan',session:getMarketSession(),greenArrow:${s.weeklyJAXRecent},tradeType:'Swing'})"
-          style="margin-left:auto;background:#0d1f2b;border:1px solid var(--blue);color:var(--blue);font-family:var(--mono);font-size:8px;padding:3px 8px;cursor:pointer;border-radius:2px;letter-spacing:1px">📓 LOG</button>
+          style="margin-left:auto;background:#0d1f2b;border:1px solid var(--blue);color:var(--blue);font-family:var(--mono);font-size:8px;padding:3px 8px;cursor:pointer;border-radius:2px">📓 LOG</button>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px">
-        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
-          <div style="font-size:8px;color:var(--muted2)">PRICE</div>
-          <div style="font-size:13px;font-weight:700;color:var(--green2)">$${parseFloat(s.price).toFixed(2)}</div>
-        </div>
-        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
-          <div style="font-size:8px;color:var(--muted2)">WK RSI</div>
-          <div style="font-size:13px;font-weight:700;color:${rsiClr}">${s.weeklyRsi}</div>
-        </div>
-        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
-          <div style="font-size:8px;color:var(--muted2)">BULL</div>
-          <div style="font-size:13px;font-weight:700;color:#fff">${s.weeklyBullScore}/5</div>
-        </div>
-        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
-          <div style="font-size:8px;color:var(--muted2)">FLIP</div>
-          <div style="font-size:13px;font-weight:700;color:${flipClr}">${flipStr}</div>
-        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px"><div style="font-size:8px;color:var(--muted2)">PRICE</div><div style="font-size:13px;font-weight:700;color:var(--green2)">$${parseFloat(s.price).toFixed(2)}</div></div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px"><div style="font-size:8px;color:var(--muted2)">WK RSI</div><div style="font-size:13px;font-weight:700;color:${rsiClr}">${s.weeklyRsi}</div></div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px"><div style="font-size:8px;color:var(--muted2)">BULL</div><div style="font-size:13px;font-weight:700;color:#fff">${s.weeklyBullScore}/5</div></div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px"><div style="font-size:8px;color:var(--muted2)">FLIP</div><div style="font-size:13px;font-weight:700;color:${flipClr}">${flipStr}</div></div>
       </div>
       ${badges?`<div style="font-size:9px;color:var(--muted2);font-family:var(--mono)">${badges}</div>`:""}
     </div>`;
