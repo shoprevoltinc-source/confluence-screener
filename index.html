@@ -1549,6 +1549,7 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <select id="listSel">
     <option value="watchlist">Watchlist</option>
     <option value="sp500">S&P 500 (487)</option>
+    <option value="full">Full Universe (685)</option>
     <option value="custom">Custom</option>
   </select>
   <span class="ctrl-label">MIN</span>
@@ -1802,6 +1803,7 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <span class="ctrl-label">LIST</span>
   <select id="jaxListSel">
     <option value="sp500">S&P 500 (487)</option>
+    <option value="full">Full Universe (685)</option>
     <option value="catalyst">Catalyst Universe</option>
     <option value="watchlist">My Watchlist</option>
     <option value="custom">Custom</option>
@@ -5960,6 +5962,7 @@ async function startRecoveryScan(){
 
   const listVal  = document.getElementById("listSel").value;
   const tickers  = listVal==="sp500"?[...SP500]:listVal==="watchlist"?[...WATCHLIST]
+    :listVal==="full"?[...new Set([...SP500,...SMALLCAP])]
     :document.getElementById("customTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
   const minScore = parseInt(document.getElementById("minSel").value);
   const nKeys    = TD_KEYS.length;
@@ -7413,6 +7416,7 @@ async function startJAXScan(){
   const listVal   = document.getElementById("jaxListSel").value;
   const minBull   = parseInt(document.getElementById("jaxMinBull").value)||3;
   const tickers   = listVal==="sp500"?[...SP500]:
+                    listVal==="full"?[...new Set([...SP500,...SMALLCAP])]:
                     listVal==="catalyst"?[...SMALLCAP]:
                     listVal==="watchlist"?[...WATCHLIST]:
                     document.getElementById("jaxCustomTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
