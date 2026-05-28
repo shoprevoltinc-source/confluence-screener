@@ -2,13 +2,11 @@ name: Daily Full Scan
 
 on:
   schedule:
-    # 6:00am ET = 11:00 UTC (pre-market, before open)
+    # 6:00am ET = 11:00 UTC (pre-market)
     - cron: '0 11 * * 1-5'
     # 9:45am ET = 14:45 UTC (first scan after open)
     - cron: '45 14 * * 1-5'
-    # 12:00pm ET = 17:00 UTC (midday)
-    - cron: '0 17 * * 1-5'
-    # 3:30pm ET = 20:30 UTC (final scan before close)
+    # 3:30pm ET = 20:30 UTC (end of day)
     - cron: '30 20 * * 1-5'
 
   workflow_dispatch:
