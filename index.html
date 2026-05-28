@@ -193,7 +193,6 @@ body::before{
   display:none;
   border-top:1px solid var(--border);
   padding:6px 0;
-  display:none;
   gap:20px;align-items:center;
 }
 .stat-chip{
@@ -1549,7 +1548,6 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <select id="listSel">
     <option value="watchlist">Watchlist</option>
     <option value="sp500">S&P 500 (487)</option>
-    <option value="full">Full Universe (685)</option>
     <option value="custom">Custom</option>
   </select>
   <span class="ctrl-label">MIN</span>
@@ -1803,7 +1801,6 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <span class="ctrl-label">LIST</span>
   <select id="jaxListSel">
     <option value="sp500">S&P 500 (487)</option>
-    <option value="full">Full Universe (685)</option>
     <option value="catalyst">Catalyst Universe</option>
     <option value="watchlist">My Watchlist</option>
     <option value="custom">Custom</option>
@@ -3033,7 +3030,7 @@ function saveResults(){
 // ══════════════════════════════════════════════════════════
 
 let confResults   = [];
- // movers that scored 1-2/4
+let confNearMisses = []; // movers that scored 1-2/4
 let confRunning   = false;
 let confStopReq   = false;
 let confFilter    = "all";
@@ -5100,10 +5097,11 @@ async function runMorningBrief(){
       // Gather all candidate tickers from all sources
       const candidates = new Set();
       if(data.jax_cron_alerts&&data.jax_cron_alerts.data) data.jax_cron_alerts.data.slice(0,20).forEach(r=>candidates.add(r.sym));
-      if(data.daily_triggers&&data.daily_triggers.length) data.daily_triggers.forEach(r=>candidates.add(r.sym));
+      if(data.daily_triggers&&data.daily_triggers.data&&data.daily_triggers.data.length) data.daily_triggers.data.forEach(r=>candidates.add(r.sym));
       if(data.weekly_monitor&&data.weekly_monitor.length) data.weekly_monitor.slice(0,10).forEach(r=>candidates.add(r.sym));
       if(data.confluence&&data.confluence.length) data.confluence.slice(0,10).forEach(r=>candidates.add(r.sym));
       if(data.catalyst&&data.catalyst.length) data.catalyst.slice(0,10).forEach(r=>candidates.add(r.sym));
+      if(data.jax_scan&&data.jax_scan.length) data.jax_scan.filter(r=>r.greenArrow).slice(0,10).forEach(r=>candidates.add(r.sym));
       // Fetch live quotes — max 30 to stay under Finnhub free tier
       const syms = [...candidates].slice(0,30);
       await Promise.all(syms.map(async sym=>{
@@ -5910,12 +5908,14 @@ function clearSaved(which){
     document.getElementById("r-filterBar").style.display="none";
     document.getElementById("r-results").innerHTML='<div class="empty">Cleared.</div>';
     try{localStorage.removeItem("cs_recovery");}catch(e){}
+    fbSafeSave("recovery", []);
   } else {
     cResults=[];
     document.getElementById("c-savedBanner").style.display="none";
     document.getElementById("c-filterBar").style.display="none";
     document.getElementById("c-results").innerHTML='<div class="empty">Cleared.</div>';
     try{localStorage.removeItem("cs_catalyst");}catch(e){}
+    fbSafeSave("catalyst", []);
   }
   updateHdr(activeTab==="recovery"?rResults:cResults);
 }
@@ -5962,7 +5962,6 @@ async function startRecoveryScan(){
 
   const listVal  = document.getElementById("listSel").value;
   const tickers  = listVal==="sp500"?[...SP500]:listVal==="watchlist"?[...WATCHLIST]
-    :listVal==="full"?[...new Set([...SP500,...SMALLCAP])]
     :document.getElementById("customTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
   const minScore = parseInt(document.getElementById("minSel").value);
   const nKeys    = TD_KEYS.length;
@@ -6587,7 +6586,7 @@ function collapseDebugAfterTest(panel){
     }, 800); // small delay so user sees result before collapse
   }
 }
-function stopScan(){stopReq=true;document.getElementById("stopBtn").disabled=true;document.getElementById("catStopBtn").disabled=true;log("Stop requested...","warn",activeTab==="recovery"?"r":"c");}
+function stopScan(){stopReq=true;document.getElementById("stopBtn").disabled=true;document.getElementById("catStopBtn").disabled=true;document.getElementById("jaxStopBtn").disabled=true;log("Stop requested...","warn",activeTab==="recovery"?"r":"c");}
 
 async function countdown(secs,panel){
   const el=document.getElementById(panel+"-countdown");
@@ -7103,8 +7102,8 @@ function clearJournal(){
     localStorage.setItem("cs_journal_cleared", new Date().toISOString());
   }catch(e){}
   if(window.firebaseReady){
-    window.fbSave("journal", []);
-    window.fbSave("journal_cleared", {time: new Date().toISOString()});
+    fbSafeSave("journal", []);
+    fbSafeSave("journal_cleared", {time: new Date().toISOString()});
   }
   renderJournal();
   showToast("📓 Journal cleared on all devices");
@@ -7416,7 +7415,6 @@ async function startJAXScan(){
   const listVal   = document.getElementById("jaxListSel").value;
   const minBull   = parseInt(document.getElementById("jaxMinBull").value)||3;
   const tickers   = listVal==="sp500"?[...SP500]:
-                    listVal==="full"?[...new Set([...SP500,...SMALLCAP])]:
                     listVal==="catalyst"?[...SMALLCAP]:
                     listVal==="watchlist"?[...WATCHLIST]:
                     document.getElementById("jaxCustomTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
