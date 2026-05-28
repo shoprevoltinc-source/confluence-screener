@@ -4155,7 +4155,7 @@ async function startWeeklyMonitor(){
   }, 500);
 
   async function runWMWorker(keyIdx, tickerChunk){
-    const DELAY = 10000; // 10s = 6 stocks/min per key × 3 calls = 18 credits/min — safe under per-key limit
+    const DELAY = 15000; // 15s = 4 stocks/min per key × 3 calls = 12 credits/min — safe under per-key limit
     for(let i=0; i<tickerChunk.length; i++){
       if(wmStopReq) break;
       const sym = tickerChunk[i];
@@ -4259,14 +4259,13 @@ async function startWeeklyMonitor(){
           }
         }catch(e){}
 
-        // ── Step 5b: 4H 200 EMA check ────────────────────────────────────
+        // ── Step 5b: 4H 200 EMA check (reuse h4 from Step 4 — no extra API call) ──
         let h4_200EMA = 0, h4Above200 = false;
         if(h4Trail > 0){
           try{
-            const h4b = await fetch4HCandles(sym, keyIdx);
-            if(h4b && h4b.closes.length >= 202){
-              h4_200EMA  = calcEMA(h4b.closes, 200);
-              h4Above200 = h4b.closes[h4b.closes.length-1] > h4_200EMA;
+            if(h4 && h4.closes.length >= 202){
+              h4_200EMA  = calcEMA(h4.closes, 200);
+              h4Above200 = h4.closes[h4.closes.length-1] > h4_200EMA;
             }
           }catch(e){}
         }
@@ -5806,7 +5805,7 @@ async function loadSaved(){
     }
 
     // Then check Firebase for newer results from another device
-    document.addEventListener("firebaseReady", async ()=>{
+    async function _doLoadSavedFirebase(){
       try{
         const fbR = await window.fbLoad("recovery");
         const fbC = await window.fbLoad("catalyst");
@@ -5898,7 +5897,9 @@ async function loadSaved(){
         });
 
       }catch(e){ console.warn("Firebase load error:", e); }
-    });
+    }
+    if(window.firebaseReady){ _doLoadSavedFirebase(); }
+    else { document.addEventListener("firebaseReady", _doLoadSavedFirebase, {once:true}); }
   }catch(e){}
 }
 function clearSaved(which){
