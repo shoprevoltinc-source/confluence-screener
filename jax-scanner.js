@@ -1,18 +1,15 @@
 // ── JAX PRO Scanner — GitHub Action
-// Runs at 12:00pm and 3:30pm ET on weekdays
-// Scans all 658 stocks, detects green arrows, saves to Firebase
+// Scans all stocks, detects green arrows, saves to Firebase
 // Exact port of Pine Script JAX PRO Strategy v5
 
 const https = require('https');
 
 // ── Config from environment ────────────────────────────────
-// TD_KEYS secret = comma-separated list of all keys
-// Supports both comma-separated and newline-separated keys
 const TD_KEYS = (process.env.TD_KEYS || '').split(/[,\n]/).map(k=>k.trim()).filter(Boolean);
-const FIREBASE_URL = process.env.FIREBASE_DB_URL; // matches your existing secret name
+const FIREBASE_URL = process.env.FIREBASE_DB_URL;
 
-// ── Full 658 stock universe ────────────────────────────────
-const SP500 = ["MMM","AOS","ABT","ABBV","ACN","ADBE","AMD","AES","AFL","A","APD","AKAM","ALB","ARE","ALGN","ALLE","LNT","ALL","GOOGL","GOOG","MO","AMZN","AMCR","AEE","AAL","AEP","AXP","AIG","AMT","AWK","AMP","AME","AMGN","APH","ADI","ANSS","AON","APA","AAPL","AMAT","APTV","ADM","ANET","AJG","AIZ","T","ATO","ADSK","ADP","AZO","AVB","AVY","BKR","BALL","BAC","BK","BBWI","BAX","BDX","WRB","BRK/B","BBY","BIO","BIIB","BLK","BX","BA","BKNG","BWA","BSX","BMY","AVGO","BR","BLDR","BG","CDNS","CPT","CPB","COF","CAH","KMX","CCL","CARR","CAT","CBOE","CBRE","CDW","CE","COR","CNC","CF","CRL","SCHW","CHTR","CVX","CMG","CB","CHD","CI","CINF","CTAS","CSCO","C","CFG","CLX","CME","CMS","KO","CTSH","CL","CMCSA","CAG","COP","ED","STZ","COO","CPRT","GLW","CTVA","CSGP","COST","CTRA","CRWD","CCI","CSX","CMI","CVS","DHR","DRI","DVA","DAY","DE","DAL","DVN","DXCM","FANG","DLR","DFS","DG","DLTR","D","DPZ","DOV","DOW","DHI","DTE","DUK","DD","EMN","ETN","EBAY","ECL","EIX","EW","EA","ELV","EMR","ENPH","ETR","EOG","EPAM","EQT","EFX","EQIX","EQR","ESS","EL","ETSY","EG","EVRG","ES","EXC","EXPE","EXPD","EXR","XOM","FFIV","FDS","FICO","FAST","FRT","FDX","FIS","FITB","FSLR","FE","FI","FMC","F","FTNT","FTV","FOXA","FOX","BEN","FCX","GRMN","IT","GE","GD","GIS","GM","GPC","GILD","GS","HAL","HIG","HAS","HCA","HSIC","HSY","HES","HPE","HLT","HOLX","HD","HON","HRL","HST","HWM","HPQ","HUBB","HUM","HBAN","HII","IBM","IEX","IDXX","ITW","INCY","IR","PODD","INTC","ICE","IFF","IP","IPG","INTU","ISRG","IVZ","IQV","IRM","JCI","JPM","K","KDP","KEY","KEYS","KMB","KIM","KMI","KLAC","KHC","KR","LHX","LH","LRCX","LW","LVS","LDOS","LEN","LLY","LIN","LYV","LKQ","LMT","L","LOW","LULU","LYB","MTB","MRO","MPC","MKTX","MAR","MMC","MLM","MAS","MA","MTCH","MKC","MCD","MCK","MDT","MRK","META","MET","MTD","MGM","MCHP","MU","MSFT","MAA","MRNA","MHK","MOH","TAP","MDLZ","MPWR","MNST","MCO","MS","MOS","MSI","MSCI","NDAQ","NTAP","NFLX","NEM","NEE","NKE","NI","NDSN","NSC","NTRS","NOC","NCLH","NRG","NUE","NVDA","NVR","NXPI","ORLY","OXY","ODFL","OMC","ON","OKE","ORCL","OTIS","PCAR","PKG","PLTR","PANW","PARA","PH","PAYX","PAYC","PYPL","PNR","PEP","PFE","PCG","PM","PSX","PNW","PNC","POOL","PPG","PPL","PFG","PG","PGR","PLD","PRU","PEG","PTC","PSA","PHM","PWR","QCOM","DGX","RL","RJF","RTX","O","REG","REGN","RF","RSG","RMD","RVTY","ROK","ROL","ROP","ROST","RCL","SPGI","CRM","SBAC","SLB","STX","SRE","NOW","SHW","SPG","SWKS","SJM","SNA","SO","LUV","SWK","SBUX","STT","STLD","STE","SYK","SYF","SNPS","SYY","TMUS","TROW","TTWO","TPR","TRGP","TGT","TEL","TDY","TFX","TER","TSLA","TXN","TXT","TMO","TJX","TSCO","TT","TDG","TRV","TRMB","TFC","TYL","TSN","USB","UBER","UDR","ULTA","UNP","UAL","UPS","URI","UNH","UHS","VLO","VTR","VRSN","VRSK","VZ","VRTX","VTRS","V","VMC","WAB","WBA","WMT","DIS","WBD","WM","WAT","WEC","WFC","WELL","WST","WDC","WY","WMB","WTW","GWW","WYNN","XEL","XYL","YUM","ZBRA","ZBH","ZTS"];
+// ── Full stock universe ────────────────────────────────────
+const SP500 = ["MMM","AOS","ABT","ABBV","ACN","ADBE","AMD","AES","AFL","A","APD","AKAM","ALB","ARE","ALGN","ALLE","LNT","ALL","GOOGL","GOOG","MO","AMZN","AMCR","AEE","AAL","AEP","AXP","AIG","AMT","AWK","AMP","AME","AMGN","APH","ADI","ANSS","AON","APA","AAPL","AMAT","APTV","ADM","ANET","AJG","AIZ","T","ATO","ADSK","ADP","AZO","AVB","AVY","BKR","BALL","BAC","BK","BBWI","BAX","BDX","WRB","BRK/B","BBY","BIO","BIIB","BLK","BX","BA","BKNG","BWA","BSX","BMY","AVGO","BR","BLDR","BG","CDNS","CPT","CPB","COF","CAH","KMX","CCL","CARR","CAT","CBOE","CBRE","CDW","CE","COR","CNC","CF","CRL","SCHW","CHTR","CVX","CMG","CB","CHD","CI","CINF","CTAS","CSCO","C","CFG","CLX","CME","CMS","KO","CTSH","CL","CMCSA","CAG","COP","ED","STZ","COO","CPRT","GLW","CTVA","CSGP","COST","CTRA","CRWD","CCI","CSX","CMI","CVS","DHR","DRI","DVA","DAY","DE","DAL","DVN","DXCM","FANG","DLR","DFS","DG","DLTR","D","DPZ","DOV","DOW","DHI","DTE","DUK","DD","EMN","ETN","EBAY","ECL","EIX","EW","EA","ELV","EMR","ENPH","ETR","EOG","EPAM","EQT","EFX","EQIX","EQR","ESS","EL","ETSY","EG","EVRG","ES","EXC","EXPE","EXPD","EXR","XOM","FFIV","FDS","FICO","FAST","FRT","FDX","FIS","FITB","FSLR","FE","FI","FMC","F","FTNT","FTV","FOXA","FOX","BEN","FCX","GRMN","IT","GE","GD","GIS","GM","GPC","GILD","GS","HAL","HIG","HAS","HCA","HSIC","HSY","HES","HPE","HLT","HOLX","HD","HON","HRL","HST","HWM","HPQ","HUBB","HUM","HBAN","HII","IBM","IEX","IDXX","ITW","INCY","IR","PODD","INTC","ICE","IFF","IP","IPG","INTU","ISRG","IVZ","IQV","IRM","JCI","JPM","K","KDP","KEY","KEYS","KMB","KIM","KMI","KLAC","KHC","KR","LHX","LH","LRCX","LW","LVS","LDOS","LEN","LLY","LIN","LYV","LKQ","LMT","L","LOW","LULU","LYB","MTB","MRO","MPC","MKTX","MAR","MMC","MLM","MAS","MA","MTCH","MKC","MCD","MCK","MDT","MRK","META","MET","MTD","MGM","MCHP","MU","MSFT","MAA","MRNA","MHK","MOH","TAP","MDLZ","MPWR","MNST","MCO","MS","MOS","MSI","MSCI","NDAQ","NTAP","NFLX","NEM","NEE","NKE","NI","NDSN","NSC","NTRS","NOC","NCLH","NRG","NUE","NVDA","NVR","NXPI","ORLY","OXY","ODFL","OMC","ON","OKE","ORCL","OTIS","PCAR","PKG","PLTR","PANW","PARA","PH","PAYX","PAYC","PYPL","PNR","PEP","PFE","PCG","PM","PSX","PNW","PNC","POOL","PPG","PPL","PFG","PG","PGR","PLD","PRU","PEG","PTC","PSA","PHM","PWR","QCOM","DGX","RL","RJF","RTX","O","REG","REGN","RF","RSG","RMD","RVTY","ROK","ROL","ROP","ROST","RCL","SPGI","CRM","SBAC","SLB","STX","SRE","NOW","SHW","SPG","SWKS","SJM","SNA","SO","LUV","SWK","SBUX","STT","STLD","STE","SYK","SYF","SNPS","SYY","TMUS","TROW","TTWO","TPR","TRGP","TGT","TEL","TDY","TFX","TER","TSLA","TXN","TXT","TMO","TJX","TSCO","TT","TDG","TRV","TRMB","TFC","TYL","TSN","USB","UBER","UDR","ULTA","UNP","UAL","UPS","URI","UNH","UHS","VLO","VRT","VTR","VRSN","VRSK","VZ","VRTX","VTRS","V","VMC","WAB","WBA","WMT","DIS","WBD","WM","WAT","WEC","WFC","WELL","WST","WDC","WY","WMB","WTW","GWW","WYNN","XEL","XYL","YUM","ZBRA","ZBH","ZTS"];
 
 const SMALLCAP = ["MRAM", "KTOS", "AVAV", "RCAT", "ACHR", "JOBY", "ASTS", "LUNR", "RDW", "SPIR", 
   "BBAI", "CDRE", "QUBT", "IONQ", "RGTI", "SOUN", "ARQQ", "QBTS", "VRNT", "MGNX", "RXRX", "DNLI", 
@@ -22,7 +19,7 @@ const SMALLCAP = ["MRAM", "KTOS", "AVAV", "RCAT", "ACHR", "JOBY", "ASTS", "LUNR"
   "DIOD", "VIAV", "POWI", "AEVA", "LAZR", "MVIS", "OUST", "WOLF", "AMBA", "SLAB", "BLNK", "CHPT", 
   "EVGO", "STEM", "ARRY", "NOVA", "SHLS", "FLNC", "BLDP", "FCEL", "PLUG", "RUN", "CSIQ", "DQ", 
   "JKS", "BE", "CWEN", "GPRE", "AMRC", "VNET", "CLSK", "IREN", "HUT", "MARA", "SOFI", "HOOD", 
-  "AFRM", "UPST", "DAVE", "MQ", "LMND", "ROOT", "DKNG", "PENN", "RBLX", "MSTR", "CIFR", "RIOT", 
+  "AFRM", "UPST", "DAVE", "MQ", "LMND", "ROOT", "DKNG", "PENN", "CELH", "RBLX", "MSTR", "CIFR", "RIOT", 
   "FOUR", "RELY", "CRWD", "DDOG", "ZS", "GTLB", "BILL", "DOCS", "BRZE", "CFLT", "ASAN", "SMAR", 
   "WEAV", "ALKT", "JAMF", "TASK", "SPSC", "TDOC", "ACCD", "PRVA", "GDRX", "PGNY", "TMDX", "NVCR", 
   "MRCY", "GEVO", "CLNE", "REGI", "AXON", "SITM", "NXPI", "AMKR", "NVRO", "FATE", "DISH", "LUMN", 
@@ -31,7 +28,7 @@ const SMALLCAP = ["MRAM", "KTOS", "AVAV", "RCAT", "ACHR", "JOBY", "ASTS", "LUNR"
   "SATS", "SPOK", "LPSN", "MTTR", "CEVA", "DRS", "CACI", "SAIC", "BWXT", "HWM", "TDG", "LILM", 
   "SEMR", "ONEM", "CANO", "TALK", "ALHC", "CERT", "XERS", "INVA", "LUNG", "LDOS", "PANW", "SNOW", 
   "MDB", "NET", "TEAM", "HUBS", "ZI", "INSP", "IRTC", "OMCL", "NTRA", "RGEN", "PAYC", "PAYO", 
-  "SMCI", "AEHR", "ACLS", "UCTT", "KLIC", "KRYS", "VKTX", "ARWR", "EXAS", "RKLB", "DOMO", "TSSI", 
+  "SMCI", "AEHR", "ACLS", "EME", "TTMI", "UCTT", "KLIC", "KRYS", "VKTX", "ARWR", "EXAS", "RKLB", "DOMO", "TSSI", 
   "MAXN", "SPWR", "LC", "CACC", "ENVA", "QFIN", "WKHS", "MVST"
 ];
 
@@ -230,9 +227,6 @@ async function fetchCandles(sym, keyIndex){
 async function saveToFirebase(key, payload){
   const url = `${FIREBASE_URL}/screener/${key}.json`;
   console.log(`💾 Saving to Firebase: ${FIREBASE_URL}/screener/${key}.json`);
-  // fbLoad does JSON.parse(val.data) so data field must be a JSON string
-  // httpRequest does JSON.stringify(body) so we pass data as a pre-stringified string
-  // to avoid double stringify, we build the full payload as a raw string
   const raw = JSON.stringify({
     data:    JSON.stringify(payload),
     savedAt: new Date().toISOString(),
@@ -273,10 +267,9 @@ async function main(){
 
   const fired   = [];
   const errors  = [];
-  const DELAY   = 10000; // 10s between calls per worker
+  const DELAY   = 10000;
   const nKeys   = TD_KEYS.length;
 
-  // Split tickers across keys — interleaved for even distribution
   const chunks = Array.from({length: nKeys}, ()=>[]);
   ALL_TICKERS.forEach((sym, i)=> chunks[i % nKeys].push(sym));
 
@@ -311,7 +304,6 @@ async function main(){
     }
   }
 
-  // Run all workers in parallel
   await Promise.all(chunks.map((chunk, ki)=> runWorker(ki, chunk)));
 
   console.log(`\n✅ Scan complete — ${fired.length} green arrows fired`);
@@ -320,7 +312,6 @@ async function main(){
   }
   if(errors.length) console.log(`⚠️  Skipped ${errors.length} stocks (API limits)`);
 
-  // Save to Firebase
   const payload = {
     data: fired,
     time: new Date().toISOString(),
