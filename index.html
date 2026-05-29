@@ -1349,6 +1349,17 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
 
 <script>
 // ── Early stub — allows tab clicks before main script loads ──
+
+function updateRecoverySub(){
+  const v = document.getElementById("listSel").value;
+  const label = v==="sp500"?"S&P 500 (487)":v==="full"?"Full Universe (685)":v==="watchlist"?"Watchlist":"Custom";
+  document.getElementById("r-sub").textContent = label+" · RSI OVERSOLD · EMA21 SETUP · C7 DEEP BOUNCE";
+}
+function updateJaxSub(){
+  const v = document.getElementById("jaxListSel").value;
+  const label = v==="sp500"?"S&P 500 (487)":v==="full"?"Full Universe (685)":v==="catalyst"?"Catalyst Universe":v==="watchlist"?"Watchlist":"Custom";
+  document.getElementById("mainSubtitle").textContent = "🟢 JAX SCANNER · "+label+" · PURE GREEN ARROW";
+}
 function switchTab(tab){ _doSwitchTab(tab); }
 </script>
 
@@ -1545,9 +1556,10 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <span class="ctrl-label">MODE</span>
   <select id="scanMode"><option value="replace">Replace</option><option value="merge">Merge</option></select>
   <span class="ctrl-label">LIST</span>
-  <select id="listSel">
+  <select id="listSel" onchange="updateRecoverySub()">
     <option value="watchlist">Watchlist</option>
     <option value="sp500">S&P 500 (487)</option>
+    <option value="full">Full Universe (685)</option>
     <option value="custom">Custom</option>
   </select>
   <span class="ctrl-label">MIN</span>
@@ -1799,8 +1811,9 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <button class="btn-stop" id="jaxStopBtn" onclick="stopScan()" disabled>■ STOP</button>
   <button class="btn-clear" onclick="clearJAX()">🗑</button>
   <span class="ctrl-label">LIST</span>
-  <select id="jaxListSel">
+  <select id="jaxListSel" onchange="updateJaxSub()">
     <option value="sp500">S&P 500 (487)</option>
+    <option value="full">Full Universe (685)</option>
     <option value="catalyst">Catalyst Universe</option>
     <option value="watchlist">My Watchlist</option>
     <option value="custom">Custom</option>
@@ -2833,7 +2846,7 @@ function splitInterleaved(arr, n){
 }
 
 // ── Ticker Lists ────────────────────────────────────────────
-const SP500 = ["MMM","AOS","ABT","ABBV","ACN","ADBE","AMD","AES","AFL","A","APD","AKAM","ALB","ARE","ALGN","ALLE","LNT","ALL","GOOGL","GOOG","MO","AMZN","AMCR","AEE","AAL","AEP","AXP","AIG","AMT","AWK","AMP","AME","AMGN","APH","ADI","ANSS","AON","APA","AAPL","AMAT","APTV","ADM","ANET","AJG","AIZ","T","ATO","ADSK","ADP","AZO","AVB","AVY","BKR","BALL","BAC","BK","BBWI","BAX","BDX","WRB","BRK/B","BBY","BIO","BIIB","BLK","BX","BA","BKNG","BWA","BSX","BMY","AVGO","BR","BLDR","BG","CDNS","CPT","CPB","COF","CAH","KMX","CCL","CARR","CAT","CBOE","CBRE","CDW","CE","COR","CNC","CF","CRL","SCHW","CHTR","CVX","CMG","CB","CHD","CI","CINF","CTAS","CSCO","C","CFG","CLX","CME","CMS","KO","CTSH","CL","CMCSA","CAG","COP","ED","STZ","COO","CPRT","GLW","CTVA","CSGP","COST","CTRA","CRWD","CCI","CSX","CMI","CVS","DHR","DRI","DVA","DAY","DE","DAL","DVN","DXCM","FANG","DLR","DFS","DG","DLTR","D","DPZ","DOV","DOW","DHI","DTE","DUK","DD","EMN","ETN","EBAY","ECL","EIX","EW","EA","ELV","EMR","ENPH","ETR","EOG","EPAM","EQT","EFX","EQIX","EQR","ESS","EL","ETSY","EG","EVRG","ES","EXC","EXPE","EXPD","EXR","XOM","FFIV","FDS","FICO","FAST","FRT","FDX","FIS","FITB","FSLR","FE","FI","FMC","F","FTNT","FTV","FOXA","FOX","BEN","FCX","GRMN","IT","GE","GD","GIS","GM","GPC","GILD","GS","HAL","HIG","HAS","HCA","HSIC","HSY","HES","HPE","HLT","HOLX","HD","HON","HRL","HST","HWM","HPQ","HUBB","HUM","HBAN","HII","IBM","IEX","IDXX","ITW","INCY","IR","PODD","INTC","ICE","IFF","IP","IPG","INTU","ISRG","IVZ","IQV","IRM","JCI","JPM","K","KDP","KEY","KEYS","KMB","KIM","KMI","KLAC","KHC","KR","LHX","LH","LRCX","LW","LVS","LDOS","LEN","LLY","LIN","LYV","LKQ","LMT","L","LOW","LULU","LYB","MTB","MRO","MPC","MKTX","MAR","MMC","MLM","MAS","MA","MTCH","MKC","MCD","MCK","MDT","MRK","META","MET","MTD","MGM","MCHP","MU","MSFT","MAA","MRNA","MHK","MOH","TAP","MDLZ","MPWR","MNST","MCO","MS","MOS","MSI","MSCI","NDAQ","NTAP","NFLX","NEM","NEE","NKE","NI","NDSN","NSC","NTRS","NOC","NCLH","NRG","NUE","NVDA","NVR","NXPI","ORLY","OXY","ODFL","OMC","ON","OKE","ORCL","OTIS","PCAR","PKG","PLTR","PANW","PARA","PH","PAYX","PAYC","PYPL","PNR","PEP","PFE","PCG","PM","PSX","PNW","PNC","POOL","PPG","PPL","PFG","PG","PGR","PLD","PRU","PEG","PTC","PSA","PHM","PWR","QCOM","DGX","RL","RJF","RTX","O","REG","REGN","RF","RSG","RMD","RVTY","ROK","ROL","ROP","ROST","RCL","SPGI","CRM","SBAC","SLB","STX","SRE","NOW","SHW","SPG","SWKS","SJM","SNA","SO","LUV","SWK","SBUX","STT","STLD","STE","SYK","SYF","SNPS","SYY","TMUS","TROW","TTWO","TPR","TRGP","TGT","TEL","TDY","TFX","TER","TSLA","TXN","TXT","TMO","TJX","TSCO","TT","TDG","TRV","TRMB","TFC","TYL","TSN","USB","UBER","UDR","ULTA","UNP","UAL","UPS","URI","UNH","UHS","VLO","VTR","VRSN","VRSK","VZ","VRTX","VTRS","V","VMC","WAB","WBA","WMT","DIS","WBD","WM","WAT","WEC","WFC","WELL","WST","WDC","WY","WMB","WTW","GWW","WYNN","XEL","XYL","YUM","ZBRA","ZBH","ZTS"];
+const SP500 = ["MMM","AOS","ABT","ABBV","ACN","ADBE","AMD","AES","AFL","A","APD","AKAM","ALB","ARE","ALGN","ALLE","LNT","ALL","GOOGL","GOOG","MO","AMZN","AMCR","AEE","AAL","AEP","AXP","AIG","AMT","AWK","AMP","AME","AMGN","APH","ADI","ANSS","AON","APA","AAPL","AMAT","APTV","ADM","ANET","AJG","AIZ","T","ATO","ADSK","ADP","AZO","AVB","AVY","BKR","BALL","BAC","BK","BBWI","BAX","BDX","WRB","BRK/B","BBY","BIO","BIIB","BLK","BX","BA","BKNG","BWA","BSX","BMY","AVGO","BR","BLDR","BG","CDNS","CPT","CPB","COF","CAH","KMX","CCL","CARR","CAT","CBOE","CBRE","CDW","CE","COR","CNC","CF","CRL","SCHW","CHTR","CVX","CMG","CB","CHD","CI","CINF","CTAS","CSCO","C","CFG","CLX","CME","CMS","KO","CTSH","CL","CMCSA","CAG","COP","ED","STZ","COO","CPRT","GLW","CTVA","CSGP","COST","CTRA","CRWD","CCI","CSX","CMI","CVS","DHR","DRI","DVA","DAY","DE","DAL","DVN","DXCM","FANG","DLR","DFS","DG","DLTR","D","DPZ","DOV","DOW","DHI","DTE","DUK","DD","EMN","ETN","EBAY","ECL","EIX","EW","EA","ELV","EMR","ENPH","ETR","EOG","EPAM","EQT","EFX","EQIX","EQR","ESS","EL","ETSY","EG","EVRG","ES","EXC","EXPE","EXPD","EXR","XOM","FFIV","FDS","FICO","FAST","FRT","FDX","FIS","FITB","FSLR","FE","FI","FMC","F","FTNT","FTV","FOXA","FOX","BEN","FCX","GRMN","IT","GE","GD","GIS","GM","GPC","GILD","GS","HAL","HIG","HAS","HCA","HSIC","HSY","HES","HPE","HLT","HOLX","HD","HON","HRL","HST","HWM","HPQ","HUBB","HUM","HBAN","HII","IBM","IEX","IDXX","ITW","INCY","IR","PODD","INTC","ICE","IFF","IP","IPG","INTU","ISRG","IVZ","IQV","IRM","JCI","JPM","K","KDP","KEY","KEYS","KMB","KIM","KMI","KLAC","KHC","KR","LHX","LH","LRCX","LW","LVS","LDOS","LEN","LLY","LIN","LYV","LKQ","LMT","L","LOW","LULU","LYB","MTB","MRO","MPC","MKTX","MAR","MMC","MLM","MAS","MA","MTCH","MKC","MCD","MCK","MDT","MRK","META","MET","MTD","MGM","MCHP","MU","MSFT","MAA","MRNA","MHK","MOH","TAP","MDLZ","MPWR","MNST","MCO","MS","MOS","MSI","MSCI","NDAQ","NTAP","NFLX","NEM","NEE","NKE","NI","NDSN","NSC","NTRS","NOC","NCLH","NRG","NUE","NVDA","NVR","NXPI","ORLY","OXY","ODFL","OMC","ON","OKE","ORCL","OTIS","PCAR","PKG","PLTR","PANW","PARA","PH","PAYX","PAYC","PYPL","PNR","PEP","PFE","PCG","PM","PSX","PNW","PNC","POOL","PPG","PPL","PFG","PG","PGR","PLD","PRU","PEG","PTC","PSA","PHM","PWR","QCOM","DGX","RL","RJF","RTX","O","REG","REGN","RF","RSG","RMD","RVTY","ROK","ROL","ROP","ROST","RCL","SPGI","CRM","SBAC","SLB","STX","SRE","NOW","SHW","SPG","SWKS","SJM","SNA","SO","LUV","SWK","SBUX","STT","STLD","STE","SYK","SYF","SNPS","SYY","TMUS","TROW","TTWO","TPR","TRGP","TGT","TEL","TDY","TFX","TER","TSLA","TXN","TXT","TMO","TJX","TSCO","TT","TDG","TRV","TRMB","TFC","TYL","TSN","USB","UBER","UDR","ULTA","UNP","UAL","UPS","URI","UNH","UHS","VLO","VRT","VTR","VRSN","VRSK","VZ","VRTX","VTRS","V","VMC","WAB","WBA","WMT","DIS","WBD","WM","WAT","WEC","WFC","WELL","WST","WDC","WY","WMB","WTW","GWW","WYNN","XEL","XYL","YUM","ZBRA","ZBH","ZTS"];
 const DEFAULT_WATCHLIST = ["SOFI","NKE","AAPL","NVDA","AMD","TSLA","META","GOOGL","MSFT","AMZN","JPM","BAC","PLTR","CRWD","UBER","HOOD","INTC","NOK","CELH","F"];
 let WATCHLIST = loadWatchlist();
 
@@ -2933,7 +2946,7 @@ const SMALLCAP = ["MRAM", "KTOS", "AVAV", "RCAT", "ACHR", "JOBY", "ASTS", "LUNR"
   "SATS", "SPOK", "LPSN", "MTTR", "CEVA", "DRS", "CACI", "SAIC", "BWXT", "HWM", "TDG", "LILM", 
   "SEMR", "ONEM", "CANO", "TALK", "ALHC", "CERT", "XERS", "INVA", "LUNG", "LDOS", "PANW", "SNOW", 
   "MDB", "NET", "TEAM", "HUBS", "ZI", "INSP", "IRTC", "OMCL", "NTRA", "RGEN", "PAYC", "PAYO", 
-  "SMCI", "AEHR", "ACLS", "UCTT", "KLIC", "KRYS", "VKTX", "ARWR", "EXAS", "RKLB", "DOMO", "TSSI", 
+  "SMCI", "AEHR", "ACLS", "EME", "TTMI", "UCTT", "KLIC", "KRYS", "VKTX", "ARWR", "EXAS", "RKLB", "DOMO", "TSSI", 
   "MAXN", "SPWR", "LC", "CACC", "ENVA", "QFIN", "WKHS", "MVST"
 ];
 
@@ -2969,7 +2982,7 @@ function _doSwitchTab(tab){
     renderCatalyst();
     if(cResults.length) document.getElementById("c-filterBar").style.display="flex";
   } else if(tab==="jax"){
-    document.getElementById("mainSubtitle").textContent="🟢 JAX SCANNER · PURE GREEN ARROW · NO RSI FILTER";
+    document.getElementById("mainSubtitle").textContent="🟢 JAX SCANNER · PURE GREEN ARROW · NO RSI FILTER"; updateJaxSub();
     renderJAX();
     if(jaxResults.length) document.getElementById("jax-filterBar").style.display="flex";
   } else if(tab==="alerts"){
@@ -5963,6 +5976,7 @@ async function startRecoveryScan(){
 
   const listVal  = document.getElementById("listSel").value;
   const tickers  = listVal==="sp500"?[...SP500]:listVal==="watchlist"?[...WATCHLIST]
+    :listVal==="full"?[...new Set([...SP500,...SMALLCAP])]
     :document.getElementById("customTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
   const minScore = parseInt(document.getElementById("minSel").value);
   const nKeys    = TD_KEYS.length;
@@ -7416,6 +7430,7 @@ async function startJAXScan(){
   const listVal   = document.getElementById("jaxListSel").value;
   const minBull   = parseInt(document.getElementById("jaxMinBull").value)||3;
   const tickers   = listVal==="sp500"?[...SP500]:
+                    listVal==="full"?[...new Set([...SP500,...SMALLCAP])]:
                     listVal==="catalyst"?[...SMALLCAP]:
                     listVal==="watchlist"?[...WATCHLIST]:
                     document.getElementById("jaxCustomTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
