@@ -1350,6 +1350,12 @@ if('serviceWorker' in navigator && location.hostname.includes('github.io')){
 <script>
 // ── Early stub — allows tab clicks before main script loads ──
 
+
+function tickerLogo(sym, size=24){
+  return `<img src="https://financialmodelingprep.com/image-stock/${sym}.png" 
+    onerror="this.style.display='none'" 
+    style="width:${size}px;height:${size}px;border-radius:4px;object-fit:contain;background:rgba(255,255,255,0.05)">`;
+}
 function updateRecoverySub(){
   const v = document.getElementById("listSel").value;
   const label = v==="sp500"?"S&P 500 (487)":v==="full"?"Full Universe (685)":v==="watchlist"?"Watchlist":"Custom";
@@ -3408,7 +3414,7 @@ function renderConfluence(){
     return `<div class="${cardCls}" onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
       <div class="conf-band">
         <div>
-          <div class="conf-sym">${s.sym}</div>
+          <div class="conf-sym" style="display:flex;align-items:center;gap:6px">${tickerLogo(s.sym,20)}${s.sym}</div>
           <div style="margin-top:3px;display:flex;gap:5px;align-items:center">
             <span style="font-family:var(--sans);font-size:11px;font-weight:700;padding:2px 8px;border-radius:2px;background:${isFull?"rgba(0,200,83,0.15)":"rgba(255,214,0,0.12)"};color:${scoreClr}">${scoreStr}</span>
             ${sessBadge}
@@ -4707,7 +4713,7 @@ function renderWeeklyMonitor(){
     return `<div class="${cardCls}" onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
       <div class="wm-band">
         <div>
-          <div class="wm-sym">${s.sym}</div>
+          <div class="wm-sym" style="display:flex;align-items:center;gap:6px">${tickerLogo(s.sym,20)}${s.sym}</div>
           <div style="margin-top:4px">
             <span class="wm-badge ${badgeCls}">${badgeLabel}</span>
           </div>
@@ -5573,7 +5579,7 @@ async function runExitMonitor(){
         const pnlClr = parseFloat(s.unrealPct)>=0?"var(--green2)":"var(--red)";
         html += `<div class="agent-trade" style="border-color:rgba(255,23,68,0.4);background:rgba(255,23,68,0.04);margin-bottom:6px">
           <div style="display:flex;align-items:center;gap:8px">
-            <span class="agent-trade-sym">${s.sym}</span>
+            <span class="agent-trade-sym" style="display:flex;align-items:center;gap:5px">${tickerLogo(s.sym,18)}${s.sym}</span>
             <span style="font-family:var(--mono);font-size:8px;color:var(--red);font-weight:700">🚨 CONSIDER EXIT</span>
           </div>
           <div class="agent-trade-detail">Entry $${s.entry.toFixed(2)} → Now $${s.currentPrice.toFixed(2)} · <span style="color:${pnlClr}">${parseFloat(s.unrealPct)>=0?"+":""}${s.unrealPct}%</span><br>Reason: ${s.reason}</div>
@@ -5588,7 +5594,7 @@ async function runExitMonitor(){
         const toTarget = s.target>0?((s.target-s.currentPrice)/s.currentPrice*100).toFixed(1):null;
         html += `<div class="agent-trade" style="margin-bottom:6px">
           <div style="display:flex;align-items:center;gap:8px">
-            <span class="agent-trade-sym">${s.sym}</span>
+            <span class="agent-trade-sym" style="display:flex;align-items:center;gap:5px">${tickerLogo(s.sym,18)}${s.sym}</span>
             <span style="font-family:var(--mono);font-size:8px;color:var(--green2)">HOLD</span>
           </div>
           <div class="agent-trade-detail">Entry $${s.entry.toFixed(2)} → Now $${s.currentPrice.toFixed(2)} · <span style="color:${pnlClr}">${parseFloat(s.unrealPct)>=0?"+":""}${s.unrealPct}%</span>${toTarget?` · ${toTarget}% to target`:""}${s.stop?" · Stop $"+s.stop.toFixed(2):""}</div>
@@ -6096,7 +6102,7 @@ function renderRecovery(){
     return `<div class="${cardCls}" onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
       <div class="card-hdr">
         <div class="card-left">
-          <div class="card-ticker">${s.sym}</div>
+          <div class="card-ticker" style="display:flex;align-items:center;gap:6px">${tickerLogo(s.sym,20)}${s.sym}</div>
           <span class="grade" style="background:${g.bg};color:${g.fg}">${g.l}</span>
           <div class="card-hint" style="display:flex;gap:6px;align-items:center">
             <span>#${i+1} · CLICK → TRADINGVIEW</span>
@@ -6463,7 +6469,7 @@ function renderCatalyst(){
     return `<div class="${cardCls}" onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
       <div class="card-hdr">
         <div class="card-left">
-          <div class="card-ticker">${s.sym}</div>
+          <div class="card-ticker" style="display:flex;align-items:center;gap:6px">${tickerLogo(s.sym,20)}${s.sym}</div>
           <span class="grade" style="background:${heatBg};color:#000">${heat}</span>
           <div class="card-hint" style="display:flex;gap:6px;align-items:center">
             <span>#${i+1} · CLICK → TRADINGVIEW</span>
@@ -6878,7 +6884,7 @@ function renderPulseResults(){
       <div class="alert-icon">${icon}</div>
       <div class="alert-body">
         <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-          <span class="alert-sym">${a.sym}</span>
+          <span class="alert-sym" style="display:flex;align-items:center;gap:5px">${tickerLogo(a.sym,18)}${a.sym}</span>
           ${a.weeklyMatch?`<span style="font-size:8px;padding:1px 6px;border-radius:1px;background:rgba(156,39,176,0.15);color:#E040FB;border:1px solid rgba(156,39,176,0.3);font-family:var(--mono)">🟣 WEEKLY</span>`:""}
           ${a.hasUpgrade?`<span style="font-size:8px;padding:1px 6px;border-radius:1px;background:rgba(0,176,255,0.12);color:var(--blue);border:1px solid rgba(0,176,255,0.3);font-family:var(--mono)">📊 UPGRADE</span>`:""}
           ${a.hasDowngrade?`<span style="font-size:8px;padding:1px 6px;border-radius:1px;background:rgba(255,23,68,0.1);color:var(--red);border:1px solid rgba(255,23,68,0.2);font-family:var(--mono)">📉 DOWNGRADE</span>`:""}
@@ -7728,7 +7734,7 @@ function renderJAX(){
     return `<div class="card jax" ${cardStyle} onclick="window.open('https://www.tradingview.com/chart/?symbol=${s.sym}','_blank')">
       <div class="card-hdr">
         <div class="card-left">
-          <div class="card-ticker">${s.sym}</div>
+          <div class="card-ticker" style="display:flex;align-items:center;gap:6px">${tickerLogo(s.sym,20)}${s.sym}</div>
           <span class="grade" style="background:${bullBg};color:#000">🟢 BULL ${s.bullScore}/5</span>
           <div class="card-hint" style="display:flex;gap:6px;align-items:center">
             <span>#${i+1} · CLICK → TRADINGVIEW</span>
