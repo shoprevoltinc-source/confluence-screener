@@ -445,9 +445,144 @@ const _indicators = (() => {
   }
 
 
+  // ── scoreTA — chart-quality composite (0-100) ──────────────────────
+  // ADDITIVE: computes nothing the scan can't already see; just combines
+  // existing inputs into a triage score + visible component breakdown.
+  // mode: "recovery"  → reward oversold-turning-up, distance-off-high is a plus
+  //       "continuation" (JAX/Catalyst) → reward strength, penalize overbought/extended
+  // Returns { taScore, taParts, ...flags }. Never throws on short history.
+  function scoreTA(closes, highs, lows, volumes, mode){
+    const out = { taScore:0, taParts:{}, taHigherLows:false, taCoiling:false,
+                  taVolConfirm:false, taNearTrail:false, taStrongClose:false,
+                  taExtended:false, taIgniting:false };
+    if(!closes || closes.length < 30) return out;
+    const n = closes.length;
+    const price = closes[n-1], prev = closes[n-2];
+    const change = prev ? ((price-prev)/prev)*100 : 0;
+    const cont = mode !== "recovery"; // default to continuation unless told recovery
+
+    // 1) Trend structure (0-25): higher-lows / higher-highs over last ~20 bars
+    let trendPts = 0;
+    {
+      const win = Math.min(20, n-1);
+      const segLows  = lows.slice(-win), segHighs = highs.slice(-win);
+      const half = Math.floor(win/2);
+      const lowEarly = Math.min(...segLows.slice(0,half)),  lowLate = Math.min(...segLows.slice(half));
+      const hiEarly  = Math.max(...segHighs.slice(0,half)), hiLate  = Math.max(...segHighs.slice(half));
+      const higherLows  = lowLate >= lowEarly;
+      const higherHighs = hiLate  >= hiEarly;
+      out.taHigherLows = higherLows;
+      // chop penalty: how often direction flips bar-to-bar in the window
+      let flips = 0; const seg = closes.slice(-win);
+      for(let i=2;i<seg.length;i++){ const a=seg[i]-seg[i-1], b=seg[i-1]-seg[i-2]; if((a>0)!==(b>0)) flips++; }
+      const chop = flips/Math.max(seg.length-2,1); // 0 = clean, ~1 = noise
+      trendPts = (higherLows?12:0) + (higherHighs?8:0) + Math.round((1-chop)*5);
+    }
+    out.taParts.trend = trendPts;
+
+    // 2) Volatility compression (0-20): current ATR vs 20-day avg ATR
+    let coilPts = 0;
+    {
+      const atr = calcATR(highs, lows, closes);
+      const ratio = atr.avgATR20 > 0 ? atr.currentATR/atr.avgATR20 : 1;
+      out.taCoiling = ratio < 0.8;
+      // ratio 0.5 → full marks, 1.2+ → 0
+      coilPts = Math.max(0, Math.min(20, Math.round((1.2 - ratio)/0.7 * 20)));
+    }
+    out.taParts.compression = coilPts;
+
+    // 3) Volume confirmation (0-20): dry-up during base OR spike on the move
+    let volPts = 0;
+    {
+      const today = volumes[n-1] || 0;
+      const avg20 = volumes.slice(-21,-1).reduce((a,b)=>a+(b||0),0)/20;
+      const spike = avg20>0 ? today/avg20 : 0;
+      const dryUp = avg20>0 && (volumes.slice(-6,-1).reduce((a,b)=>a+(b||0),0)/5) < avg20*0.6;
+      out.taVolConfirm = spike >= 1.5 || dryUp;
+      if(spike >= 2)      volPts = 20;
+      else if(spike>=1.5) volPts = 15;
+      else if(dryUp)      volPts = 12;   // quiet base is constructive
+      else if(spike>=1)   volPts = 6;
+      else                volPts = 2;
+    }
+    out.taParts.volume = volPts;
+
+    // 4) Position vs ATR trail (0-15): just-reclaimed = good R/R, far above = extended
+    let trailPts = 0;
+    {
+      const ts = calcATRTrailStop(highs, lows, closes, 10, 3.5);
+      const dist = ts.trailVal>0 ? (price - ts.trailVal)/ts.trailVal*100 : 0;
+      out.taNearTrail = dist >= 0 && dist <= 6;
+      out.taExtended  = dist > 15;
+      if(dist < 0)        trailPts = 4;    // below trail — risky
+      else if(dist <= 6)  trailPts = 15;   // fresh reclaim — best entry
+      else if(dist <= 12) trailPts = 9;
+      else if(dist <= 20) trailPts = 4;
+      else                trailPts = 1;    // far extended
+    }
+    out.taParts.trail = trailPts;
+
+    // 5) Candle quality, last bar (0-10): strong close, small upper wick
+    let candlePts = 0;
+    {
+      const h=highs[n-1], l=lows[n-1], c=closes[n-1], o=closes[n-2]; // o≈prev close (no open in feed)
+      const range = h-l;
+      if(range>0){
+        const closePos = (c-l)/range;            // 1 = closed at high
+        const upperWick = (h-Math.max(c,o))/range;
+        candlePts = Math.round(closePos*7) + Math.round((1-Math.min(upperWick*2,1))*3);
+        out.taStrongClose = closePos >= 0.7 && upperWick <= 0.25;
+      } else candlePts = 3;
+    }
+    out.taParts.candle = candlePts;
+
+    // 6) Momentum (0-10) — MODE-DEPENDENT
+    let momPts = 0;
+    {
+      const rsi = calcRSI(closes,14);
+      const rsi5ago = calcRSI(closes.slice(0,-5),14);
+      if(cont){
+        // continuation: reward rising RSI, penalize overbought (the PLTR-at-67 problem)
+        if(rsi>70)        momPts = 2;
+        else if(rsi>=50)  momPts = (rsi>rsi5ago?10:7);
+        else              momPts = 4;
+      } else {
+        // recovery: reward oversold turning up
+        if(rsi<45 && rsi>rsi5ago+3) momPts = 10; // oversold and lifting
+        else if(rsi<50 && rsi>rsi5ago) momPts = 7;
+        else if(rsi<55) momPts = 4;
+        else momPts = 2;                          // already recovered — less juice
+      }
+    }
+    out.taParts.momentum = momPts;
+
+    // 7) Ignition bonus (0-15) — today's move + volume, the thing the 6-cond
+    //    Recovery score is blind to. Big green day on volume floats to the top.
+    let igPts = 0;
+    {
+      const today = volumes[n-1] || 0;
+      const avg20 = volumes.slice(-21,-1).reduce((a,b)=>a+(b||0),0)/20;
+      const spike = avg20>0 ? today/avg20 : 0;
+      const bigUp = change >= 5;
+      const modUp = change >= 2.5;
+      out.taIgniting = bigUp && spike >= 1.5;
+      if(bigUp && spike>=2)        igPts = 15;
+      else if(bigUp && spike>=1.5) igPts = 12;
+      else if(bigUp)               igPts = 8;
+      else if(modUp && spike>=1.5) igPts = 6;
+      else if(modUp)               igPts = 3;
+    }
+    out.taParts.ignition = igPts;
+
+    out.taScore = Math.max(0, Math.min(100,
+      trendPts + coilPts + volPts + trailPts + candlePts + momPts + igPts));
+    return out;
+  }
+
   return {
     calcEMA, calcRSI, calcMACD, calcSuperTrend, calcATRTrailStop,
-    calcJAXPRO, calcATR, scoreRecovery, scoreCatalyst, scoreJAX, scoreJAXDeep
+    calcJAXPRO, calcATR, scoreRecovery, scoreCatalyst, scoreJAX, scoreJAXDeep,
+    scoreTA
   };
 })();
 
