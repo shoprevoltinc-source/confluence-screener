@@ -2201,11 +2201,11 @@ function switchTab(tab){ _doSwitchTab(tab); }
 
 <div class="filter-bar" id="wm-filterBar" style="display:none">
   <span class="filter-label">SHOW</span>
-  <button class="chip on" onclick="setWMFilter('all',this)">ALL</button>
+  <button class="chip" onclick="setWMFilter('all',this)">ALL</button>
   <button class="chip" onclick="setWMFilter('t1',this)">⭐ ENTER NOW</button>
   <button class="chip" onclick="setWMFilter('t2',this)">🟢 4H BULL</button>
   <button class="chip" onclick="setWMFilter('t3',this)">🟣 JAX</button>
-  <button class="chip" onclick="setWMFilter('fresh',this)">🔔 THIS WEEK</button>
+  <button class="chip on" onclick="setWMFilter('recent',this)">🔔 THIS WEEK</button>
   <button class="chip" onclick="setWMFilter('weekly',this)">📅 WATCHING</button>
   <select class="sort-select" id="wm-sortSel" onchange="renderWeeklyMonitor()">
     <option value="priority">Priority (Both > Weekly > Age)</option>
@@ -3910,7 +3910,7 @@ function loadBacktest(){
 let wmResults  = [];
 let wmRunning  = false;
 let wmStopReq  = false;
-let wmFilter   = "all";
+let wmFilter   = "recent";  // default: flip age 0-1 weeks (isRecent)
 
 function logWM(msg, type=""){
   const p = document.getElementById("wm-log");
@@ -4448,6 +4448,7 @@ function renderWeeklyMonitor(){
   if(wmFilter==="t1")     f = f.filter(r=>r.tier1);
   else if(wmFilter==="t2")     f = f.filter(r=>r.tier2&&!r.tier1);
   else if(wmFilter==="t3")     f = f.filter(r=>r.tier3&&!r.tier1&&!r.tier2);
+  else if(wmFilter==="recent") f = f.filter(r=>r.isRecent);
   else if(wmFilter==="fresh")  f = f.filter(r=>r.isFresh);
   else if(wmFilter==="weekly") f = f.filter(r=>!r.tier1&&!r.tier2&&!r.tier3);
   if(search) f = f.filter(r=>r.sym.includes(search));
@@ -4697,6 +4698,30 @@ async function gatherAllData(){
     const dt = await window.fbLoad("daily_triggers");
     data.daily_triggers = (dt && dt.data) ? dt.data : null;
   }catch(e){ data.daily_triggers = null; }
+
+  // Recovery + Catalyst from Firebase (populated by daily-full-scan GitHub Action)
+  // Merge with any existing manual scan data already in data.recovery / data.catalyst
+  try{
+    const fbRec = await window.fbLoad("recovery");
+    if(fbRec && fbRec.data && fbRec.data.length){
+      // Merge: Firebase results take priority, dedupe by sym
+      const existing = Array.isArray(data.recovery) ? data.recovery : [];
+      const merged = [...fbRec.data];
+      existing.forEach(r=>{ if(!merged.find(x=>x.sym===r.sym)) merged.push(r); });
+      data.recovery = merged;
+    }
+  }catch(e){}
+
+  try{
+    const fbCat = await window.fbLoad("catalyst");
+    if(fbCat && fbCat.data && fbCat.data.length){
+      const existing = Array.isArray(data.catalyst) ? data.catalyst : [];
+      const merged = [...fbCat.data];
+      existing.forEach(r=>{ if(!merged.find(x=>x.sym===r.sym)) merged.push(r); });
+      data.catalyst = merged;
+    }
+  }catch(e){}
+
   return data;
 }
 
@@ -4937,6 +4962,8 @@ async function runMorningBrief(){
       if(data.confluence&&data.confluence.length) data.confluence.slice(0,10).forEach(r=>candidates.add(r.sym));
       if(data.catalyst&&data.catalyst.length) data.catalyst.slice(0,10).forEach(r=>candidates.add(r.sym));
       if(data.jax_scan&&data.jax_scan.length) data.jax_scan.filter(r=>r.greenArrow).slice(0,10).forEach(r=>candidates.add(r.sym));
+      if(data.recovery&&data.recovery.length) data.recovery.filter(r=>r.score>=5||r.greenArrow).slice(0,10).forEach(r=>candidates.add(r.sym));
+      if(data.catalyst&&data.catalyst.length) data.catalyst.filter(r=>r.atrCoiling).slice(0,10).forEach(r=>candidates.add(r.sym));
       // Fetch live quotes — max 30 to stay under Finnhub free tier
       const syms = [...candidates].slice(0,30);
       await Promise.all(syms.map(async sym=>{
