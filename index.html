@@ -4705,6 +4705,8 @@ function buildScannerContext(data){
   const sections = [];
 
   // ── Account status FIRST — prevents open position hallucinations ──
+  // NOTE TO CLAUDE: You MUST evaluate ALL tabs equally. Recovery, JAX, Catalyst, 
+  // Confluence and Weekly are all valid signal sources. Do not anchor on Weekly only.
   const journal  = Array.isArray(data.journal) ? data.journal : [];
   const openPos  = journal.filter(e=>e.status==="open"&&e.price);
   const openList = openPos.map(e=>`${e.sym}@$${parseFloat(e.price).toFixed(2)}`).join(", ");
@@ -4735,7 +4737,7 @@ TODAY (enter immediately): ${today.map(r=>`${r.sym}@$${r.price?.toFixed(2)} bull
 YESTERDAY (still valid): ${yest.map(r=>`${r.sym}@$${r.price?.toFixed(2)} bull${r.bullScore}/5 ${r.tier}`).join(", ")||"none"}`);
   }
 
-  // Weekly monitor — most important
+  // Weekly monitor — one of several equal data sources
   const wm = (data.weekly_monitor||[]);
   const t1  = wm.filter(r=>r.tier1);
   const t2  = wm.filter(r=>r.tier2&&!r.tier1);
@@ -4759,7 +4761,7 @@ ${pulse.map(r=>`${r.sym} ${r.changePct>=0?"▲":"▼"}${Math.abs(r.changePct||0)
   }
 
   // Confluence — enriched with pillars, price, RSI, cross-ref with weekly
-  const conf = (data.confluence||[]).sort((a,b)=>b.confScore-a.confScore||b.absChange-a.absChange).slice(0,8);
+  const conf = (data.confluence||[]).sort((a,b)=>b.confScore-a.confScore||b.absChange-a.absChange).slice(0,15);
   if(conf.length){
     const wmSyms = new Set((data.weekly_monitor||[]).map(r=>r.sym));
     const fmtConf = r => {
@@ -4780,7 +4782,7 @@ ${pulse.map(r=>`${r.sym} ${r.changePct>=0?"▲":"▼"}${Math.abs(r.changePct||0)
   }
 
   // JAX Scanner — enriched, cross-ref with weekly watchlist
-  const jax = (data.jax_scan||[]).filter(r=>r.greenArrow).slice(0,8);
+  const jax = (data.jax_scan||[]).filter(r=>r.greenArrow).slice(0,20);
   if(jax.length){
     const wmSyms = new Set((data.weekly_monitor||[]).map(r=>r.sym));
     const fmtJAX = r => {
@@ -4795,7 +4797,7 @@ JAX ONLY: ${jaxOnly.map(fmtJAX).join(", ")||"none"}`);
   }
 
   // Catalyst — ATR coil breakouts only (not earnings plays)
-  const cat = (data.catalyst||[]).filter(r=>r.atrCoiling).sort((a,b)=>b.bullScore-a.bullScore).slice(0,6);
+  const cat = (data.catalyst||[]).filter(r=>r.atrCoiling).sort((a,b)=>b.bullScore-a.bullScore).slice(0,15);
   if(cat.length){
     const wmSyms = new Set((data.weekly_monitor||[]).map(r=>r.sym));
     const fmtCat = r => {
@@ -4812,7 +4814,7 @@ COIL ONLY: ${standalone.map(fmtCat).join(", ")||"none"}`);
   }
 
   // Recovery
-  const rec = (data.recovery||[]).filter(r=>r.score>=5||r.greenArrow).slice(0,10);
+  const rec = (data.recovery||[]).filter(r=>r.score>=5||r.greenArrow).slice(0,20);
   if(rec.length){
     const fmtRec = r => {
       const c7  = r.deepBounce||r.c7 ? " C7-DEEP-BOUNCE" : "";
@@ -5014,15 +5016,24 @@ TRADE SLOTS (up to 5):
 - Leave slots empty rather than fill with weak signals
 - If 49 green arrows fired — score ALL of them, recommend only top scorers ≥ 4
 
-DATA SOURCES PRIORITY (highest to lowest):
-1. 🔥 AUTO-SCAN — green arrow fired today across all 657 stocks
-2. 🔥 DAILY TRIGGER — green arrow fired on weekly watchlist stock
-3. ⭐⭐ A++ weekly signal — weekly flip + 4H flip + 200EMA reclaim
-4. ⭐ TIER 1 weekly — weekly flip + 4H just flipped
-5. 🟢 TIER 2 weekly — weekly flip + 4H established
-6. Confluence 4/4 — all pillars firing
-7. Catalyst coil — energy building
-8. Pulse movers crossing weekly signals
+DATA SOURCES — ALL TABS ARE EQUAL. You MUST evaluate every tab:
+- 🔴 RECOVERY TAB — deeply oversold stocks bouncing off lows. IBM ran +40% from a Recovery signal. These are NOT weak — 6/6 Recovery + green arrow = high conviction entry.
+- 🟢 JAX TAB — green arrows across 685 stocks. Bull 4-5/5 + green arrow = strong momentum signal regardless of weekly status.
+- ⚡ CATALYST TAB — ATR coil + volume = energy building before breakout. VOL-IGNITING = breakout imminent.
+- ⚡ CONFLUENCE TAB — 4/4 pillars = all systems aligned. Strong standalone signal.
+- 📅 WEEKLY MONITOR — weekly trail flips. Important but NOT the only valid signal source.
+
+SCORING ORDER — evaluate ALL tabs before ranking:
+1. 🔥 DAILY TRIGGER — green arrow on weekly watchlist stock today
+2. 🔴 RECOVERY 6/6 + green arrow — IBM pattern, highest oversold conviction  
+3. ⭐⭐ A++ weekly — flip + 4H flip + 200EMA reclaim
+4. ⭐ TIER 1 weekly — flip + 4H just flipped
+5. 🟢 JAX bull 5/5 + green arrow today — pure momentum
+6. 🟢 TIER 2 weekly — flip + 4H established
+7. ⚡ Confluence 4/4 — all pillars firing
+8. 🔴 RECOVERY 5/6 or C7 deep bounce
+9. ⚡ Catalyst VOL-IGNITING — breakout imminent
+10. Pulse movers crossing weekly signals
 
 TIER SYSTEM (priority order):
 - A++ ⭐⭐ ENTER NOW: Weekly bull + 4H just flipped + daily 200 EMA fresh reclaim = HIGHEST CONVICTION
