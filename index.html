@@ -4812,9 +4812,23 @@ COIL ONLY: ${standalone.map(fmtCat).join(", ")||"none"}`);
   }
 
   // Recovery
-  const rec = (data.recovery||[]).filter(r=>r.score>=5||r.greenArrow).slice(0,5);
+  const rec = (data.recovery||[]).filter(r=>r.score>=5||r.greenArrow).slice(0,10);
   if(rec.length){
-    sections.push(`RECOVERY (5/6+): ${rec.map(r=>r.sym+" "+r.score+"/6"+(r.greenArrow?" 🟢":"")).join(", ")}`);
+    const fmtRec = r => {
+      const c7  = r.deepBounce||r.c7 ? " C7-DEEP-BOUNCE" : "";
+      const jax = r.greenArrow ? " 🟢GREEN-ARROW" : "";
+      const rsi = r.rsi ? " RSI"+Math.round(r.rsi) : "";
+      const bull = r.bullScore ? " bull"+r.bullScore+"/5" : "";
+      return r.sym+"@$"+(r.price||0).toFixed(2)+" "+r.score+"/6"+c7+jax+rsi+bull;
+    };
+    const rec66 = rec.filter(r=>r.score===6);
+    const rec55 = rec.filter(r=>r.score===5&&!rec66.find(x=>x.sym===r.sym));
+    const recJax = rec.filter(r=>r.greenArrow&&r.score<5);
+    sections.push(`🔴 RECOVERY TAB SIGNALS (oversold bounce setups — IBM pattern):
+6/6 CONDITIONS MET: ${rec66.map(fmtRec).join(", ")||"none"}
+5/6 CONDITIONS MET: ${rec55.map(fmtRec).join(", ")||"none"}
+JAX+RECOVERY: ${recJax.map(fmtRec).join(", ")||"none"}
+NOTE: Recovery stocks are deeply oversold bounces — RSI < 45, off 52w highs, EMA21 reclaiming. These are the IBM@$212 pattern. Score them: +2 for 6/6, +1 for 5/6, +1 for C7 deep bounce, +1 for green arrow, +1 for RSI < 40.`);
   }
 
   return sections.join("\n\n");
@@ -5035,6 +5049,13 @@ CROSS-REFERENCE RULES (highest conviction combos):
 - CATALYST coil only (no weekly) = 0.5% risk max, only if vol igniting
 - CATALYST with vol igniting (VOL-IGNITING) = breakout imminent, prioritize over regular coil
 - Never recommend catalyst earnings plays — only ATR coil breakouts
+
+TAB GUARANTEE RULES (ensures all scanners get representation):
+- If Recovery tab has ANY stock scoring 5/6 or 6/6 conditions = MUST include at least 1 Recovery pick in final 5. Score it: +2 for 6/6, +1 for 5/6, +1 for C7 deep bounce, +1 for RSI < 40, +1 for green arrow confirmed. Recovery picks with RSI < 40 + 6/6 + green arrow = minimum 5/10 entry.
+- If JAX auto-scan has ANY stock with bull 4/5 or 5/5 + green arrow today (not on weekly) = MUST include at least 1 pure auto-scan pick if weekly slots 1+2 are filled
+- If Catalyst tab has ANY stock with heat score 8+ or VOL-IGNITING status = MUST include at least 1 catalyst pick
+- These guarantees only apply if the respective tab data is present and has qualifying signals
+- Weekly picks still fill slots 1-2 first. Tab guarantees fill remaining slots 3-5
 
 POSITION SIZING BY CONVICTION:
 - Daily Trigger fired today + Weekly = full 1% risk
