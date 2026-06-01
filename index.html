@@ -5957,8 +5957,9 @@ function renderRecovery(){
     const wC=s.wr<-80?"var(--green2)":s.wr<-65?"#64DD17":"var(--muted2)";
     const cardCls=s.greenArrow?"card jax":s.score>=6?"card s6":s.score>=5?"card s5":"card";
     const sessBadge=s.session==="premarket"?'<span class="badge pm">🌅 PRE-MKT</span>':s.session==="afterhours"?'<span class="badge ah">🌙 AH</span>':'<span class="badge live">🔴 LIVE</span>';
-    const dots=s.conds.map((on,j)=>`<div class="dot" title="${LABELS[j]}" style="background:${on?g.bg:"var(--border)"}"></div>`).join("");
-    const tags=LABELS.map((lbl,j)=>`<span class="tag" style="background:${s.conds[j]?"rgba(0,200,83,0.08)":"var(--bg3)"};color:${s.conds[j]?"var(--green2)":"var(--muted)"};border:1px solid ${s.conds[j]?"rgba(0,200,83,0.2)":"var(--border)"}">${s.conds[j]?"✓":"✗"} ${lbl}</span>`).join("");
+    const conds=s.conds||[s.c1,s.c2,s.c3,s.c4,s.c5,s.c6]; // rebuild for github-actions data (no conds array)
+    const dots=conds.map((on,j)=>`<div class="dot" title="${LABELS[j]}" style="background:${on?g.bg:"var(--border)"}"></div>`).join("");
+    const tags=LABELS.map((lbl,j)=>`<span class="tag" style="background:${conds[j]?"rgba(0,200,83,0.08)":"var(--bg3)"};color:${conds[j]?"var(--green2)":"var(--muted)"};border:1px solid ${conds[j]?"rgba(0,200,83,0.2)":"var(--border)"}">${conds[j]?"✓":"✗"} ${lbl}</span>`).join("");
     return `<div class="${cardCls}" onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
       <div class="card-hdr">
         <div class="card-left">
@@ -6179,8 +6180,9 @@ function renderCatalyst(){
     const heatBg=s.heat>=8?"var(--red)":s.heat>=6?"var(--orange)":s.score>=4?"#FF9100":"var(--yellow)";
     const heat=s.greenArrow&&s.isIgniting?"🚀🟢 IGNITION+JAX":s.greenArrow?"🟢 JAX":s.heat>=8?"🔥🔥🔥 FIRE":s.heat>=6?"🔥🔥 HOT":s.score>=4?"🔥 WARM":"📡 WATCH";
     const CAT_LABELS=["Price range","ATR coiling","Vol dry-up/spike","Earnings/breakout","Near 52w low","RSI<55"];
-    const dots=s.conds.map((on,j)=>`<div class="dot" title="${CAT_LABELS[j]}" style="background:${on?heatBg:"var(--border)"}"></div>`).join("");
-    const tags=CAT_LABELS.map((lbl,j)=>`<span class="tag" style="background:${s.conds[j]?"rgba(255,109,0,0.08)":"var(--bg3)"};color:${s.conds[j]?heatBg:"var(--muted)"};border:1px solid ${s.conds[j]?"rgba(255,109,0,0.25)":"var(--border)"}">${s.conds[j]?"✓":"✗"} ${lbl}</span>`).join("");
+    const conds=s.conds||[s.c1,s.c2,s.c3,s.c4,s.c5,s.c6]; // rebuild for github-actions data (no conds array)
+    const dots=conds.map((on,j)=>`<div class="dot" title="${CAT_LABELS[j]}" style="background:${on?heatBg:"var(--border)"}"></div>`).join("");
+    const tags=CAT_LABELS.map((lbl,j)=>`<span class="tag" style="background:${conds[j]?"rgba(255,109,0,0.08)":"var(--bg3)"};color:${conds[j]?heatBg:"var(--muted)"};border:1px solid ${conds[j]?"rgba(255,109,0,0.25)":"var(--border)"}">${conds[j]?"✓":"✗"} ${lbl}</span>`).join("");
     const cardCls=s.greenArrow&&s.isIgniting?"card jax":s.heat>=8?"card s6":s.heat>=6?"card s5":"card";
     return `<div class="${cardCls}" onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
       <div class="card-hdr">
@@ -6226,7 +6228,7 @@ function renderCatalyst(){
         <div class="tags-row">${tags}</div>
         <div style="margin-top:5px;font-size:8px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap">
           <span>Vol ${s.dailySpike.toFixed(1)}x</span>
-          <span>${s.rangeWidth.toFixed(1)}% range · ${s.flatDays}d flat</span>
+          <span>${(s.rangeWidth||0).toFixed(1)}% range · ${s.flatDays}d flat</span>
           <span style="color:${s.pctFromHigh<-30?"var(--green2)":"var(--muted)"}">📉 ${s.pctFromHigh.toFixed(0)}% off hi</span>
         </div>
         ${s.jaxHasData?`<div class="jax-panel ${s.greenArrow?"active":""}">
@@ -7389,7 +7391,7 @@ function renderJAX(){
         <div class="card-right">
           <div class="card-price">$${s.price.toFixed(2)}</div>
           ${sessBadge}
-          <div class="card-chg ${s.change>=0?"up":"dn"}">${s.change>=0?"▲":"▼"}${Math.abs(s.change).toFixed(2)}%</div>
+          <div class="card-chg ${s.change>=0?"up":"dn"}">${s.change>=0?"▲":"▼"}${Math.abs(s.change||0).toFixed(2)}%</div>
         </div>
       </div>
       <div class="badges">
@@ -7429,7 +7431,7 @@ function renderJAX(){
         </div>
         <div class="jax-trail">
           Trail $${s.trailVal.toFixed(2)} · ${s.utBuy?"🟢 UTBuy fired!":s.stFlipped?"🟢 ST Flip!":"Signal active"}
-          <span style="float:right;color:var(--muted)">52w hi $${s.high52.toFixed(2)} · ${s.pctHi.toFixed(0)}% off</span>
+          <span style="float:right;color:var(--muted)">52w hi $${(s.high52||0).toFixed(2)} · ${(s.pctHi||0).toFixed(0)}% off</span>
         </div>
       </div>
     </div>`;
