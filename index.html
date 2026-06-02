@@ -5927,6 +5927,16 @@ function setRFilter(v,btn){
   renderRecovery();
 }
 
+// taScore badge — chart-quality triage score (0-100). Hidden if absent (old data).
+function taBadge(s){
+  if(typeof s.taScore!=="number") return "";
+  const v=s.taScore;
+  const col=v>=70?"#00C853":v>=50?"#FFB300":v>=30?"#FF6D00":"var(--muted2)";
+  const ig=s.taIgniting?" 🚀":"";
+  const tip=s.taParts?`TA ${v}/100 · trend ${s.taParts.trend} · coil ${s.taParts.compression} · vol ${s.taParts.volume} · trail ${s.taParts.trail} · candle ${s.taParts.candle} · mom ${s.taParts.momentum} · ign ${s.taParts.ignition}`:`TA ${v}/100`;
+  return `<span class="grade" title="${tip}" style="background:${col};color:#000">TA ${v}${ig}</span>`;
+}
+
 function renderRecovery(){
   const min=parseInt(document.getElementById("minSel").value);
   const sort=document.getElementById("r-sortSel")?.value||"jax";
@@ -5964,7 +5974,7 @@ function renderRecovery(){
       <div class="card-hdr">
         <div class="card-left">
           <div class="card-ticker" style="display:flex;align-items:center;gap:6px">${tickerLogo(s.sym,20)}${s.sym}</div>
-          <span class="grade" style="background:${g.bg};color:${g.fg}">${g.l}</span>
+          <span class="grade" style="background:${g.bg};color:${g.fg}">${g.l}</span>${taBadge(s)}
           <div class="card-hint" style="display:flex;gap:6px;align-items:center">
             <span>#${i+1} · CLICK → TRADINGVIEW</span>
             <button class="log-btn" onclick="event.stopPropagation();logRecoveryStock('${s.sym}',${s.price},${s.score},${s.greenArrow?1:0})">📓 LOG</button>
@@ -6188,7 +6198,7 @@ function renderCatalyst(){
       <div class="card-hdr">
         <div class="card-left">
           <div class="card-ticker" style="display:flex;align-items:center;gap:6px">${tickerLogo(s.sym,20)}${s.sym}</div>
-          <span class="grade" style="background:${heatBg};color:#000">${heat}</span>
+          <span class="grade" style="background:${heatBg};color:#000">${heat}</span>${taBadge(s)}
           <div class="card-hint" style="display:flex;gap:6px;align-items:center">
             <span>#${i+1} · CLICK → TRADINGVIEW</span>
             <button class="log-btn" onclick="event.stopPropagation();logCatalystStock('${s.sym}',${s.price},${s.score},${s.greenArrow?1:0},${s.heat})">📓 LOG</button>
@@ -7382,7 +7392,7 @@ function renderJAX(){
       <div class="card-hdr">
         <div class="card-left">
           <div class="card-ticker" style="display:flex;align-items:center;gap:6px">${tickerLogo(s.sym,20)}${s.sym}</div>
-          <span class="grade" style="background:${bullBg};color:#000">🟢 BULL ${s.bullScore}/5</span>
+          <span class="grade" style="background:${bullBg};color:#000">🟢 BULL ${s.bullScore}/5</span>${taBadge(s)}
           <div class="card-hint" style="display:flex;gap:6px;align-items:center">
             <span>#${i+1} · CLICK → TRADINGVIEW</span>
             <button class="log-btn" onclick="event.stopPropagation();logJAXStock('${s.sym}',${s.price},${s.bullScore})">📓 LOG</button>
