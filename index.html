@@ -1399,6 +1399,7 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <div class="tab" id="tab-weekly" onclick="switchTab('weekly')">📅 Weekly</div>
   <div class="tab" id="tab-backtest" onclick="switchTab('backtest')">🔬 Backtest</div>
   <div class="tab" id="tab-agent" onclick="switchTab('agent')" style="color:var(--green2);font-weight:700">🤖 Agent</div>
+  <div class="tab" id="tab-weinstein" onclick="switchTab('weinstein')" style="color:#FFB300;font-weight:700">📊 Weinstein</div>
 </div>
 
 <!-- ═══ WATCHLIST BAR ═══ -->
@@ -2444,6 +2445,35 @@ function switchTab(tab){ _doSwitchTab(tab); }
 
 </div><!-- end backtest -->
 
+<div class="tab-panel" id="panel-weinstein">
+
+<div class="agent-header">
+  <div>
+    <div class="agent-title">📊 Weinstein Stage Analysis</div>
+    <div class="agent-sub" id="ws-sub">TOP 10 · DAILY + WEEKLY · DESKTOP AGENT POWERED</div>
+  </div>
+  <div style="margin-left:auto;font-family:var(--mono);font-size:8px;color:var(--muted2)" id="ws-lastrun"></div>
+</div>
+
+<div style="padding:0 16px 8px">
+  <div id="ws-topbar" style="display:none;background:#0a1525;border:1px solid #1a3a4a;border-radius:4px;padding:8px 14px;margin-bottom:10px;font-family:var(--mono);font-size:10px;display:flex;gap:16px;align-items:center">
+    <span id="ws-enter-count" style="color:var(--green2)">🟢 — ENTER</span>
+    <span id="ws-wait-count" style="color:#FFB300">🟡 — WAIT</span>
+    <span id="ws-avoid-count" style="color:var(--red)">🔴 — AVOID</span>
+    <span id="ws-tickers" style="color:var(--muted2);margin-left:auto"></span>
+  </div>
+</div>
+
+<div id="ws-grid" style="padding:0 16px 80px">
+  <div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:40px 20px;text-align:center;line-height:1.8">
+    No Weinstein analysis yet.<br>
+    <span style="color:#FFB300">Open desktop Claude → run Prompt 1 with Firebase + TradingView MCP connected.</span><br>
+    <span style="font-size:9px;color:var(--muted2)">Results write to screener/weinstein and appear here automatically.</span>
+  </div>
+</div>
+
+</div><!-- end weinstein -->
+
 <script>
 // ── Market session detection ──────────────────────────────────────────────────
 function getMarketSession(){
@@ -2808,6 +2838,9 @@ function _doSwitchTab(tab){
     loadWeeklyCronAlerts();
   } else if(tab==="agent"){
     document.getElementById("mainSubtitle").textContent="🤖 TRADING AGENT · AI-POWERED DECISION ENGINE";
+  } else if(tab==="weinstein"){
+    document.getElementById("mainSubtitle").textContent="📊 WEINSTEIN STAGE ANALYSIS · DESKTOP AGENT · DUAL TIMEFRAME";
+    loadWeinstein();
     loadAgent();
   } else if(tab==="backtest"){
     document.getElementById("mainSubtitle").textContent="🔬 BACKTEST · WEEKLY TRAIL FLIP SIGNAL VALIDATOR · 5 YEARS";
@@ -7624,6 +7657,180 @@ function toggleAccordion(bodyId, arrowId){
   body.classList.toggle('open', !isOpen);
   if(arrow) arrow.classList.toggle('open', !isOpen);
 }
+
+// ── Weinstein Tab ─────────────────────────────────────────────────────────────
+let wsResults = [];
+
+function loadWeinstein(){
+  const grid = document.getElementById("ws-grid");
+  const lastrun = document.getElementById("ws-lastrun");
+  grid.innerHTML = '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:20px;text-align:center">Loading...</div>';
+  window.fbLoad("weinstein").then(fb => {
+    if(!fb || !fb.data){
+      grid.innerHTML = '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:40px 20px;text-align:center;line-height:1.8">No Weinstein analysis yet.<br><span style="color:#FFB300">Open desktop Claude → run Prompt 1 with Firebase + TradingView MCP connected.</span><br><span style="font-size:9px;color:var(--muted2)">Results write to screener/weinstein and appear here automatically.</span></div>';
+      return;
+    }
+    try{
+      wsResults = typeof fb.data === "string" ? JSON.parse(fb.data) : fb.data;
+      if(!Array.isArray(wsResults)) wsResults = [];
+      if(fb.savedAt) lastrun.textContent = "Updated " + new Date(fb.savedAt).toLocaleString();
+      const analyzed = fb.tickersAnalyzed || wsResults.length;
+      document.getElementById("ws-sub").textContent = analyzed + " TICKERS · DAILY + WEEKLY · DESKTOP AGENT";
+      renderWeinstein();
+    }catch(e){ grid.innerHTML = '<div style="color:var(--red);font-family:var(--mono);font-size:11px;padding:20px">Error parsing data.</div>'; }
+  }).catch(() => {
+    grid.innerHTML = '<div style="color:var(--red);font-family:var(--mono);font-size:11px;padding:20px">Firebase error — check connection.</div>';
+  });
+}
+
+function renderWeinstein(){
+  const grid = document.getElementById("ws-grid");
+  const topbar = document.getElementById("ws-topbar");
+  if(!wsResults.length){
+    grid.innerHTML = '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:20px;text-align:center">No results.</div>';
+    return;
+  }
+
+  // Count by action
+  const enters = wsResults.filter(r=>r.action==="ENTER").length;
+  const waits  = wsResults.filter(r=>r.action==="WAIT").length;
+  const avoids = wsResults.filter(r=>r.action==="AVOID").length;
+  document.getElementById("ws-enter-count").textContent = "🟢 " + enters + " ENTER";
+  document.getElementById("ws-wait-count").textContent  = "🟡 " + waits  + " WAIT";
+  document.getElementById("ws-avoid-count").textContent = "🔴 " + avoids + " AVOID";
+  const syms = wsResults.map(r=>r.sym);
+  const tickerDisplay = syms.length > 12
+    ? syms.slice(0,12).join(" · ") + " +" + (syms.length-12) + " more"
+    : syms.join(" · ");
+  document.getElementById("ws-tickers").textContent = wsResults.length + " analyzed: " + tickerDisplay;
+  topbar.style.display = "flex";
+
+  // Sort: ENTER first, then WAIT, then AVOID, within each by taScore
+  const order = {ENTER:0, WAIT:1, AVOID:2};
+  const sorted = [...wsResults].sort((a,b) => {
+    const od = (order[a.action]||1) - (order[b.action]||1);
+    return od !== 0 ? od : (b.taScore||0) - (a.taScore||0);
+  });
+
+  grid.innerHTML = sorted.map(s => {
+    // Action styling
+    const isEnter = s.action==="ENTER";
+    const isWait  = s.action==="WAIT";
+    const isAvoid = s.action==="AVOID";
+    const acColor = isEnter?"var(--green2)":isWait?"#FFB300":"var(--red)";
+    const acBg    = isEnter?"rgba(0,200,83,0.08)":isWait?"rgba(255,179,0,0.08)":"rgba(255,60,60,0.08)";
+    const acIcon  = isEnter?"🟢":isWait?"🟡":"🔴";
+    const borderColor = isEnter?"var(--green2)":isWait?"#FFB300":"var(--red)";
+
+    // Stage labels
+    const stageLabel = n => ["","① BASE","② BREAKOUT","③ MARKUP","④ DISTRIB","⑤ BREAKDOWN","⑥ MARKDOWN"][n] || ("Stage "+n);
+    const stageColor = n => n===2?"var(--green2)":n===3?"#64B5F6":n>=4?"var(--red)":"var(--muted2)";
+
+    // Alignment badge
+    const alignColor = s.alignment==="CONFIRMED"?"var(--green2)":s.alignment==="CONFLICT"?"#FFB300":"var(--red)";
+
+    // Trail bullets
+    const dTrail = s.trailBullishDaily  ? "🟢" : "🔴";
+    const wTrail = s.trailBullishWeekly ? "🟢" : "🔴";
+
+    // JAX bullets
+    const dJAX = s.jaxActiveDaily  ? "⚡" : "—";
+    const wJAX = s.jaxActiveWeekly ? "⚡" : "—";
+
+    // taScore badge color
+    const tsColor = (s.taScore||0)>=70?"#00C853":(s.taScore||0)>=50?"#FFB300":(s.taScore||0)>=30?"#FF6D00":"var(--muted2)";
+    const igFlag  = s.taIgniting ? " 🚀" : "";
+
+    // Change color
+    const chg = parseFloat(s.change||0);
+    const chgStr = (chg>=0?"▲":"▼")+Math.abs(chg).toFixed(2)+"%";
+    const chgColor = chg>=0?"var(--green2)":"var(--red)";
+
+    return `<div style="background:#0a1525;border:1px solid #1a3a4a;border-left:3px solid ${borderColor};border-radius:4px;padding:12px 14px;margin-bottom:10px;cursor:pointer"
+      onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
+
+      <!-- Header row -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:6px">${tickerLogo(s.sym,18)}<span style="font-size:16px;font-weight:700;color:#fff;font-family:var(--mono)">${s.sym}</span></div>
+        <span style="font-size:13px;font-weight:700;color:${chgColor};font-family:var(--mono)">${chgStr}</span>
+        <span style="font-size:11px;color:var(--muted2);font-family:var(--mono)">$${parseFloat(s.price||0).toFixed(2)}</span>
+        <span style="background:${tsColor};color:#000;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;font-family:var(--mono)">TA ${s.taScore||0}${igFlag}</span>
+        <span style="background:${acBg};color:${acColor};font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;border:1px solid ${acColor};font-family:var(--mono);margin-left:auto">${acIcon} ${s.action}</span>
+        <button onclick="event.stopPropagation();logToJournal({sym:'${s.sym}',price:${s.price||0},score:'W',source:'weinstein',session:getMarketSession(),greenArrow:${s.jaxActiveDaily||false},tradeType:'Weinstein'})"
+          style="background:#0d1f2b;border:1px solid var(--blue);color:var(--blue);font-family:var(--mono);font-size:8px;padding:3px 8px;cursor:pointer;border-radius:2px">📓 LOG</button>
+      </div>
+
+      <!-- Stage row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:8px">
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">DAILY</div>
+          <div style="font-size:11px;font-weight:700;color:${stageColor(s.dailyStage)};font-family:var(--mono)">${stageLabel(s.dailyStage)}</div>
+        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">WEEKLY</div>
+          <div style="font-size:11px;font-weight:700;color:${stageColor(s.weeklyStage)};font-family:var(--mono)">${stageLabel(s.weeklyStage)}</div>
+        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">ALIGN</div>
+          <div style="font-size:10px;font-weight:700;color:${alignColor};font-family:var(--mono)">${s.alignment||"—"}</div>
+        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">TRAIL D/W</div>
+          <div style="font-size:12px;font-family:var(--mono)">${dTrail} ${wTrail}</div>
+        </div>
+      </div>
+
+      <!-- RSI / Trail values row -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">D-RSI</div>
+          <div style="font-size:12px;font-weight:700;color:${(s.dailyRSI||0)<70?"var(--green2)":"var(--red)"};font-family:var(--mono)">${(s.dailyRSI||0).toFixed(1)}</div>
+        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">W-RSI</div>
+          <div style="font-size:12px;font-weight:700;color:${(s.weeklyRSI||0)<70?"#64B5F6":"var(--red)"};font-family:var(--mono)">${(s.weeklyRSI||0).toFixed(1)}</div>
+        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">JAX D/W</div>
+          <div style="font-size:12px;font-family:var(--mono)">${dJAX} ${wJAX}</div>
+        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">D-TRAIL</div>
+          <div style="font-size:11px;font-weight:700;color:var(--muted2);font-family:var(--mono)">$${parseFloat(s.dailyTrail||0).toFixed(2)}</div>
+        </div>
+      </div>
+
+      ${isEnter && s.entryZone ? `
+      <!-- Trade levels (ENTER only) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">
+        <div style="background:rgba(0,200,83,0.06);border:1px solid rgba(0,200,83,0.2);border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">ENTRY</div>
+          <div style="font-size:13px;font-weight:700;color:var(--green2);font-family:var(--mono)">$${parseFloat(s.entryZone||0).toFixed(2)}</div>
+        </div>
+        <div style="background:rgba(255,60,60,0.06);border:1px solid rgba(255,60,60,0.2);border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">STOP</div>
+          <div style="font-size:13px;font-weight:700;color:var(--red);font-family:var(--mono)">$${parseFloat(s.stop||0).toFixed(2)}</div>
+        </div>
+        <div style="background:rgba(100,181,246,0.06);border:1px solid rgba(100,181,246,0.2);border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">TARGET</div>
+          <div style="font-size:13px;font-weight:700;color:#64B5F6;font-family:var(--mono)">$${parseFloat(s.target||0).toFixed(2)}</div>
+        </div>
+      </div>` : ""}
+
+      ${isWait && s.trigger ? `
+      <!-- Trigger (WAIT only) -->
+      <div style="background:rgba(255,179,0,0.08);border:1px solid rgba(255,179,0,0.25);border-radius:3px;padding:6px 10px;margin-bottom:8px;font-family:var(--mono);font-size:10px;color:#FFB300">
+        ⏳ TRIGGER: ${s.trigger}
+      </div>` : ""}
+
+      <!-- Summary + Key Risk -->
+      ${s.summary ? `<div style="font-family:var(--mono);font-size:10px;color:var(--muted2);margin-bottom:4px">${s.summary}</div>` : ""}
+      ${s.keyRisk  ? `<div style="font-family:var(--mono);font-size:9px;color:#FF6D00">⚠️ ${s.keyRisk}</div>` : ""}
+
+    </div>`;
+  }).join("");
+}
+
 </script>
 </body>
 </html>
