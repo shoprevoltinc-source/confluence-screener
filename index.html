@@ -7666,7 +7666,7 @@ function loadWeinstein(){
   const lastrun = document.getElementById("ws-lastrun");
   grid.innerHTML = '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:20px;text-align:center">Loading...</div>';
   // Read raw from Firebase to handle both wrapped {data,savedAt} and direct array structures
-  window.db.ref("screener/weinstein").once("value").then(snap => {
+  db.ref("screener/weinstein").once("value").then(snap => {
     if(!snap.exists()){
       grid.innerHTML = '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:40px 20px;text-align:center;line-height:1.8">No Weinstein analysis yet.<br><span style="color:#FFB300">Open desktop Claude → run Prompt 1 with Firebase + TradingView MCP connected.</span><br><span style="font-size:9px;color:var(--muted2)">Results write to screener/weinstein and appear here automatically.</span></div>';
       return;
