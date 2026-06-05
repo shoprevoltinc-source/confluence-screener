@@ -7665,20 +7665,46 @@ function loadWeinstein(){
   const grid = document.getElementById("ws-grid");
   const lastrun = document.getElementById("ws-lastrun");
   grid.innerHTML = '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:20px;text-align:center">Loading...</div>';
-  window.fbLoad("weinstein").then(fb => {
-    if(!fb || !fb.data){
+  // Read raw from Firebase to handle both wrapped {data,savedAt} and direct array structures
+  window.db.ref("screener/weinstein").once("value").then(snap => {
+    if(!snap.exists()){
       grid.innerHTML = '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:40px 20px;text-align:center;line-height:1.8">No Weinstein analysis yet.<br><span style="color:#FFB300">Open desktop Claude → run Prompt 1 with Firebase + TradingView MCP connected.</span><br><span style="font-size:9px;color:var(--muted2)">Results write to screener/weinstein and appear here automatically.</span></div>';
       return;
     }
     try{
-      wsResults = typeof fb.data === "string" ? JSON.parse(fb.data) : fb.data;
-      if(!Array.isArray(wsResults)) wsResults = [];
-      if(fb.savedAt) lastrun.textContent = "Updated " + new Date(fb.savedAt).toLocaleString();
-      const analyzed = fb.tickersAnalyzed || wsResults.length;
-      document.getElementById("ws-sub").textContent = analyzed + " TICKERS · DAILY + WEEKLY · DESKTOP AGENT";
+      const val = snap.val();
+      let results = [], savedAt = null, tickersAnalyzed = 0;
+
+      if(val && val.data){
+        // Expected format: {data: string|array, savedAt, device, tickersAnalyzed}
+        results = typeof val.data === "string" ? JSON.parse(val.data) : val.data;
+        savedAt = val.savedAt;
+        tickersAnalyzed = val.tickersAnalyzed || (Array.isArray(results)?results.length:0);
+      } else if(Array.isArray(val)){
+        // Desktop agent wrote array directly
+        results = val;
+        tickersAnalyzed = val.length;
+      } else if(val && typeof val === "object"){
+        // Desktop agent wrote object with numeric keys (Firebase array-like)
+        const keys = Object.keys(val);
+        const numericKeys = keys.filter(k => !isNaN(k));
+        if(numericKeys.length > 0){
+          results = numericKeys.map(k => val[k]);
+          tickersAnalyzed = results.length;
+          savedAt = val.savedAt || null;
+        }
+      }
+
+      if(!Array.isArray(results)) results = [];
+      wsResults = results;
+      if(savedAt) lastrun.textContent = "Updated " + new Date(savedAt).toLocaleString();
+      document.getElementById("ws-sub").textContent = tickersAnalyzed + " TICKERS · DAILY + WEEKLY · DESKTOP AGENT";
       renderWeinstein();
-    }catch(e){ grid.innerHTML = '<div style="color:var(--red);font-family:var(--mono);font-size:11px;padding:20px">Error parsing data.</div>'; }
-  }).catch(() => {
+    }catch(e){
+      console.warn("loadWeinstein error:", e);
+      grid.innerHTML = '<div style="color:var(--red);font-family:var(--mono);font-size:11px;padding:20px">Error parsing data: '+e.message+'</div>';
+    }
+  }).catch(e => {
     grid.innerHTML = '<div style="color:var(--red);font-family:var(--mono);font-size:11px;padding:20px">Firebase error — check connection.</div>';
   });
 }
