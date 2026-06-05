@@ -2603,6 +2603,40 @@ async function fetchCandles(sym){ return fetchCandlesWithKey(sym, 0); }
 // [indicators.js] calcRSI — moved to indicators.js
 // [indicators.js] calcEMA — moved to indicators.js
 
+// calcRVOL15m — relative volume on the most recent CLOSED 15m bar vs same-slot
+// average over the prior N days (default 10).
+// Uses Finnhub raw response: intra.t (unix timestamps), intra.v (volumes).
+// Algorithm: trailing same-slot mean (avg volume at that time-of-day over last N days).
+// Returns a ratio (e.g. 2.5 = 250% of average). Returns 0 if insufficient data.
+function calcRVOL15m(timestamps, volumes, lookbackDays = 10) {
+  if (!timestamps || !volumes || timestamps.length < 2) return 0;
+  try {
+    // Use second-to-last bar (last CLOSED bar, not the in-progress one)
+    const lastIdx = timestamps.length - 2;
+    if (lastIdx < 0) return 0;
+    const refTime = new Date(timestamps[lastIdx] * 1000);
+    const refHour = refTime.getUTCHours();
+    const refMin  = refTime.getUTCMinutes();
+    const refVol  = volumes[lastIdx];
+    if (!refVol) return 0;
+
+    // Collect same time-slot volumes from prior days
+    const sameSlotVols = [];
+    for (let i = 0; i < lastIdx; i++) {
+      const t = new Date(timestamps[i] * 1000);
+      if (t.getUTCHours() === refHour && t.getUTCMinutes() === refMin) {
+        sameSlotVols.push(volumes[i]);
+      }
+    }
+    // Need at least 3 prior same-slot bars for a meaningful average
+    if (sameSlotVols.length < 3) return 0;
+    const recentSlots = sameSlotVols.slice(-lookbackDays);
+    const avgVol = recentSlots.reduce((a, b) => a + b, 0) / recentSlots.length;
+    if (!avgVol) return 0;
+    return Math.round((refVol / avgVol) * 100) / 100; // e.g. 2.50
+  } catch(e) { return 0; }
+}
+
 // ── scoreRecovery ─────────────────────────────────────────────────────────────
 // [indicators.js] scoreRecovery — moved to indicators.js
 
@@ -2654,7 +2688,7 @@ async function runWorker(keyIndex, tickers, minScore, isCatalyst, maxPrice, minV
           atrData = calcATR(candles.highs, candles.lows, candles.closes);
           // 15m RVOL from Finnhub intraday
           const intra = await fetch15mCandles(sym);
-          if(intra) rvol15m = calcRVOL15m(intra.times, intra.volumes);
+          if(intra) rvol15m = calcRVOL15m(intra.t, intra.v);
         }catch(e){}
 
         result = scoreCatalyst(sym, candles.closes, candles.highs, candles.lows, candles.volumes, maxPrice, minVolSpike, earnings, atrData, rvol15m);
@@ -2792,6 +2826,15 @@ let rResults=[], cResults=[], stopReq=false, isRunning=false;
 let rFilter="all", cFilter="all";
 let scanned=0, passed=0, errCount=0;
 let activeTab="recovery";
+// Alert session state (legacy alert-sessions design — kept for fbListen compatibility)
+let activeSession = null;
+let sessionAlerts = {
+  premarket:  { alerts: [], time: null },
+  open:       { alerts: [], time: null },
+  midday:     { alerts: [], time: null },
+  afternoon:  { alerts: [], time: null },
+  preclose:   { alerts: [], time: null }
+};
 
 // ── Tab switching ────────────────────────────────────────────
 function _doSwitchTab(tab){
@@ -4065,8 +4108,9 @@ async function startWeeklyMonitor(){
         // ── Step 4: 4H check — is 4H trail currently bullish? ────────────────
         // Backtest validated: weekly bull + 4H flip = 96% win rate (24/25 signals)
         let h4Bullish = false, h4Trail = 0, h4FlipRecent = false;
+        let h4 = null; // hoisted so Step 5b can access it
         try{
-          const h4 = await fetch4HCandles(sym, keyIdx);
+          h4 = await fetch4HCandles(sym, keyIdx);
           if(h4 && h4.closes.length >= 20){
             // Check current 4H trail direction
             const h4TS = calcATRTrailStop(h4.highs, h4.lows, h4.closes, 10, 3.5);
