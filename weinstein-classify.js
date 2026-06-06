@@ -264,10 +264,11 @@ async function readSources(sourceArg) {
     ? ["recovery", "catalyst", "jax_scan", "weekly_monitor"]
     : sourceArg.split(",").map(s => s.trim()).map(s => {
         // normalize shorthand
-        if (s === "jax")     return "jax_scan";
+        if (s === "jax")     return "jax_scan";       // now includes weekly fields
         if (s === "weekly")  return "weekly_monitor";
         if (s === "recovery") return "recovery";
         if (s === "catalyst") return "catalyst";
+        if (s === "jax_live") return "jax_cron_alerts";  // alias
         return s;
       });
 
