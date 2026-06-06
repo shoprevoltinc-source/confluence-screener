@@ -206,7 +206,8 @@ function calcJAXPRO(closes, highs, lows){
   const stBull    = st.bullish;
   const bullScore = (emaStack?1:0)+(macdBull?1:0)+(rsiBull?1:0)+(wrBull?1:0)+(stBull?1:0);
   const greenArrow = (atrTS.utBuy || st.flipped) && bullScore >= 1 && rsi14 < 70;
-  return { greenArrow, bullScore, rsi14, trailVal: atrTS.trailVal, utBuy: atrTS.utBuy, stFlipped: st.flipped };
+  return { greenArrow, bullScore, rsi14, trailVal: atrTS.trailVal, utBuy: atrTS.utBuy, stFlipped: st.flipped,
+           emaStack, macdBull, rsiBull, wrBull, stBull, emaRising: ema20 > ema40 };
 }
 
 // ── Fetch daily candles from Twelve Data ──────────────────
@@ -223,15 +224,49 @@ async function fetchCandles(sym, keyIndex){
   };
 }
 
+// ── NEW: Fetch weekly candles from Twelve Data ─────────────
+// Called only for green arrow tickers — no extra API budget for non-firers
+async function fetchWeeklyData(sym, keyIndex){
+  const key = TD_KEYS[keyIndex % TD_KEYS.length];
+  const url = `https://api.twelvedata.com/time_series?symbol=${sym}&interval=1week&outputsize=52&apikey=${key}`;
+  try {
+    const d = await fetchJSON(url);
+    if(!d.values || d.status==='error') return null;
+    const vals = [...d.values].reverse();
+    const closes = vals.map(v=>parseFloat(v.close));
+    const highs  = vals.map(v=>parseFloat(v.high));
+    const lows   = vals.map(v=>parseFloat(v.low));
+    if(closes.length < 20) return null;
+
+    const weeklyRsi      = calcRSI(closes, 14);
+    const wST            = calcSuperTrend(highs, lows, closes, 1.5, 10);
+    const wATR           = calcATRTrailStop(highs, lows, closes, 10, 3.5);
+    const wEma20         = calcEMA(closes, 20);
+    const price          = closes[closes.length-1];
+    const weeklyBullish  = wST.bullish;
+    const weeklyJAX      = wATR.utBuy || wST.flipped;
+    const weeklyJAXRecent = wST.flipped; // flipped this week
+    const weeklyTrail    = wATR.trailVal;
+    const dailyAbove200  = price > calcEMA(closes, 40); // use 40w as proxy for 200d
+
+    return {
+      weeklyBullish,
+      weeklyRsi:       parseFloat(weeklyRsi.toFixed(1)),
+      weeklyJAX,
+      weeklyJAXRecent,
+      weeklyTrail:     parseFloat(weeklyTrail.toFixed(2)),
+      weeklyAboveEma:  price > wEma20,
+    };
+  } catch(e) {
+    return null;
+  }
+}
+
 // ── Save results to Firebase ──────────────────────────────
 async function saveToFirebase(key, payload){
   const url = `${FIREBASE_URL}/screener/${key}.json`;
-  console.log(`💾 Saving to Firebase: ${FIREBASE_URL}/screener/${key}.json`);
-  const raw = JSON.stringify({
-    data:    JSON.stringify(payload),
-    savedAt: new Date().toISOString(),
-    device:  'github-action'
-  });
+  console.log(`💾 Saving to Firebase: screener/${key}`);
+  const raw = JSON.stringify(payload);
   return new Promise((resolve, reject)=>{
     const u = new URL(url);
     const options = {
@@ -244,7 +279,7 @@ async function saveToFirebase(key, payload){
       let data = '';
       res.on('data', chunk=> data+=chunk);
       res.on('end', ()=>{
-        console.log(`✅ Firebase save response:`, data.substring(0, 200));
+        console.log(`✅ Firebase saved: screener/${key}`);
         resolve(data);
       });
     });
@@ -258,10 +293,9 @@ async function saveToFirebase(key, payload){
 async function main(){
   console.log(`🔍 JAX Scanner starting — ${ALL_TICKERS.length} stocks — ${new Date().toISOString()}`);
   console.log(`📡 Using ${TD_KEYS.length} API keys`);
-  console.log(`🔑 Keys detected: ${TD_KEYS.map(k=>k.substring(0,8)+'...').join(', ')||'NONE'}`);
 
   if(!TD_KEYS.length){
-    console.error('❌ No API keys found. Check TD_KEYS secret in GitHub — must be comma or newline separated.');
+    console.error('❌ No API keys found. Check TD_KEYS secret.');
     process.exit(1);
   }
 
@@ -284,18 +318,43 @@ async function main(){
         }
         const jax = calcJAXPRO(candles.closes, candles.highs, candles.lows);
         if(jax && jax.greenArrow){
+          const price = candles.closes[candles.closes.length-1];
+
+          // Fetch weekly data for this green arrow ticker
+          await sleep(1000); // small pause before weekly fetch
+          const weekly = await fetchWeeklyData(sym, keyIdx);
+
           const result = {
             sym,
-            price:      candles.closes[candles.closes.length-1],
-            bullScore:  jax.bullScore,
-            rsi:        jax.rsi14,
-            trailVal:   jax.trailVal,
-            utBuy:      jax.utBuy,
-            stFlipped:  jax.stFlipped,
-            firedAt:    new Date().toISOString(),
+            price:            parseFloat(price.toFixed(2)),
+            change:           parseFloat(((price - candles.closes[candles.closes.length-2]) / candles.closes[candles.closes.length-2] * 100).toFixed(2)),
+            bullScore:        jax.bullScore,
+            rsi:              parseFloat(jax.rsi14.toFixed(1)),
+            greenArrow:       true,
+            utBuy:            jax.utBuy,
+            stFlipped:        jax.stFlipped,
+            emaStack:         jax.emaStack,
+            macdBull:         jax.macdBull,
+            rsiBull:          jax.rsiBull,
+            wrBull:           jax.wrBull,
+            stBull:           jax.stBull,
+            emaRising:        jax.emaRising,
+            trailVal:         parseFloat(jax.trailVal.toFixed(2)),
+            dailyJAX:         true,
+            dailyAbove200:    price > calcEMA(candles.closes, 200 > candles.closes.length ? candles.closes.length : 200),
+            // Weekly fields — what the classifier needs
+            weeklyBullish:    weekly ? weekly.weeklyBullish    : false,
+            weeklyRsi:        weekly ? weekly.weeklyRsi        : 0,
+            weeklyJAX:        weekly ? weekly.weeklyJAX        : false,
+            weeklyJAXRecent:  weekly ? weekly.weeklyJAXRecent  : false,
+            weeklyTrail:      weekly ? weekly.weeklyTrail      : 0,
+            weeklyAboveEma:   weekly ? weekly.weeklyAboveEma   : false,
+            weeklyFetched:    weekly !== null,
+            firedAt:          new Date().toISOString(),
           };
           fired.push(result);
-          console.log(`🟢 GREEN ARROW: ${sym} @ $${result.price.toFixed(2)} bull${result.bullScore}/5 RSI${result.rsi.toFixed(0)}`);
+          const wStage = weekly && weekly.weeklyBullish ? (weekly.weeklyJAX ? 'W2' : 'W1?') : 'W-bear';
+          console.log(`🟢 ${sym} @ $${result.price} bull${result.bullScore}/5 RSI${result.rsi} ${wStage}`);
         }
       }catch(e){
         if(!e.message?.includes('credits')) errors.push(sym);
@@ -307,19 +366,30 @@ async function main(){
   await Promise.all(chunks.map((chunk, ki)=> runWorker(ki, chunk)));
 
   console.log(`\n✅ Scan complete — ${fired.length} green arrows fired`);
-  if(fired.length){
-    fired.forEach(r=> console.log(`  → ${r.sym} $${r.price.toFixed(2)} bull${r.bullScore}/5`));
-  }
-  if(errors.length) console.log(`⚠️  Skipped ${errors.length} stocks (API limits)`);
+  const withWeeklyBull = fired.filter(r => r.weeklyBullish);
+  const potentialEnter = fired.filter(r => r.weeklyBullish && (r.weeklyJAX || r.weeklyJAXRecent));
+  console.log(`   Weekly bullish: ${withWeeklyBull.length} | Potential ENTER: ${potentialEnter.length}`);
 
+  if(errors.length) console.log(`⚠️  Skipped ${errors.length} stocks`);
+
+  // Save full results — classifier reads this
   const payload = {
-    data: fired,
-    time: new Date().toISOString(),
-    totalScanned: ALL_TICKERS.length,
-    checkTime: new Date().toLocaleTimeString('en-US', {timeZone:'America/New_York'})
+    data:          JSON.stringify(fired),
+    savedAt:       new Date().toISOString(),
+    device:        'github-action-jax',
+    totalScanned:  ALL_TICKERS.length,
+    greenArrows:   fired.length,
+    weeklyBullish: withWeeklyBull.length,
+    potentialEnter: potentialEnter.length,
+    checkTime:     new Date().toLocaleTimeString('en-US', {timeZone:'America/New_York'})
   };
+
+  // Save to both nodes so classifier and existing app both work
+  await saveToFirebase('jax_scan', payload);
   await saveToFirebase('jax_cron_alerts', payload);
-  console.log(`💾 Saved to Firebase — jax_cron_alerts`);
+
+  console.log(`\n🎯 Top potential setups (weekly bullish + JAX):`);
+  potentialEnter.forEach(r => console.log(`   ${r.sym} $${r.price} RSI-D:${r.rsi} RSI-W:${r.weeklyRsi}`));
 }
 
 main().catch(e=>{ console.error('Fatal error:', e); process.exit(1); });
