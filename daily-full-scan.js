@@ -78,10 +78,6 @@ async function fetchCandles(sym, keyIdx, outputsize = 120) {
 }
 
 // ── Score closures (call indicators.js with the right extra args) ──
-// JAX + Recovery take (sym, closes, highs, lows). Catalyst needs maxPrice,
-// minVolSpike, earnings, atrData, rvol15m — the Action has no Finnhub, so
-// earnings=null and rvol15m=0 (same as the old behaviour), and we compute
-// atrData here via calcATR so the ATR-coil conditions actually work.
 const jaxScore = (sym, c, h, l, v) => {
   const r = I.scoreJAX(sym, c, h, l);
   return Object.assign(r, I.scoreTA(c, h, l, v, "continuation"));
@@ -97,7 +93,6 @@ const catScore = (sym, c, h, l, v) => {
 };
 
 // ── Save to Firebase (GUARDED) ──────────────────────────────
-// Never overwrite with an empty array — that is what wiped the tabs before.
 async function fbSave(key, results) {
   if (!Array.isArray(results) || results.length === 0) {
     console.warn(`⏭️  ${key}: 0 results — SKIP save (existing Firebase data preserved)`);
@@ -113,9 +108,6 @@ async function fbSave(key, results) {
   return true;
 }
 
-// Coverage-aware save: if we couldn't fetch most of the universe, the run was
-// starved/failed — skip the save so good data survives. Otherwise defer to
-// fbSave (which still blocks a genuinely-empty write).
 async function saveGuarded(key, run) {
   const coverage = run.total > 0 ? run.fetched / run.total : 0;
   if (coverage < MIN_COVERAGE) {
@@ -127,11 +119,6 @@ async function saveGuarded(key, run) {
 }
 
 // ── Scanner runner ───────────────────────────────────────────
-// Returns { results, fetched, failed, total }.
-//   fetched = symbols we successfully pulled market data for (coverage numerator)
-//   failed  = fetch-level failures (credits exhausted / API errors)
-// A scoring throw (too few bars, SKIP:, etc.) happens AFTER a successful fetch,
-// so it counts toward coverage and just doesn't produce a hit — correct.
 async function runScanner(name, universe, scoreFn, filter, keyOffset = 0) {
   const results = [];
   let fetched = 0, failed = 0;
@@ -158,13 +145,13 @@ async function runScanner(name, universe, scoreFn, filter, keyOffset = 0) {
           const msg = e.message || "";
           if (msg.includes("credits")) {
             if (retries > 0) { await sleep(60000); retries--; continue; }
-            failed++; // out of credits even after waiting → coverage gap
+            failed++;
           } else if (msg.startsWith("SKIP:") || msg.includes("not found")
                      || msg.includes("Not enough") || msg.includes("70+")
                      || msg.includes("calc failed")) {
-            // legitimate "no signal / not enough history" — fetch succeeded, no hit
+            // legitimate no-signal — fetch succeeded, no hit
           } else {
-            failed++; // network/API/parse failure → coverage gap
+            failed++;
           }
           break;
         }
@@ -176,8 +163,6 @@ async function runScanner(name, universe, scoreFn, filter, keyOffset = 0) {
   console.log(`\n🔍 ${name} — scanning ${total} stocks with ${TD_KEYS.length} keys`);
   await Promise.all(chunks.map((chunk, ki) => worker(ki, chunk)));
   const coverage = total > 0 ? fetched / total : 0;
-  // Pre-rank by chart-quality score (additive triage; does not change which
-  // stocks qualified, only their order). Falls back to 0 if taScore absent.
   results.sort((a,b) => (b.taScore||0) - (a.taScore||0));
   console.log(`  📊 ${name} done — ${results.length} hits · ${fetched}/${total} fetched `
     + `(${(coverage * 100).toFixed(0)}%) · ${failed} fetch-failures`);
@@ -189,22 +174,25 @@ async function main() {
   console.log(`🌅 Daily Full Scan — ${new Date().toISOString()}`);
   console.log(`📡 ${TD_KEYS.length} keys, ${ALL.length} stocks · using indicators.js (shared logic)`);
 
-  // ── 1. JAX Scanner — all stocks, green arrows ──────────────
+  // ── 1. JAX Scanner ─────────────────────────────────────────
+  // Saves to jax_scan ONLY — never touches jax_cron_alerts
+  // jax_cron_alerts is owned by the live browser scan (AUTO-SCAN ALERT banner)
+  // and must not be overwritten by the scheduled Action
   const jaxRun = await runScanner("JAX", ALL, jaxScore, r => r && r.greenArrow);
   await saveGuarded("jax_scan", jaxRun);
-  await saveGuarded("jax_cron_alerts", jaxRun);
+  // ❌ DO NOT save to jax_cron_alerts here — that wipes the live browser banner
 
   console.log("\n⏳ Cooling down 2 minutes before Recovery scan...");
   await sleep(120000);
 
-  // ── 2. Recovery Scanner — SP500 only, score >= 3 or C7 ─────
+  // ── 2. Recovery Scanner ─────────────────────────────────────
   const recRun = await runScanner("Recovery", SP500, recScore, r => r && (r.score >= 3 || r.c7));
   await saveGuarded("recovery", recRun);
 
   console.log("\n⏳ Cooling down 2 minutes before Catalyst scan...");
   await sleep(120000);
 
-  // ── 3. Catalyst Scanner — smallcap universe, coiling stocks ─
+  // ── 3. Catalyst Scanner ──────────────────────────────────────
   const catRun = await runScanner("Catalyst", SMALLCAP, catScore, r => r && r.atrCoiling && r.score >= 2);
   await saveGuarded("catalyst", catRun);
 
@@ -213,7 +201,7 @@ async function main() {
   console.log(`  🟢 JAX green arrows: ${jaxRun.results.length}  (${jaxRun.fetched}/${jaxRun.total} fetched)`);
   console.log(`  📈 Recovery signals: ${recRun.results.length}  (${recRun.fetched}/${recRun.total} fetched)`);
   console.log(`  ⚡ Catalyst coils:   ${catRun.results.length}  (${catRun.fetched}/${catRun.total} fetched)`);
-  console.log(`\nNote: any scanner that came back empty or low-coverage was NOT saved — prior data preserved.`);
+  console.log(`\nNote: jax_cron_alerts is owned by the live browser scan — not touched here.`);
 }
 
 main().catch(e => { console.error("Fatal:", e); process.exit(1); });
