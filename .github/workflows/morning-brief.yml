@@ -1,0 +1,27 @@
+name: Telegram Morning Brief
+
+on:
+  schedule:
+    # 9:00 AM ET = 13:00 UTC (standard time) / 14:00 UTC (daylight time)
+    # Using 13:05 UTC to fire just after daily scan completes
+    - cron: "5 13 * * 1-5"
+  workflow_dispatch: # allow manual trigger from GitHub UI
+
+jobs:
+  morning-brief:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Send Morning Brief
+        env:
+          FIREBASE_DB_URL:     ${{ secrets.FIREBASE_DB_URL }}
+          TELEGRAM_BOT_TOKEN:  ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:    ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node telegram-morning-brief.js
