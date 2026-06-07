@@ -22,10 +22,9 @@ const FIREBASE_DB_URL = (process.env.FIREBASE_DB_URL || "").replace(/\/$/, "");
 
 const SCAN_DELAY_MS     = 10000;
 const STAGGER_MS        = 1500;
-const CAT_MAX_PRICE     = 250;  // matches the web app's catMaxPrice default
-const CAT_MIN_VOL_SPIKE = 2;    // matches the web app's daily volume-spike threshold
-const MIN_COVERAGE      = 0.6;  // if <60% of a universe was fetched, treat the run as
-                                // failed (credit-starved/API down) and DO NOT overwrite
+const CAT_MAX_PRICE     = 250;
+const CAT_MIN_VOL_SPIKE = 2;
+const MIN_COVERAGE      = 0.6;
 
 if (!TD_KEYS.length)  { console.error("❌ No TD_KEYS"); process.exit(1); }
 if (!FIREBASE_DB_URL) { console.error("❌ No FIREBASE_DB_URL"); process.exit(1); }
@@ -77,7 +76,7 @@ async function fetchCandles(sym, keyIdx, outputsize = 120) {
   };
 }
 
-// ── Score closures (call indicators.js with the right extra args) ──
+// ── Score closures ───────────────────────────────────────────
 const jaxScore = (sym, c, h, l, v) => {
   const r = I.scoreJAX(sym, c, h, l);
   return Object.assign(r, I.scoreTA(c, h, l, v, "continuation"));
@@ -149,7 +148,7 @@ async function runScanner(name, universe, scoreFn, filter, keyOffset = 0) {
           } else if (msg.startsWith("SKIP:") || msg.includes("not found")
                      || msg.includes("Not enough") || msg.includes("70+")
                      || msg.includes("calc failed")) {
-            // legitimate no-signal — fetch succeeded, no hit
+            // legitimate no-signal
           } else {
             failed++;
           }
@@ -175,12 +174,50 @@ async function main() {
   console.log(`📡 ${TD_KEYS.length} keys, ${ALL.length} stocks · using indicators.js (shared logic)`);
 
   // ── 1. JAX Scanner ─────────────────────────────────────────
-  // Saves to jax_scan ONLY — never touches jax_cron_alerts
-  // jax_cron_alerts is owned by the live browser scan (AUTO-SCAN ALERT banner)
-  // and must not be overwritten by the scheduled Action
   const jaxRun = await runScanner("JAX", ALL, jaxScore, r => r && r.greenArrow);
-  await saveGuarded("jax_scan", jaxRun);
-  // ❌ DO NOT save to jax_cron_alerts here — that wipes the live browser banner
+  const jaxSaved = await saveGuarded("jax_scan", jaxRun);
+
+  // ── Write jax_cron_alerts (banner) from daily scan results ─
+  // Merges with any TradingView webhook entries already in the banner
+  // so live per-ticker alerts aren't lost when the daily scan runs.
+  if (jaxSaved) {
+    try {
+      // Read existing banner to preserve any webhook-sourced entries
+      const existingRaw = await new Promise((resolve) => {
+        https.get(`${FIREBASE_DB_URL}/screener/jax_cron_alerts.json`, res => {
+          let body = "";
+          res.on("data", d => body += d);
+          res.on("end", () => { try { resolve(JSON.parse(body)); } catch { resolve(null); } });
+        }).on("error", () => resolve(null));
+      });
+
+      // Collect any webhook-sourced entries not in today's scan
+      const scanSyms = new Set(jaxRun.results.map(r => r.sym));
+      let webhookEntries = [];
+      if (existingRaw && existingRaw.data) {
+        try {
+          const existing = typeof existingRaw.data === "string"
+            ? JSON.parse(existingRaw.data) : existingRaw.data;
+          if (Array.isArray(existing)) {
+            webhookEntries = existing.filter(r => r.source === "tradingview_webhook" && !scanSyms.has(r.sym));
+          }
+        } catch {}
+      }
+
+      // Daily scan results first, then any webhook-only entries
+      const merged = [...jaxRun.results, ...webhookEntries];
+
+      await firebasePut("screener/jax_cron_alerts", {
+        data:        JSON.stringify(merged),
+        savedAt:     new Date().toISOString(),
+        device:      "github-actions-daily",
+        greenArrows: merged.length
+      });
+      console.log(`✅ Banner updated → screener/jax_cron_alerts (${merged.length} tickers, ${webhookEntries.length} webhook entries preserved)`);
+    } catch (e) {
+      console.warn(`⚠️  jax_cron_alerts banner update failed: ${e.message} — jax_scan still saved`);
+    }
+  }
 
   console.log("\n⏳ Cooling down 2 minutes before Recovery scan...");
   await sleep(120000);
@@ -201,7 +238,6 @@ async function main() {
   console.log(`  🟢 JAX green arrows: ${jaxRun.results.length}  (${jaxRun.fetched}/${jaxRun.total} fetched)`);
   console.log(`  📈 Recovery signals: ${recRun.results.length}  (${recRun.fetched}/${recRun.total} fetched)`);
   console.log(`  ⚡ Catalyst coils:   ${catRun.results.length}  (${catRun.fetched}/${catRun.total} fetched)`);
-  console.log(`\nNote: jax_cron_alerts is owned by the live browser scan — not touched here.`);
 }
 
 main().catch(e => { console.error("Fatal:", e); process.exit(1); });
