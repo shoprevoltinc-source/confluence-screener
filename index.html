@@ -4620,8 +4620,9 @@ function loadWeeklyMonitor(){
         const banner = document.getElementById("wm-savedBanner");
         if(banner){ banner.style.display="block"; banner.textContent="💾 "+wmResults.length+" weekly signals · last scan"; }
         document.getElementById("wm-filterBar").style.display="flex";
+        document.getElementById("wm-t1").textContent       = wmResults.filter(r=>r.tier1).length;
+        document.getElementById("wm-t2").textContent       = wmResults.filter(r=>r.tier2&&!r.tier1).length;
         document.getElementById("wm-both").textContent     = wmResults.filter(r=>r.bothAligned).length;
-        const wkonly = document.getElementById("wm-wkonly"); if(wkonly) wkonly.textContent = wmResults.filter(r=>!r.bothAligned).length;
         document.getElementById("wm-fresh").textContent    = wmResults.filter(r=>r.isFresh).length;
         document.getElementById("wm-watching").textContent = wmResults.length;
         renderWeeklyMonitor();
@@ -4638,6 +4639,8 @@ function loadWeeklyMonitor(){
         const banner = document.getElementById("wm-savedBanner");
         if(banner){ banner.style.display="block"; banner.textContent="☁️ "+(fb.device||"cloud")+" · "+new Date(fb.savedAt).toLocaleString()+" — "+wmResults.length+" signals"; }
         document.getElementById("wm-filterBar").style.display="flex";
+        document.getElementById("wm-t1").textContent       = wmResults.filter(r=>r.tier1).length;
+        document.getElementById("wm-t2").textContent       = wmResults.filter(r=>r.tier2&&!r.tier1).length;
         document.getElementById("wm-both").textContent     = wmResults.filter(r=>r.bothAligned).length;
         document.getElementById("wm-fresh").textContent    = wmResults.filter(r=>r.isFresh).length;
         document.getElementById("wm-watching").textContent = wmResults.length;
