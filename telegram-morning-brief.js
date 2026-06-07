@@ -217,22 +217,58 @@ function buildMessage2(weeklyMonitor) {
   return lines.join("\n");
 }
 
-function buildMessage3(jaxScan, weinstein) {
+function buildMessage3(jaxScan, weinstein, weeklyMonitor) {
   const lines = [];
 
-  // JAX green arrows today
-  const greenArrows = (jaxScan || []).filter(r => r.greenArrow);
-  lines.push(`🟢 <b>JAX TODAY — ${greenArrows.length} green arrow${greenArrows.length !== 1 ? "s" : ""}</b>`);
+  // JAX green arrows today — top 8, bull 4/5+ only
+  const allArrows   = (jaxScan || []).filter(r => r.greenArrow);
+  const greenArrows = allArrows
+    .filter(r => (r.bullScore || 0) >= 4)
+    .sort((a, b) => (b.bullScore || 0) - (a.bullScore || 0))
+    .slice(0, 8);
+  lines.push(`🟢 <b>JAX TODAY — top ${greenArrows.length} of ${allArrows.length} arrows (bull 4-5/5)</b>`);
   if (greenArrows.length > 0) {
-    greenArrows.slice(0, 10).forEach(r => {
-      const price = r.price    ? `$${Number(r.price).toFixed(2)}`         : "";
-      const bull  = r.bullScore? ` bull${r.bullScore}/5`                   : "";
-      const rsi   = r.rsi      ? ` RSI${Number(r.rsi).toFixed(0)}`        : "";
+    greenArrows.forEach(r => {
+      const price   = r.price    ? `$${Number(r.price).toFixed(2)}`  : "";
+      const bull    = r.bullScore? ` bull${r.bullScore}/5`            : "";
+      const rsi     = r.rsi      ? ` RSI${Number(r.rsi).toFixed(0)}` : "";
       const trigger = r.utBuy ? " UTBuy" : r.stFlipped ? " STFlip" : "";
       lines.push(`• <b>${r.sym}</b> ${price}${bull}${rsi}${trigger}`);
     });
   } else {
-    lines.push("No green arrows fired yet today.");
+    lines.push("No bull 4-5/5 arrows today.");
+  }
+
+  // Top potential setups — weekly bullish + JAX
+  const wm = Array.isArray(weeklyMonitor) ? weeklyMonitor : [];
+  const wmSyms = new Set(wm.map(r => r.sym));
+  const weeklyJAX = allArrows
+    .filter(r => wmSyms.has(r.sym))
+    .sort((a, b) => (b.bullScore || 0) - (a.bullScore || 0))
+    .slice(0, 6);
+
+  // Also include weekly stocks with weekly JAX fired (no daily arrow needed)
+  const weeklyJAXOnly = wm
+    .filter(r => (r.weeklyJAX || r.weeklyJAXRecent) && !weeklyJAX.find(j => j.sym === r.sym))
+    .slice(0, 4);
+
+  const allCombos = [
+    ...weeklyJAX.map(r => {
+      const wmEntry = wm.find(w => w.sym === r.sym);
+      return { sym: r.sym, price: r.price, rsiD: r.rsi, rsiW: wmEntry?.weeklyRsi };
+    }),
+    ...weeklyJAXOnly.map(r => ({ sym: r.sym, price: r.price, rsiD: r.rsi, rsiW: r.weeklyRsi }))
+  ].slice(0, 6);
+
+  if (allCombos.length > 0) {
+    lines.push("");
+    lines.push("🎯 <b>Top setups (weekly bullish + JAX):</b>");
+    allCombos.forEach(r => {
+      const price = r.price ? `$${Number(r.price).toFixed(2)}` : "";
+      const rsiD  = r.rsiD  ? ` RSI-D:${Number(r.rsiD).toFixed(1)}`  : "";
+      const rsiW  = r.rsiW  ? ` RSI-W:${Number(r.rsiW).toFixed(1)}`  : "";
+      lines.push(`   <b>${r.sym}</b> ${price}${rsiD}${rsiW}`);
+    });
   }
 
   // Weinstein
@@ -299,7 +335,7 @@ async function main() {
   // Build messages
   const msg1 = buildMessage1(agentBrief, wm);
   const msg2 = buildMessage2(wm);
-  const msg3 = buildMessage3(jax, ws);
+  const msg3 = buildMessage3(jax, ws, wm);
 
   // Send with 1s gap between messages
   console.log("📤 Sending Message 1 (Trades)...");
