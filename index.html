@@ -9,7 +9,6 @@
 <!-- Firebase SDK — compat version works in Chrome + Edge + Safari + Mobile -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="indicators.js"></script>
 <script>
 const TD_KEYS = [
   "fceed7ef4b7847d38e1ecd0bddcad5eb",
@@ -23,11 +22,6 @@ const TD_KEYS = [
 const FH_KEY    = "d819lthr01qler4hgk4gd819lthr01qler4hgk50";
 const PROXY_URL = "";
 </script>
-<script src="firebase.js"></script>
-<script src="api.js"></script>
-<script src="agent.js"></script>
-<script src="journal.js"></script>
-<script src="weekly.js"></script>
 
 <style>
 /* ═══════════════════════════════════════════════════════════
@@ -4928,17 +4922,19 @@ function loadJAX(){
 
 
 
-loadSaved();
-renderWatchlistUI();
-loadJournal();
-loadJAX();
-loadConfluence();
-loadBacktest();
-loadWeeklyMonitor();
-loadPulseAlerts();
-loadAgent();
-// Auto-load calendar on startup
-setTimeout(()=>{ try{ loadCalendar(); }catch(e){} }, 2000);
+// ── Init called from final script tag after all external scripts load ───────
+function _initApp(){
+  try{ loadSaved(); }catch(e){ console.warn("loadSaved:",e); }
+  try{ renderWatchlistUI(); }catch(e){}
+  try{ loadJournal(); }catch(e){ console.warn("loadJournal:",e); }
+  try{ loadJAX(); }catch(e){ console.warn("loadJAX:",e); }
+  try{ loadConfluence(); }catch(e){}
+  try{ loadBacktest(); }catch(e){}
+  try{ loadWeeklyMonitor(); }catch(e){}
+  try{ loadPulseAlerts(); }catch(e){}
+  try{ loadAgent(); }catch(e){ console.warn("loadAgent:",e); }
+  setTimeout(()=>{ try{ loadCalendar(); }catch(e){} }, 2000);
+}
 
 // Update key count display dynamically
 try{
@@ -4953,5 +4949,13 @@ try{
 }catch(e){}
 
 </script>
+<script src="indicators.js"></script>
+<script src="firebase.js"></script>
+<script src="api.js"></script>
+<script src="journal.js"></script>
+<script src="weekly.js"></script>
+<script src="regime.js"></script>
+<script src="agent.js"></script>
+<script>_initApp();</script>
 </body>
 </html>
