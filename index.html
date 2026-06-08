@@ -10,8 +10,11 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="indicators.js"></script>
+<script src="firebase.js"></script>
+<script src="api.js"></script>
+<script src="agent.js"></script>
+<script src="journal.js"></script>
 <script>
-// ── API Keys ──────────────────────────────────────────────────────────────────
 const TD_KEYS = [
   "fceed7ef4b7847d38e1ecd0bddcad5eb",
   "c05d8242562f496e8709d5c9e0ce4109",
@@ -22,11 +25,8 @@ const TD_KEYS = [
   "250893f6cebe4fddb505c2c50e99b8a7"
 ].filter(Boolean);
 const FH_KEY    = "d819lthr01qler4hgk4gd819lthr01qler4hgk50";
-const PROXY_URL = ""; // unused — calling APIs directly
+const PROXY_URL = "";
 </script>
-<script src="firebase.js"></script>
-<script src="api.js"></script>
-<script src="agent.js"></script>
 
 <style>
 /* ═══════════════════════════════════════════════════════════
@@ -2400,6 +2400,116 @@ function switchTab(tab){ _doSwitchTab(tab); }
 </div><!-- end weinstein -->
 
 <script>
+// ── Market session detection ──────────────────────────────────────────────────
+function getMarketSession(){
+  const now  = new Date();
+  const et   = new Date(now.toLocaleString("en-US", {timeZone:"America/New_York"}));
+  const day  = et.getDay(); // 0=Sun, 6=Sat
+  const h    = et.getHours();
+  const m    = et.getMinutes();
+  const mins = h*60 + m;
+  if(day===0 || day===6) return "weekend";
+  if(mins < 4*60)        return "closed";      // before 4am
+  if(mins < 9*60+30)     return "premarket";   // 4am-9:30am
+  if(mins < 16*60)       return "open";        // 9:30am-4pm
+  if(mins < 20*60)       return "afterhours";  // 4pm-8pm
+  return "closed";
+}
+
+// ── Key status indicator ──────────────────────────────────────────────────────
+function updateKeyStatus(activeKeys){
+  const els = document.querySelectorAll("[id^='ks']");
+  els.forEach((el, i) => {
+    const isActive = activeKeys ? activeKeys.includes(i) : false;
+    el.className = "ks" + (isActive ? " active" : "");
+  });
+}
+
+// Cache earnings dates to avoid repeated API calls
+const earningsCache = {};
+
+async function fetchEarningsDate(sym){
+  try{
+    const today  = new Date().toISOString().split("T")[0];
+    const future = new Date(Date.now()+30*24*60*60*1000).toISOString().split("T")[0];
+    const url    = "https://finnhub.io/api/v1/calendar/earnings?from="+today+"&to="+future+"&symbol="+sym+"&token="+FH_KEY;
+    const r      = await fetch(url);
+    const d      = await r.json();
+    const list   = d.earningsCalendar||[];
+    if(!list.length) return null;
+    const days = Math.round((new Date(list[0].date)-new Date())/(1000*60*60*24));
+    return {date:list[0].date, daysUntil:Math.max(0,days)};
+  }catch(e){ return null; }
+}
+
+
+// ── Fetch analyst upgrades/downgrades — last 7 days ──────────────────────
+const upgradeCache = {};
+async function fetchUpgrades(sym){
+  if(upgradeCache[sym] !== undefined) return upgradeCache[sym];
+  try{
+    const url = "https://finnhub.io/api/v1/stock/upgrade-downgrade?symbol="+sym+"&token="+FH_KEY;
+    const r = await fetch(url);
+    if(!r.ok){ upgradeCache[sym]=null; return null; }
+    const data = await r.json();
+    if(!data || !data.length){ upgradeCache[sym]=null; return null; }
+    // Filter to last 7 days
+    const cutoff = Date.now() - 7*24*60*60*1000;
+    const recent = data.filter(d=>{
+      const dt = new Date(d.gradeDate).getTime();
+      return dt >= cutoff;
+    });
+    if(!recent.length){ upgradeCache[sym]=null; return null; }
+    // Sort by date desc, get most recent
+    recent.sort((a,b)=>new Date(b.gradeDate)-new Date(a.gradeDate));
+    const top = recent[0];
+    // Determine if bullish
+    const bullishGrades = ["buy","strong buy","outperform","overweight","positive","accumulate","add"];
+    const toGrade = (top.toGrade||"").toLowerCase();
+    const fromGrade = (top.fromGrade||"").toLowerCase();
+    const isBullish = bullishGrades.some(g=>toGrade.includes(g));
+    const isBearish = toGrade.includes("sell") || toGrade.includes("underperform") || toGrade.includes("underweight");
+    const isUpgrade = top.action === "upgrade" || (isBullish && !bullishGrades.some(g=>fromGrade.includes(g)));
+    const isDowngrade = top.action === "downgrade" || (isBearish && !fromGrade.includes("sell"));
+    const result = {
+      company:    top.company||"Analyst",
+      action:     top.action||"reiterated",
+      fromGrade:  top.fromGrade||"",
+      toGrade:    top.toGrade||"",
+      date:       top.gradeDate,
+      isBullish,
+      isBearish,
+      isUpgrade,
+      isDowngrade,
+      daysAgo:    Math.floor((Date.now()-new Date(top.gradeDate).getTime())/86400000)
+    };
+    upgradeCache[sym] = result;
+    return result;
+  }catch(e){ upgradeCache[sym]=null; return null; }
+}
+
+async function fetchLiveQuote(sym){
+  try{
+    const url = "https://finnhub.io/api/v1/quote?symbol="+sym+"&token="+FH_KEY;
+    const r   = await fetch(url);
+    const d   = await r.json();
+    if(!d||!d.c||d.c===0) return null;
+    const changePct = d.pc && d.pc > 0 ? ((d.c - d.pc) / d.pc) * 100 : (d.dp||0);
+    return {
+      price:     d.c,
+      prev:      d.pc,
+      change:    d.c - d.pc,
+      changePct: changePct,
+      high:      d.h||0,
+      low:       d.l||0,
+      open:      d.o||0,
+      session:   d.c!==d.pc?"live":"closed"
+    };
+  }catch(e){ return null; }
+}
+
+async function fetchCandles(sym){ return fetchCandlesWithKey(sym, 0); }
+
 // ══════════════════════════════════════════════════════════════════════════════
 // JAX PRO STRATEGY — ported from Pine Script v6
 // Green arrow = UTBuy/STFlip + bull_score >= entry_min + RSI < 70
@@ -3328,6 +3438,29 @@ function measureReturns(flips, closes, dates, holdWeeks){
 // ══════════════════════════════════════════════════════════
 
 // Fetch 4H candles from Twelve Data (1 credit per stock)
+async function fetch4HCandles(sym, keyIndex){
+  const key = TD_KEYS[keyIndex % TD_KEYS.length];
+  const url  = "https://api.twelvedata.com/time_series?symbol="+sym
+               +"&interval=4h&outputsize=500&apikey="+key;
+  const r = await fetch(url);
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  const d = await r.json();
+  if(d.status==="error"){
+    if(d.message&&(d.message.includes("not found")||d.message.includes("missing or invalid")))
+      throw new Error("SKIP:"+d.message);
+    throw new Error(d.message||"API error");
+  }
+  if(!d.values||!d.values.length) throw new Error("No 4H data");
+  const vals = [...d.values].reverse(); // oldest first
+  return {
+    closes:  vals.map(v=>parseFloat(v.close)),
+    highs:   vals.map(v=>parseFloat(v.high)),
+    lows:    vals.map(v=>parseFloat(v.low)),
+    dates:   vals.map(v=>v.datetime),
+    bars:    vals.length
+  };
+}
+
 // Map weekly bar index to approximate 4H bar index
 // Weekly bar = 5 trading days = ~10 4H bars (2 per day)
 function weeklyIdxTo4HIdx(weeklyIdx, weeklyDates, h4Dates){
@@ -4449,6 +4582,22 @@ function loadWeeklyMonitor(){
 }
 
 
+// ── Safe Firebase save — queues if Firebase not ready yet ─────────────────
+function fbSafeSave(key, data){
+  if(window.firebaseReady){
+    window.fbSave(key, data);
+  } else {
+    document.addEventListener("firebaseReady", ()=>window.fbSave(key, data), {once:true});
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════
+// TRADING AGENT
+// AI-powered decision engine using Claude API
+// Reads all scanner Firebase data + journal history
+// Jobs: morning brief, entry confirm, exit monitor,
+//       weekly review, pattern learning, position sizing
 async function loadSaved(){
   try{
     const rr  = localStorage.getItem("cs_recovery");
@@ -4625,6 +4774,18 @@ function updateHdr(arr){
 
 
 // ── Fetch 15-minute intraday candles from Finnhub ────────────────────────────
+async function fetch15mCandles(sym){
+  try{
+    const now  = Math.floor(Date.now()/1000);
+    const from = now - 11*24*60*60;
+    const url  = "https://finnhub.io/api/v1/stock/candle?symbol="+sym+"&resolution=15&from="+from+"&to="+now+"&token="+FH_KEY;
+    const r    = await fetch(url);
+    const d    = await r.json();
+    if(!d||d.s==="no_data"||!d.c) return null;
+    return d;
+  }catch(e){ return null; }
+}
+
 async function startRecoveryScan(){
   if(isRunning) return;
   const scanMode = document.getElementById("scanMode")?.value||"replace";
@@ -5497,412 +5658,731 @@ async function loadCalendar(){}
 function renderCalendar(){}
 
 // ── Init ──────────────────────────────────────────────────
-// ══════════════════════════════════════════════════════════
-// TRADE JOURNAL
-// ══════════════════════════════════════════════════════════
 
-let journalEntries = [];
+// ══════════════════════════════════════════════════════════
+// JAX SCANNER — Pure green arrow, no RSI restriction
+// ══════════════════════════════════════════════════════════
+let jaxResults = [];
+let jaxFilter  = "all";
 
-function loadJournal(){
-  try{
-    const saved = localStorage.getItem("cs_journal");
-    if(saved) journalEntries = JSON.parse(saved);
-  }catch(e){ journalEntries = []; }
-  // Also load from Firebase
-  const _doJournalFirebase = async()=>{
-    try{
-      const fb = await window.fbLoad("journal");
-      if(fb && fb.data && fb.data.length >= journalEntries.length){
-        journalEntries = fb.data;
-        localStorage.setItem("cs_journal", JSON.stringify(journalEntries));
+// [indicators.js] scoreJAX — moved to indicators.js
+
+async function startJAXScan(){
+  if(isRunning) return;
+  const mode = document.getElementById("jaxMode")?.value || "standard";
+  isRunning=true; stopReq=false; jaxResults=[]; jaxDeepResults=[]; scanned=0; errCount=0;
+  document.getElementById("jaxRunBtn").disabled=true;
+  document.getElementById("jaxStopBtn").disabled=false;
+  document.getElementById("jax-prog").style.display="block";
+  document.getElementById("jax-filterBar").style.display="none";
+  document.getElementById("jax-savedBanner").style.display="none";
+  document.getElementById("jax-results").innerHTML="";
+  document.getElementById("jax-log").innerHTML="";
+  const mb = document.getElementById("jaxMergeBtn");
+  if(mb) mb.style.display="none";
+  const titleEl = document.getElementById("jaxModeTitle");
+  if(titleEl){
+    titleEl.textContent = mode==="deep"?"🔵 JAX DEEP RECOVERY — RSI<80 · -20%+ off high":
+                          mode==="both"?"🟢🔵 BOTH MODES — Standard + Deep Recovery":
+                          "🟢 JAX PRO — Standard Mode · RSI<70";
+    titleEl.style.color = mode==="deep"?"var(--blue)":"var(--green2)";
+  }
+  updateKeyStatus([0,1,2,3,4]);
+
+  const listVal   = document.getElementById("jaxListSel").value;
+  const minBull   = parseInt(document.getElementById("jaxMinBull").value)||3;
+  const tickers   = listVal==="sp500"?[...SP500]:
+                    listVal==="full"?[...new Set([...SP500,...SMALLCAP])]:
+                    listVal==="catalyst"?[...SMALLCAP]:
+                    listVal==="watchlist"?[...WATCHLIST]:
+                    document.getElementById("jaxCustomTk").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
+
+  const nKeys  = TD_KEYS.length;
+  const chunks = splitInterleaved(tickers, nKeys);
+  const total  = tickers.length;
+  let done     = 0;
+
+  log("🟢 JAX scan: "+total+" stocks · min bull "+minBull+"/5 · mode:"+mode.toUpperCase(),"info","jax");
+  log("Catches MSFT/XOM/NOW type moves — UTBuy or ST flip","info","jax");
+
+  const progInterval = setInterval(()=>{
+    const pct = Math.round(done/total*100);
+    document.getElementById("jax-progPct").textContent = pct+"%";
+    document.getElementById("jax-progFill").style.width = pct+"%";
+  }, 500);
+
+  function onJAXResult(r, passed){
+    done++;
+    document.getElementById("jax-progMsg").textContent =
+      "Scanning... "+done+"/"+total+" · "+jaxResults.length+" signals found";
+    if(r.error){ errCount++; return; }
+    if(passed){
+      jaxResults.push(r); renderJAX();
+      document.getElementById("jax-scanned").textContent = done;
+      document.getElementById("jax-signals").textContent = jaxResults.length;
+      document.getElementById("jax-bull5").textContent   = jaxResults.filter(x=>x.bullScore===5).length;
+      document.getElementById("jax-deep").textContent    = jaxResults.filter(x=>x.isDeepRecovery).length;
+      document.getElementById("jax-utbuy").textContent   = jaxResults.filter(x=>x.utBuy).length;
+      const trigger = r.utBuy?"UTBuy":r.stFlipped?"ST Flip":"—";
+      log("🟢 "+r.sym.padEnd(6)+" bull:"+r.bullScore+"/5 RSI:"+r.rsi.toFixed(0)+" "+trigger+" $"+r.price.toFixed(2)+(r.pctHi<-25?" 📉"+r.pctHi.toFixed(0)+"%":""),"ok","jax");
+      // Push notification for high conviction
+      if(r.bullScore>=4){
+        sendNotification(
+          "🟢 "+r.sym+" JAX SIGNAL — bull "+r.bullScore+"/5",
+          "$"+r.price.toFixed(2)+" · "+trigger+" · RSI "+r.rsi.toFixed(0)+" · Click to open TradingView",
+          r.sym
+        );
       }
-      // Real-time sync
-      window.fbListen("journal", (fb)=>{
-        if(fb.data !== undefined){
-          const localClearedStr = localStorage.getItem("cs_journal_cleared");
-          const localCleared = localClearedStr ? new Date(localClearedStr).getTime() : 0;
-          const fbSavedAt = new Date(fb.savedAt||0).getTime();
-          if(fb.data.length === 0 || (fb.data.length > 0 && fbSavedAt > localCleared)){
-            journalEntries = fb.data;
-            localStorage.setItem("cs_journal", JSON.stringify(journalEntries));
-            renderJournal();
-            if(fb.data.length === 0) showToast("📓 Journal cleared");
-          }
-        }
-      });
-    }catch(e){}
-  };
-  if(window.firebaseReady){ _doJournalFirebase(); } else { document.addEventListener("firebaseReady", _doJournalFirebase, {once:true}); }
-  renderJournal();
-}
+    } else { scanned++; }
+    document.getElementById("h-scanned").textContent = done;
+    document.getElementById("h-passed").textContent  = jaxResults.length;
+  }
 
-function saveJournal(){
-  try{ localStorage.setItem("cs_journal", JSON.stringify(journalEntries)); }catch(e){}
-  fbSafeSave("journal", journalEntries);
-  const el = document.getElementById("jnl-last-update");
-  if(el) el.textContent = "last updated " + new Date().toLocaleTimeString();
-}
+  function onJAXProgress(sym, ki){
+    document.getElementById("jax-progMsg").textContent =
+      "K"+(ki+1)+": "+sym+" · "+done+"/"+total+" · "+jaxResults.length+" signals";
+  }
 
-function logToJournal(entry){
-  // entry = { sym, price, score, source, session, greenArrow, heat }
-  const today = new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"2-digit"});
-
-  // ── No duplicates: same ticker + same date = update existing entry ────────
-  const existing = journalEntries.find(e=>e.sym===entry.sym && e.date===today);
-  if(existing){
-    // Update price if different (e.g. re-logged after price moved)
-    const oldPrice = parseFloat(existing.price).toFixed(2);
-    const newPrice = parseFloat(entry.price).toFixed(2);
-    if(oldPrice !== newPrice){
-      existing.price = entry.price;
-      existing.score = entry.score;
-      existing.greenArrow = entry.greenArrow||false;
-      saveJournal();
-      renderJournal();
-      showToast("📓 "+entry.sym+" updated · $"+entry.price.toFixed(2)+" (was $"+oldPrice+")");
-      log("📓 Updated "+entry.sym+" in journal · $"+entry.price.toFixed(2),"info");
-    } else {
-      showToast("⚠ "+entry.sym+" already logged today at $"+oldPrice);
+  // Custom worker for JAX — no earnings fetch needed, just candles + JAX
+  async function runJAXWorker(keyIdx, tickers){
+    const DELAY = 8500;
+    for(let i=0; i<tickers.length; i++){
+      if(stopReq) break;
+      const sym = tickers[i];
+      onJAXProgress(sym, keyIdx);
+      try{
+        const candles = await fetchCandlesWithKey(sym, keyIdx);
+        const r = scoreJAX(sym, candles.closes, candles.highs, candles.lows);
+        const lq = await fetchLiveQuote(sym);
+        if(lq&&lq.price>0){ r.price=lq.price; r.change=lq.changePct||r.change; r.session=getMarketSession(); }
+        if(r.greenArrow && r.bullScore>=minBull) onJAXResult(r, true);
+        else onJAXResult(r, false);
+      }catch(e){
+        if(!e.message.startsWith("SKIP:")) onJAXResult({sym,error:e.message}, false);
+        else onJAXResult({sym,error:null}, false);
+      }
+      if(i<tickers.length-1) await sleep(DELAY);
     }
-    return;
   }
 
-  // New entry
-  const id = Date.now();
-  journalEntries.unshift({
-    id, date: today, sym: entry.sym,
-    price: entry.price, score: entry.score,
-    source: entry.source||"manual",
-    session: entry.session||getMarketSession(),
-    greenArrow: entry.greenArrow||false,
-    heat: entry.heat||0,
-    tradeType: entry.tradeType||"",
-    entryMode: entry.entryMode||"tracking", // "tracking" or "trade"
-    stopLoss: entry.stopLoss||"",
-    target1: entry.target1||"",
-    target2: entry.target2||"",
-    notes: entry.notes||"",
-    result: "", status: "tracking",
-    loggedAt: new Date().toISOString()
+  await Promise.all(chunks.map((chunk,ki)=>runJAXWorker(ki,chunk)));
+
+  clearInterval(progInterval);
+  document.getElementById("jax-progMsg").textContent = "Done — "+jaxResults.length+" JAX signals found";
+  document.getElementById("jax-progPct").textContent = "100%";
+  document.getElementById("jax-progFill").style.width = "100%";
+  document.getElementById("jaxRunBtn").disabled=false;
+  document.getElementById("jaxStopBtn").disabled=true;
+  isRunning=false;
+
+  if(jaxResults.length){
+    document.getElementById("jax-filterBar").style.display="flex";
+    document.getElementById("jax-savedBanner").style.display="block";
+    document.getElementById("jax-savedBanner").textContent =
+      "🟢 "+jaxResults.length+" JAX signals · "+new Date().toLocaleTimeString();
+    // Save to localStorage (this device)
+    try{ localStorage.setItem("cs_jax", JSON.stringify(jaxResults)); }catch(e){}
+    // Save to Firebase (all devices)
+    fbSafeSave("jax_scan", jaxResults);
+    document.getElementById("jax-savedBanner").textContent =
+      "🟢 "+jaxResults.length+" JAX signals saved · "+new Date().toLocaleTimeString();
+  }
+  // If mode is deep or both — run Deep Recovery scan too
+  const finalMode = document.getElementById("jaxMode")?.value || "standard";
+  if(finalMode === "deep" || finalMode === "both"){
+    if(finalMode === "deep") jaxResults = []; // deep only — clear standard results
+    document.getElementById("jax-progMsg").textContent = "Running Deep Recovery scan...";
+    document.getElementById("jax-progFill").style.background = "linear-gradient(90deg,var(--blue),#42A5F5)";
+    await startJAXDeepScan(tickers, minBull);
+
+    if(finalMode === "both" && jaxDeepResults.length > 0){
+      // Show merge button
+      const mb = document.getElementById("jaxMergeBtn");
+      if(mb) mb.style.display = "inline-block";
+    } else if(finalMode === "deep"){
+      // Render deep results directly
+      jaxResults = [...jaxDeepResults];
+      renderJAX();
+      const banner = document.getElementById("jax-savedBanner");
+      if(banner){ banner.style.display="block"; banner.textContent="🔵 "+jaxResults.length+" deep recovery signals · "+new Date().toLocaleTimeString(); }
+      document.getElementById("jax-filterBar").style.display="flex";
+    }
+  }
+
+  log("✅ JAX scan complete — "+jaxResults.length+" standard"+
+      (jaxDeepResults.length?" + "+jaxDeepResults.length+" deep":"")+" signals","info","jax");
+}
+
+function setJAXFilter(v, btn){
+  jaxFilter=v;
+  document.querySelectorAll("#jax-filterBar .chip").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on");
+  renderJAX();
+}
+
+function logRecoveryStock(sym, price, score, greenArrow){
+  logToJournal({sym, price, score, source:'recovery',
+    session:getMarketSession(), greenArrow:!!greenArrow,
+    tradeType:'Swing', entryMode:'tracking'});
+}
+
+function logCatalystStock(sym, price, score, greenArrow, heat){
+  logToJournal({sym, price, score, source:'catalyst',
+    session:getMarketSession(), greenArrow:!!greenArrow,
+    heat, tradeType:'Catalyst', entryMode:'tracking'});
+}
+
+function logJAXStock(sym, price, bullScore){
+  logToJournal({
+    sym:        sym,
+    price:      price,
+    score:      bullScore,
+    source:     'jax',
+    session:    getMarketSession(),
+    greenArrow: true,
+    tradeType:  'Swing',
+    entryMode:  'tracking'
   });
-  saveJournal();
-  renderJournal();
-  showToast("📓 "+entry.sym+" logged · $"+entry.price.toFixed(2)+" · "+entry.score+"/6");
-  log("📓 Logged "+entry.sym+" to journal · $"+entry.price.toFixed(2)+" · "+entry.score+"/6","ok");
 }
 
-function addManualEntry(){
-  const symEl   = document.getElementById("jnl-sym-input");
-  const priceEl = document.getElementById("jnl-price-input");
-  const stopEl  = document.getElementById("jnl-stop-input");
-  const t1El    = document.getElementById("jnl-t1-input");
-  const t2El    = document.getElementById("jnl-t2-input");
-  const typeEl  = document.getElementById("jnl-type-input");
-  const sym     = symEl?.value.trim().toUpperCase();
-  const price   = parseFloat(priceEl?.value);
-  if(!sym){ symEl?.focus(); return; }
-  if(isNaN(price)||price<=0){ priceEl?.focus(); return; }
-  const stopLoss  = parseFloat(stopEl?.value)||"";
-  const target1   = parseFloat(t1El?.value)||"";
-  const target2   = parseFloat(t2El?.value)||"";
-  const tradeType = typeEl?.value||"";
-  const entryMode = document.getElementById("jnl-entry-mode")?.value || "tracking";
-  logToJournal({sym, price, score:"?", source:"manual",
-    session:getMarketSession(), stopLoss, target1, target2, tradeType, entryMode});
-  [symEl,priceEl,stopEl,t1El,t2El].forEach(el=>{ if(el) el.value=""; });
-  if(typeEl) typeEl.value="";
-  symEl?.focus();
-}
+// ══════════════════════════════════════════════════════════
+// JAX DEEP RECOVERY — Separate scan, standard mode untouched
+// Relaxed RSI ceiling for beaten-down large caps
+// ZS, XOM, NOW, MSFT type plays — still deep in the hole
+// ══════════════════════════════════════════════════════════
+let jaxDeepResults = [];
 
-function updateResult(id, val){
-  const entry = journalEntries.find(e=>e.id===id);
-  if(!entry) return;
-  const pct = parseFloat(val);
-  if(!isNaN(pct)){
-    entry.result = pct;
-    entry.status = pct > 0 ? "win" : pct < 0 ? "loss" : "loss";
-  } else {
-    entry.result = val;
-    // Don't overwrite status — keep whatever it was
-  }
-  saveJournal();
-  renderJournal();
-}
+// [indicators.js] scoreJAXDeep — moved to indicators.js
 
-function updateField(id, field, val){
-  const entry = journalEntries.find(e=>e.id===id);
-  if(!entry) return;
-  entry[field] = val;
-  saveJournal();
-  renderJournal();
-}
+async function startJAXDeepScan(tickers, minBull){
+  log("🔵 Deep Recovery scan: "+tickers.length+" stocks · RSI<80 · -20%+ off high","info","jax");
+  log("Catches ZS, XOM, NOW type plays still recovering","info","jax");
 
-function deleteEntry(id){
-  journalEntries = journalEntries.filter(e=>e.id!==id);
-  saveJournal();
-  renderJournal();
-}
+  const nKeys  = TD_KEYS.length;
+  const chunks = splitInterleaved(tickers, nKeys);
+  const total  = tickers.length;
+  let done     = 0;
 
-function clearJournal(){
-  if(!confirm("Clear entire journal? This cannot be undone.")) return;
-  journalEntries = [];
-  try{
-    localStorage.setItem("cs_journal", JSON.stringify([]));
-    localStorage.setItem("cs_journal_cleared", new Date().toISOString());
-  }catch(e){}
-  if(window.firebaseReady){
-    fbSafeSave("journal", []);
-    fbSafeSave("journal_cleared", {time: new Date().toISOString()});
-  }
-  renderJournal();
-  showToast("📓 Journal cleared on all devices");
-}
-
-let jnlModeFilter = "all";
-function setJnlFilter(mode, btn){
-  jnlModeFilter = mode;
-  document.querySelectorAll('[id^="jnl-filter-"]').forEach(b=>b.classList.remove("on"));
-  if(btn) btn.classList.add("on");
-  renderJournal();
-}
-
-function renderJournal(){
-  const body = document.getElementById("jnl-body");
-  if(!body) return;
-  const jnlSearch = (document.getElementById("jnl-search")?.value||"").toUpperCase().trim();
-
-  // Stats
-  // Stats only on REAL TRADES for accuracy
-  // Include all entries in stats — entryMode filter only affects display
-  const tradeEntries = journalEntries; // show stats for all entries
-  const allClosed = journalEntries.filter(e=>e.status==="win"||e.status==="loss");
-  const closed = allClosed;
-  const wins   = journalEntries.filter(e=>e.status==="win");
-  const losses = journalEntries.filter(e=>e.status==="loss");
-  const winRate = closed.length ? Math.round(wins.length/closed.length*100) : null;
-  const avgWin  = wins.length  ? (wins.reduce((a,e)=>a+parseFloat(e.result||0),0)/wins.length).toFixed(1)   : null;
-  const avgLoss = losses.length? (losses.reduce((a,e)=>a+parseFloat(e.result||0),0)/losses.length).toFixed(1) : null;
-
-  const realTrades = journalEntries.filter(e=>e.entryMode==="trade").length;
-  const tracking   = journalEntries.filter(e=>e.entryMode!=="trade"&&e.entryMode!==undefined).length;
-  // Show total/closed — if no entryMode distinction, just show total
-  const totalDisplay = realTrades > 0
-    ? realTrades+"/"+journalEntries.length
-    : journalEntries.length;
-  document.getElementById("jnl-total").textContent   = totalDisplay;
-  document.getElementById("jnl-wins").textContent     = wins.length;
-  document.getElementById("jnl-losses").textContent   = losses.length;
-  document.getElementById("jnl-winrate").textContent  = winRate!==null ? winRate+"%" : "—";
-  document.getElementById("jnl-avgwin").textContent   = avgWin  ? "+"+avgWin+"%" : "—";
-  document.getElementById("jnl-avgloss").textContent  = avgLoss ? avgLoss+"%" : "—";
-
-  // ── Source breakdown ──────────────────────────────────────────────────
-  const sourceMap = {};
-  journalEntries.forEach(e=>{
-    const src = e.source||"manual";
-    if(!sourceMap[src]) sourceMap[src]={wins:0,losses:0,total:0,avgWin:0,avgLoss:0,wSum:0,lSum:0};
-    sourceMap[src].total++;
-    if(e.status==="win"){ sourceMap[src].wins++; sourceMap[src].wSum+=parseFloat(e.result||0); }
-    if(e.status==="loss"){ sourceMap[src].losses++; sourceMap[src].lSum+=parseFloat(e.result||0); }
-  });
-
-  const srcLabels = {
-    recovery:"📈 Recovery", catalyst:"⚡ Catalyst", jax:"🟢 JAX",
-    confluence:"⚡ Confluence", weekly:"📅 Weekly", pulse:"🔔 Pulse", manual:"✏️ Manual"
-  };
-  const srcOrder = ["weekly","confluence","jax","recovery","catalyst","pulse","manual"];
-  const breakdown = document.getElementById("jnl-breakdown");
-  const grid      = document.getElementById("jnl-source-grid");
-
-  if(grid && Object.keys(sourceMap).length > 1){
-    const sorted = srcOrder.filter(s=>sourceMap[s]).concat(
-      Object.keys(sourceMap).filter(s=>!srcOrder.includes(s))
-    );
-    const bestWR = Math.max(...sorted.map(s=>{
-      const sm = sourceMap[s];
-      const closed = sm.wins+sm.losses;
-      return closed>0 ? Math.round(sm.wins/closed*100) : 0;
-    }));
-
-    grid.innerHTML = sorted.map(src=>{
-      const sm     = sourceMap[src];
-      const closed = sm.wins + sm.losses;
-      const wr     = closed>0 ? Math.round(sm.wins/closed*100) : null;
-      const avgW   = sm.wins>0   ? (sm.wSum/sm.wins).toFixed(1) : null;
-      const avgL   = sm.losses>0 ? (sm.lSum/sm.losses).toFixed(1) : null;
-      const wrClr  = wr===null?"var(--muted)":wr>=70?"var(--green2)":wr>=50?"var(--yellow)":"var(--red)";
-      const isTop  = wr === bestWR && wr !== null && closed >= 3;
-      return `<div class="jnl-source-card${isTop?" top":""}">
-        <div class="jnl-src-name">${srcLabels[src]||src}</div>
-        <div class="jnl-src-wr" style="color:${wrClr}">${wr!==null?wr+"%":"—"}</div>
-        <div class="jnl-src-detail">${sm.wins}W / ${sm.losses}L / ${sm.total-closed} open</div>
-        <div class="jnl-src-detail">${avgW?"+"+avgW+"%":""} ${avgL?avgL+"%":""}</div>
-      </div>`;
-    }).join("");
-
-    if(breakdown) breakdown.style.display = "block";
-  } else {
-    if(breakdown) breakdown.style.display = "none";
+  async function runDeepWorker(keyIdx, tickers){
+    const DELAY = 8500;
+    for(let i=0; i<tickers.length; i++){
+      if(stopReq) break;
+      const sym = tickers[i];
+      document.getElementById("jax-progMsg").textContent =
+        "K"+(keyIdx+1)+" [DEEP]: "+sym+" · "+done+"/"+total;
+      try{
+        const candles = await fetchCandlesWithKey(sym, keyIdx);
+        const r = scoreJAXDeep(sym, candles.closes, candles.highs, candles.lows);
+        const lq = await fetchLiveQuote(sym);
+        if(lq&&lq.price>0){ r.price=lq.price; r.change=lq.changePct||r.change; r.session=getMarketSession(); }
+        if(r.bullScore >= minBull){
+          jaxDeepResults.push(r);
+          log("🔵 DEEP: "+r.sym.padEnd(6)+" bull:"+r.bullScore+"/5 RSI:"+r.rsi.toFixed(0)+" pctHi:"+r.pctHi.toFixed(0)+"%","info","jax");
+        }
+      }catch(e){
+        if(!e.message.startsWith("SKIP:") && !e.message.startsWith("Need"))
+          log("⚠ "+sym+": "+e.message,"warn","jax");
+      }
+      done++;
+      const pct = Math.round(done/total*100);
+      document.getElementById("jax-progPct").textContent = pct+"%";
+      document.getElementById("jax-progFill").style.width = pct+"%";
+      if(i<tickers.length-1) await sleep(DELAY);
+    }
   }
 
-  const filteredEntries = journalEntries
-    .filter(e=> jnlModeFilter==="all" ? true :
-                jnlModeFilter==="trade" ? e.entryMode==="trade" :
-                (e.entryMode==="tracking"||!e.entryMode))
-    .filter(e=> jnlSearch ? e.sym.includes(jnlSearch) : true);
+  await Promise.all(chunks.map((chunk,ki)=>runDeepWorker(ki,chunk)));
+  log("🔵 Deep Recovery complete — "+jaxDeepResults.length+" signals found","info","jax");
+}
 
-  if(!journalEntries.length){
-    body.innerHTML = `<tr><td colspan="9" class="jnl-empty">
-      <span style="font-size:24px;display:block;margin-bottom:8px">📓</span>
-      No entries yet — click LOG on any screener card<br>
-      <span style="font-size:8px;color:var(--muted)">Every flagged stock gets logged with price, score, and source</span>
-    </td></tr>`;
-    return;
+function mergeJAXResults(){
+  // Merge standard + deep, remove duplicates, render together
+  const standardSyms = new Set(jaxResults.map(r=>r.sym));
+  const newDeep = jaxDeepResults.filter(r=>!standardSyms.has(r.sym));
+  const merged  = [...jaxResults, ...newDeep];
+  const banner  = document.getElementById("jax-savedBanner");
+  if(banner){
+    banner.style.display = "block";
+    banner.textContent   = "🟢 "+jaxResults.length+" standard + 🔵 "+newDeep.length+" deep recovery = "+merged.length+" total";
   }
+  // Temporarily render merged
+  const tempResults = [...jaxResults];
+  jaxResults.push(...newDeep);
+  renderJAX();
+  // Restore — deep results stay separate
+  jaxResults.length = 0;
+  jaxResults.push(...tempResults);
+  document.getElementById("jaxMergeBtn").textContent = "🔀 MERGED ("+merged.length+")";
+  log("🔀 Merged: "+jaxResults.length+" standard + "+newDeep.length+" new deep = "+merged.length+" total","ok","jax");
+}
 
-  body.innerHTML = filteredEntries.map(e=>{
-    const resultPct = parseFloat(e.result);
-    const hasResult = !isNaN(resultPct) && e.result!=="";
-    const resultColor = hasResult ? (resultPct>0?"var(--green2)":resultPct<0?"var(--red)":"var(--muted)") : "var(--muted)";
-    const rowCls = e.status==="win"?"win":e.status==="loss"?"loss":"open";
-    const scoreBg = e.score>=6?"var(--green2)":e.score>=5?"var(--yellow)":e.score>=4?"var(--orange)":"var(--muted)";
-    const scoreColor = e.score>=5?"#000":"#fff";
-    // Risk:Reward calculation
-    const ep = parseFloat(e.price)||0;
-    const sl = parseFloat(e.stopLoss)||0;
-    const t1 = parseFloat(e.target1)||0;
-    const risk    = sl>0&&ep>0 ? ep-sl : 0;
-    const reward  = t1>0&&ep>0 ? t1-ep : 0;
-    const rrRatio = risk>0&&reward>0 ? (reward/risk).toFixed(1)+"R" : "—";
-    const rrColor = risk>0&&reward>0 ? (reward/risk>=2?"var(--green2)":reward/risk>=1?"var(--yellow)":"var(--red)") : "var(--muted)";
-    // Type badge
-    const typeBg = e.tradeType==="Catalyst"?"rgba(255,109,0,0.15)":e.tradeType==="Deep Bounce"?"rgba(0,176,255,0.15)":e.tradeType==="Swing"?"rgba(0,200,83,0.12)":"var(--bg3)";
-    const typeColor = e.tradeType==="Catalyst"?"var(--orange)":e.tradeType==="Deep Bounce"?"var(--blue)":e.tradeType==="Swing"?"var(--green2)":"var(--muted)";
-    return `<tr class="${rowCls}">
-      <td style="color:var(--muted2);white-space:nowrap">${e.date}</td>
-      <td>
-        <span class="jnl-sym" style="cursor:pointer" onclick="window.open('https://www.tradingview.com/chart/?symbol=${e.sym}','_blank')">${e.sym}</span>
-        ${e.greenArrow?'<span class="badge jax" style="font-size:7px;padding:1px 4px;margin-left:4px">🟢</span>':''}
-        <span style="font-size:7px;padding:1px 5px;border-radius:1px;margin-left:3px;
-          background:${e.entryMode==="trade"?"rgba(0,200,83,0.15)":"rgba(100,100,100,0.15)"};
-          color:${e.entryMode==="trade"?"var(--green2)":"var(--muted2)"};
-          border:1px solid ${e.entryMode==="trade"?"rgba(0,200,83,0.3)":"rgba(100,100,100,0.2)"}">
-          ${e.entryMode==="trade"?"💰 TRADE":"📊 TRACK"}
-        </span>
-        <select onchange="updateField(${e.id},'entryMode',this.value);renderJournal()" 
-          style="font-size:7px;background:transparent;border:none;color:var(--muted);cursor:pointer">
-          <option value="">▾</option>
-          <option value="tracking">📊 Tracking</option>
-          <option value="trade">💰 Real Trade</option>
-        </select>
-      </td>
-      <td>
-        ${e.tradeType?`<span style="font-size:8px;padding:1px 6px;border-radius:1px;background:${typeBg};color:${typeColor}">${e.tradeType}</span>`:"<span style='color:var(--muted);font-size:8px'>—</span>"}
-        <select onchange="updateField(${e.id},'tradeType',this.value)" style="font-size:8px;background:transparent;border:none;color:var(--muted);cursor:pointer;margin-left:2px">
-          <option value="">edit</option>
-          <option value="Catalyst">⚡ Catalyst</option>
-          <option value="Deep Bounce">📉 Deep Bounce</option>
-          <option value="Swing">📈 Swing</option>
-          <option value="Watchlist">👀 Watchlist</option>
-        </select>
-      </td>
-      <td style="font-weight:700">$${ep.toFixed(2)}</td>
-      <td>
-        ${sl>0?`<span style="color:var(--red);font-size:10px">$${sl.toFixed(2)}</span>`:""}
-        <input class="jnl-result-input" type="number" value="${e.stopLoss||''}" placeholder="stop"
-          onchange="updateField(${e.id},'stopLoss',parseFloat(this.value)||'')"
-          style="width:65px;color:var(--red);border-color:rgba(255,23,68,0.2);${sl>0?'display:none':''}">
-      </td>
-      <td>
-        ${t1>0?`<span style="color:var(--green2);font-size:10px">$${t1.toFixed(2)}</span><br><span style="font-size:8px;color:var(--muted)">(+${((t1-ep)/ep*100).toFixed(1)}%)</span>`:""}
-        <input class="jnl-result-input" type="number" value="${e.target1||''}" placeholder="T1"
-          onchange="updateField(${e.id},'target1',parseFloat(this.value)||'')"
-          style="width:65px;color:var(--green2);border-color:rgba(0,200,83,0.2);${t1>0?'display:none':''}">
-      </td>
-      <td>
-        ${parseFloat(e.target2||0)>0?`<span style="color:#64DD17;font-size:10px">$${parseFloat(e.target2).toFixed(2)}</span>`:""}
-        <input class="jnl-result-input" type="number" value="${e.target2||''}" placeholder="T2"
-          onchange="updateField(${e.id},'target2',parseFloat(this.value)||'')"
-          style="width:65px;color:#64DD17;border-color:rgba(100,221,23,0.2);${parseFloat(e.target2||0)>0?'display:none':''}">
-      </td>
-      <td style="color:${e.closePrice?(parseFloat(e.closePrice)>ep?"var(--green2)":parseFloat(e.closePrice)<ep?"var(--red)":"var(--muted)"):"var(--muted)"}">
-        ${e.closePrice?"$"+parseFloat(e.closePrice).toFixed(2)+(Math.abs(parseFloat(e.result||0))<0.01?" (flat)":""):"—"}
-      </td>
-      <td><span class="jnl-score" style="background:${scoreBg};color:${scoreColor}">${e.score}/6</span></td>
-      <td><span class="jnl-source">${e.source}</span></td>
-      <td style="color:var(--muted2);font-size:9px">${e.session==="premarket"?"🌅 6AM":e.session==="open"?"🟢 9:45AM":e.session==="manual"?"📊 Manual":"—"}</td>
-      <td>
-        <input class="jnl-result-input" type="text" 
-          value="${e.result}" 
-          placeholder="e.g. +10.5"
-          onchange="updateResult(${e.id}, this.value)"
-          style="color:${resultColor}">
-      </td>
-      <td><span style="color:${rrColor};font-size:10px;font-weight:700">${rrRatio}</span></td>
-      <td>
-        <span class="jnl-pct" style="color:${resultColor}">
-          ${hasResult?(resultPct>0?"▲ +":"▼ ")+Math.abs(resultPct).toFixed(1)+"%":e.status==="open"?"⏳ OPEN":"—"}
-        </span>
-      </td>
-      <td>
-        <button class="jnl-del" onclick="deleteEntry(${e.id})" title="Delete">×</button>
-      </td>
-    </tr>`;
+function clearJAX(){
+  jaxResults=[];
+  try{ localStorage.removeItem("cs_jax"); }catch(e){}
+  fbSafeSave("jax_scan", {data:"[]", savedAt:new Date().toISOString(), device:"cleared"});
+  document.getElementById("jax-savedBanner").style.display="none";
+  document.getElementById("jax-filterBar").style.display="none";
+  document.getElementById("jax-results").innerHTML='<div class="empty"><span class="empty-icon">🟢</span>Cleared.</div>';
+}
+
+function renderJAX(){
+  const sort   = document.getElementById("jax-sortSel")?.value||"bull";
+  const search = (document.getElementById("jax-tickerSearch")?.value||"").toUpperCase().trim();
+  const minB   = parseInt(document.getElementById("jaxMinBull")?.value)||3;
+
+  let f = [...jaxResults];
+  if(jaxFilter!=="all") f=f.filter(r=>r.bullScore===jaxFilter);
+  if(search) f=f.filter(r=>r.sym.includes(search));
+  f.sort((a,b)=>sort==="rsi"?a.rsi-b.rsi:sort==="pullback"?a.pctHi-b.pctHi:b.bullScore-a.bullScore||b.rsi-a.rsi);
+
+  document.getElementById("jax-resCount").textContent=f.length+" signals";
+  const grid = document.getElementById("jax-results");
+  if(!f.length){ grid.innerHTML='<div class="empty">No JAX signals found yet.</div>'; return; }
+
+  grid.innerHTML=f.map((s,i)=>{
+    const bullBg = s.bullScore>=5?"var(--green2)":s.bullScore>=4?"#64DD17":s.bullScore>=3?"var(--yellow)":"var(--orange)";
+    const trigger= s.utBuy?"🟢 UTBuy fired":s.stFlipped?"🟢 ST Flip":"🟢 Signal";
+    const sessBadge=s.session==="premarket"?'<span class="badge pm">🌅 PRE-MKT</span>':s.session==="afterhours"?'<span class="badge ah">🌙 AH</span>':'<span class="badge live">🔴 LIVE</span>';
+    const cardStyle=s.isDeepRecovery?"style=\"border-color:rgba(21,101,192,0.4);box-shadow:0 4px 20px rgba(21,101,192,0.08)\"":"";
+    return `<div class="card jax" ${cardStyle} onclick="window.open('https://www.tradingview.com/chart/?symbol=${s.sym}','_blank')">
+      <div class="card-hdr">
+        <div class="card-left">
+          <div class="card-ticker" style="display:flex;align-items:center;gap:6px">${tickerLogo(s.sym,20)}${s.sym}</div>
+          <span class="grade" style="background:${bullBg};color:#000">🟢 BULL ${s.bullScore}/5</span>${taBadge(s)}
+          <div class="card-hint" style="display:flex;gap:6px;align-items:center">
+            <span>#${i+1} · CLICK → TRADINGVIEW</span>
+            <button class="log-btn" onclick="event.stopPropagation();logJAXStock('${s.sym}',${s.price},${s.bullScore})">📓 LOG</button>
+          </div>
+        </div>
+        <div class="card-right">
+          <div class="card-price">$${s.price.toFixed(2)}</div>
+          ${sessBadge}
+          <div class="card-chg ${s.change>=0?"up":"dn"}">${s.change>=0?"▲":"▼"}${Math.abs(s.change||0).toFixed(2)}%</div>
+        </div>
+      </div>
+      <div class="badges">
+        ${s.isDeepRecovery?
+          '<span class="badge" style="background:rgba(21,101,192,0.2);color:#90CAF9;border:1px solid rgba(21,101,192,0.4);font-weight:700">🔵 DEEP RECOVERY</span>':
+          '<span class="badge jax jax-pulse">'+trigger+'</span>'}
+        ${s.pctHi<-25?'<span class="badge" style="background:rgba(0,176,255,0.12);color:var(--blue);border:1px solid rgba(0,176,255,0.3)">📉 '+s.pctHi.toFixed(0)+'% off hi</span>':''}
+        ${s.emaRising?'<span class="badge" style="background:rgba(0,200,83,0.1);color:var(--green2);border:1px solid rgba(0,200,83,0.2)">↑ EMA RISING</span>':''}
+        ${s.isDeepRecovery?'<span class="badge" style="background:rgba(255,214,0,0.1);color:var(--yellow);border:1px solid rgba(255,214,0,0.2)">RSI '+s.rsi.toFixed(0)+' &lt;80</span>':''}
+      </div>
+      <div class="bars-grid">
+        <div class="bar-item">
+          <div class="bar-lbl">RSI 14 (no restriction)</div>
+          <div class="bar-row">
+            <div class="bar-track"><div class="bar-fill" style="width:${s.rsi}%;background:${s.rsi<45?"var(--green2)":s.rsi<55?"var(--yellow)":s.rsi>70?"var(--red)":"var(--blue)"}"></div></div>
+            <span class="bar-val" style="color:${s.rsi<45?"var(--green2)":s.rsi<55?"var(--yellow)":s.rsi>70?"var(--red)":"var(--blue)"}">${s.rsi.toFixed(1)}</span>
+          </div>
+        </div>
+        <div class="bar-item">
+          <div class="bar-lbl">ATR Trail Stop</div>
+          <div class="bar-row">
+            <span style="font-size:10px;color:var(--green2);font-weight:700">$${s.trailVal.toFixed(2)}</span>
+            <span style="font-size:8px;color:var(--muted);margin-left:6px">stop level</span>
+          </div>
+        </div>
+      </div>
+      <div class="jax-panel active">
+        <div class="jax-title" style="color:var(--green2)">
+          🟢 JAX PRO CONFIRMED <span style="float:right">${s.bullScore}/5</span>
+        </div>
+        <div class="jax-conditions">
+          <span class="jax-c ${s.emaStack?"pass":"fail"}">EMA STACK</span>
+          <span class="jax-c ${s.macdBull?"pass":"fail"}">MACD+</span>
+          <span class="jax-c ${s.rsiBull?"pass":"fail"}">RSI&gt;50</span>
+          <span class="jax-c ${s.wrBull?"pass":"fail"}">WR&gt;-50</span>
+          <span class="jax-c ${s.stBull?"pass":"fail"}">SUPERTREND</span>
+        </div>
+        <div class="jax-trail">
+          Trail $${s.trailVal.toFixed(2)} · ${s.utBuy?"🟢 UTBuy fired!":s.stFlipped?"🟢 ST Flip!":"Signal active"}
+          <span style="float:right;color:var(--muted)">52w hi $${(s.high52||0).toFixed(2)} · ${(s.pctHi||0).toFixed(0)}% off</span>
+        </div>
+      </div>
+    </div>`;
   }).join("");
 }
 
-// ── Auto-fetch closing prices at 4:15pm ET ───────────────────────────────────
-let closeAutoTimer = null;
-
-async function fetchClosingPrices(){
-  const openEntries = journalEntries.filter(e=>(e.status==="open"||e.status==="tracking") && e.price > 0);
-  if(!openEntries.length){ log("Journal: no open entries to update","info"); return; }
-  log("📓 Fetching prices for "+openEntries.length+" entries...","info");
-  for(const entry of openEntries){
-    try{
-      const q = await fetchLiveQuote(entry.sym);
-      if(q && q.price > 0){
-        const entryPrice = parseFloat(entry.price);
-        const closePrice = q.price;
-        const resultPct  = ((closePrice - entryPrice) / entryPrice * 100);
-        entry.closePrice = closePrice;
-        entry.closedAt   = new Date().toISOString();
-        if(Math.abs(resultPct) >= 0.01){
-          entry.result = resultPct.toFixed(2);
-          if(entry.status === "open") entry.status = resultPct >= 0 ? "win" : "loss";
-        } else {
-          entry.closePrice = closePrice;
-          if(entry.status !== "tracking") entry.status = "open";
-        }
-        log("📓 "+entry.sym+" → $"+closePrice.toFixed(2)+" · "+(Math.abs(resultPct)<0.01?"flat (holiday?)":(resultPct>=0?"+":"")+resultPct.toFixed(2)+"%"),"ok");
+// ── Load JAX results ─────────────────────────────────────
+function loadJAX(){
+  try{
+    const saved = localStorage.getItem("cs_jax");
+    if(saved){
+      jaxResults = JSON.parse(saved);
+      if(jaxResults.length){
+        const el = document.getElementById("jax-savedBanner");
+        const fb = document.getElementById("jax-filterBar");
+        if(el){ el.style.display="block"; el.textContent="💾 "+jaxResults.length+" JAX signals · last scan"; }
+        if(fb) fb.style.display="flex";
+        // Sync stat bar
+        document.getElementById("jax-scanned").textContent = jaxResults.length;
+        document.getElementById("jax-signals").textContent = jaxResults.length;
+        document.getElementById("jax-bull5").textContent   = jaxResults.filter(r=>r.bullScore===5).length;
+        document.getElementById("jax-deep").textContent    = jaxResults.filter(r=>r.isDeepRecovery).length;
+        document.getElementById("jax-utbuy").textContent   = jaxResults.filter(r=>r.utBuy).length;
+        renderJAX();
       }
-    }catch(e){ log("📓 "+entry.sym+": could not fetch price","warn"); }
-    await sleep(300);
-  }
-  saveJournal();
-  renderJournal();
-  log("📓 Prices updated for "+openEntries.length+" entries","ok");
-  const wins   = journalEntries.filter(e=>e.status==="win").length;
-  const losses = journalEntries.filter(e=>e.status==="loss").length;
-  sendNotification("📓 Journal Updated","wins "+wins+" · losses "+losses,"journal");
-}
-
-function startCloseAutoTimer(){
-  if(closeAutoTimer) clearInterval(closeAutoTimer);
-  closeAutoTimer = setInterval(()=>{
-    const et = new Date(new Date().toLocaleString("en-US",{timeZone:"America/New_York"}));
-    const h = et.getHours(), m = et.getMinutes(), day = et.getDay();
-    // 4:15pm ET on weekdays only
-    if(day > 0 && day < 6 && h === 16 && m === 15){
-      log("⏰ 4:15 PM ET — auto-fetching closing prices...","info");
-      fetchClosingPrices();
     }
-  }, 60000);
+  }catch(e){ jaxResults=[]; }
+
+  const _doJAXFirebase = async()=>{
+    try{
+      const fb = await window.fbLoad("jax_scan");
+      // fbLoad parses JSON internally - fb.data should be an array
+      // Handle both array and object (backwards compat with old saves)
+      const jaxData = Array.isArray(fb?.data) ? fb.data :
+                      Array.isArray(fb?.data?.data) ? fb.data.data :
+                      (typeof fb?.data?.data === "string") ? JSON.parse(fb.data.data) : null;
+      if(jaxData && jaxData.length > 0){
+        jaxResults = jaxData;
+        localStorage.setItem("cs_jax", JSON.stringify(jaxResults));
+        const el = document.getElementById("jax-savedBanner");
+        const fb2 = document.getElementById("jax-filterBar");
+        if(el){ el.style.display="block"; el.textContent="☁️ "+(fb.device||"cloud")+" · "+new Date(fb.savedAt).toLocaleString()+" — "+jaxResults.length+" signals"; }
+        if(fb2) fb2.style.display="flex";
+        renderJAX();
+      }
+      window.fbListen("jax_scan", (fb)=>{
+        const jaxD = Array.isArray(fb?.data) ? fb.data :
+                     Array.isArray(fb?.data?.data) ? fb.data.data :
+                     (typeof fb?.data?.data === "string") ? JSON.parse(fb.data.data) : null;
+        if(jaxD && jaxD.length > 0){
+          jaxResults = jaxD;
+          localStorage.setItem("cs_jax", JSON.stringify(jaxResults));
+          const el = document.getElementById("jax-savedBanner");
+          const fb2 = document.getElementById("jax-filterBar");
+          if(el){ el.style.display="block"; el.textContent="🔴 LIVE from "+(fb.device||"cloud")+" · "+new Date(fb.savedAt).toLocaleTimeString()+" — "+jaxResults.length+" signals"; }
+          if(fb2) fb2.style.display="flex";
+          renderJAX();
+        }
+      });
+    }catch(e){ console.warn("JAX Firebase:", e); }
+  };
+  if(window.firebaseReady){ _doJAXFirebase(); } else { document.addEventListener("firebaseReady", _doJAXFirebase, {once:true}); }
 }
 
-// Start the auto-close timer when page loads
-startCloseAutoTimer();
 
+
+loadSaved();
+renderWatchlistUI();
+loadJournal();
+loadJAX();
+loadConfluence();
+loadBacktest();
+loadWeeklyMonitor();
+loadPulseAlerts();
+loadAgent();
+// Auto-load calendar on startup
+setTimeout(()=>{ try{ loadCalendar(); }catch(e){} }, 2000);
+
+// Update key count display dynamically
+try{
+  const nk = TD_KEYS.filter(Boolean).length;
+  const el = document.getElementById("key-info-display");
+  if(el) el.textContent = nk+" keys · "+(nk*8)+" credits/min · parallel";
+  // Show/hide K6 K7 indicators based on actual key count
+  for(let i=0; i<7; i++){
+    const k = document.getElementById("ks"+i);
+    if(k) k.style.display = i < nk ? "" : "none";
+  }
+}catch(e){}
+
+// Load cron alerts on startup — wait for Firebase to be ready
+document.addEventListener("firebaseReady", ()=>{
+  try{ loadCronAlerts(); }catch(e){}
+  try{ loadWeeklyCronAlerts(); }catch(e){}
+});
+
+async function loadWeeklyCronAlerts(){
+  if(!window.firebaseReady || typeof window.fbLoad !== "function"){
+    document.addEventListener("firebaseReady", ()=>{ try{ loadWeeklyCronAlerts(); }catch(e){} }, {once:true});
+    return;
+  }
+  try{
+    const fb = await window.fbLoad("weekly_cron_alerts");
+    if(!fb||!fb.data) return;
+    const alerts = Array.isArray(fb.data)?fb.data:(typeof fb.data==="string"?JSON.parse(fb.data):fb.data);
+    if(!alerts||!alerts.length) return;
+    const savedAt  = new Date(fb.savedAt);
+    const hoursAgo = (Date.now()-savedAt.getTime())/(1000*60*60);
+    if(hoursAgo>168) return;
+    const banner  = document.getElementById("weekly-cron-banner");
+    const count   = document.getElementById("weekly-cron-count");
+    const time    = document.getElementById("weekly-cron-time");
+    const tickers = document.getElementById("weekly-cron-tickers");
+    if(!banner) return;
+    const appPlus  = alerts.filter(r=>r.tierApp);
+    const jax      = alerts.filter(r=>r.tier1&&!r.tierApp);
+    const oversold = alerts.filter(r=>r.tier2&&!r.tier1&&!r.tierApp);
+    banner.style.display="block";
+    count.textContent=alerts.length+" weekly signal"+(alerts.length>1?"s":"")+
+      (appPlus.length?" · "+appPlus.length+" ⭐⭐A++":"")+
+      (jax.length?" · "+jax.length+" ⭐JAX":"")+
+      (oversold.length?" · "+oversold.length+" 📈oversold":"");
+    time.textContent="Scanned: "+savedAt.toLocaleDateString()+" "+savedAt.toLocaleTimeString();
+    tickers.textContent=alerts.slice(0,12).map(r=>{
+      const tier=r.tierApp?"⭐⭐":r.tier1?"⭐":r.tier2?"📈":"📅";
+      return tier+r.sym;
+    }).join(" · ");
+  }catch(e){ console.warn("loadWeeklyCronAlerts error:",e); }
+}
+
+function showWeeklyCronAlerts(){
+  const panel=document.getElementById("weekly-cron-panel");
+  if(!panel) return;
+  if(panel.style.display==="block"){ panel.style.display="none"; return; }
+  panel.style.display="block";
+  const resultsEl=document.getElementById("weekly-cron-results");
+  resultsEl.innerHTML='<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:10px">Loading...</div>';
+  window.fbLoad("weekly_cron_alerts").then(fb=>{
+    if(!fb||!fb.data){ resultsEl.innerHTML='<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:10px">No data.</div>'; return; }
+    const alerts=Array.isArray(fb.data)?fb.data:(typeof fb.data==="string"?JSON.parse(fb.data):fb.data);
+    const timeEl=document.getElementById("weekly-cron-panel-time");
+    if(timeEl) timeEl.textContent=new Date(fb.savedAt).toLocaleString();
+    resultsEl.innerHTML=renderWeeklyCronCards(alerts);
+  }).catch(()=>{ resultsEl.innerHTML='<div style="color:var(--red);font-family:var(--mono);font-size:11px;padding:10px">Error.</div>'; });
+}
+
+function renderWeeklyCronCards(alerts){
+  if(!alerts||!alerts.length) return '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:10px">No signals.</div>';
+  return alerts.map(s=>{
+    const tierLabel=s.tierApp?"⭐⭐ A++ FRESH FLIP + JAX":s.tier1?"⭐ JAX RECENT":s.tier2?"📈 OVERSOLD RECOVERY":"📅 TRAIL FLIP";
+    const tierClr=s.tierApp?"var(--green2)":s.tier1?"var(--blue)":s.tier2?"var(--yellow)":"var(--muted2)";
+    const rsiClr=s.weeklyRsi<55?"var(--green2)":s.weeklyRsi<65?"var(--blue)":s.weeklyRsi<70?"var(--yellow)":"var(--red)";
+    const flipStr=s.weeksAgo===0?"THIS WEEK":s.weeksAgo===1?"1 WK AGO":s.weeksAgo+" WKS AGO";
+    const flipClr=s.weeksAgo===0?"var(--green2)":s.weeksAgo===1?"var(--blue)":"var(--yellow)";
+    const badges=[s.weeklyJAXRecent?"🟢 WK JAX FIRED":"",s.cameFromOversold?"💹 FROM OVERSOLD":""].filter(Boolean).join(" · ");
+    return `<div style="background:#0a1525;border:1px solid #1a3a4a;border-left:3px solid ${tierClr};border-radius:4px;padding:10px 14px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <span style="font-size:15px;font-weight:700;color:#fff;font-family:var(--mono);cursor:pointer"
+          onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">${s.sym}</span>
+        <span style="font-size:10px;font-weight:700;color:${tierClr};letter-spacing:1px">${tierLabel}</span>
+        <button onclick="event.stopPropagation();logToJournal({sym:'${s.sym}',price:${s.price},score:'W',source:'weekly-scan',session:getMarketSession(),greenArrow:${s.weeklyJAXRecent},tradeType:'Swing'})"
+          style="margin-left:auto;background:#0d1f2b;border:1px solid var(--blue);color:var(--blue);font-family:var(--mono);font-size:8px;padding:3px 8px;cursor:pointer;border-radius:2px">📓 LOG</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px">
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px"><div style="font-size:8px;color:var(--muted2)">PRICE</div><div style="font-size:13px;font-weight:700;color:var(--green2)">$${parseFloat(s.price).toFixed(2)}</div></div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px"><div style="font-size:8px;color:var(--muted2)">WK RSI</div><div style="font-size:13px;font-weight:700;color:${rsiClr}">${s.weeklyRsi}</div></div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px"><div style="font-size:8px;color:var(--muted2)">BULL</div><div style="font-size:13px;font-weight:700;color:#fff">${s.weeklyBullScore}/5</div></div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px"><div style="font-size:8px;color:var(--muted2)">FLIP</div><div style="font-size:13px;font-weight:700;color:${flipClr}">${flipStr}</div></div>
+      </div>
+      ${badges?`<div style="font-size:9px;color:var(--muted2);font-family:var(--mono)">${badges}</div>`:""}
+    </div>`;
+  }).join("");
+}
+
+function toggleAccordion(bodyId, arrowId){
+  const body = document.getElementById(bodyId);
+  const arrow = document.getElementById(arrowId);
+  if(!body) return;
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  if(arrow) arrow.classList.toggle('open', !isOpen);
+}
+
+// ── Weinstein Tab ─────────────────────────────────────────────────────────────
+let wsResults = [];
+
+function loadWeinstein(){
+  const grid = document.getElementById("ws-grid");
+  const lastrun = document.getElementById("ws-lastrun");
+  grid.innerHTML = '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:20px;text-align:center">Loading...</div>';
+  // Read raw from Firebase to handle both wrapped {data,savedAt} and direct array structures
+  firebase.database().ref("screener/weinstein").once("value").then(snap => {
+    if(!snap.exists()){
+      grid.innerHTML = '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:40px 20px;text-align:center;line-height:1.8">No Weinstein analysis yet.<br><span style="color:#FFB300">Open desktop Claude → run Prompt 1 with Firebase + TradingView MCP connected.</span><br><span style="font-size:9px;color:var(--muted2)">Results write to screener/weinstein and appear here automatically.</span></div>';
+      return;
+    }
+    try{
+      const val = snap.val();
+      let results = [], savedAt = null, tickersAnalyzed = 0;
+
+      if(val && val.data){
+        // Expected format: {data: string|array, savedAt, device, tickersAnalyzed}
+        results = typeof val.data === "string" ? JSON.parse(val.data) : val.data;
+        savedAt = val.savedAt;
+        tickersAnalyzed = val.tickersAnalyzed || (Array.isArray(results)?results.length:0);
+      } else if(Array.isArray(val)){
+        // Desktop agent wrote array directly
+        results = val;
+        tickersAnalyzed = val.length;
+      } else if(val && typeof val === "object"){
+        // Desktop agent wrote object with numeric keys (Firebase array-like)
+        const keys = Object.keys(val);
+        const numericKeys = keys.filter(k => !isNaN(k));
+        if(numericKeys.length > 0){
+          results = numericKeys.map(k => val[k]);
+          tickersAnalyzed = results.length;
+          savedAt = val.savedAt || null;
+        }
+      }
+
+      if(!Array.isArray(results)) results = [];
+      wsResults = results;
+      if(savedAt) lastrun.textContent = "Updated " + new Date(savedAt).toLocaleString();
+      document.getElementById("ws-sub").textContent = tickersAnalyzed + " TICKERS · DAILY + WEEKLY · DESKTOP AGENT";
+      renderWeinstein();
+    }catch(e){
+      console.warn("loadWeinstein error:", e);
+      grid.innerHTML = '<div style="color:var(--red);font-family:var(--mono);font-size:11px;padding:20px">Error parsing data: '+e.message+'</div>';
+    }
+  }).catch(e => {
+    grid.innerHTML = '<div style="color:var(--red);font-family:var(--mono);font-size:11px;padding:20px">Firebase error — check connection.</div>';
+  });
+}
+
+function renderWeinstein(){
+  const grid = document.getElementById("ws-grid");
+  const topbar = document.getElementById("ws-topbar");
+  if(!wsResults.length){
+    grid.innerHTML = '<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:20px;text-align:center">No results.</div>';
+    return;
+  }
+
+  // Count by action
+  const enters = wsResults.filter(r=>r.action==="ENTER").length;
+  const waits  = wsResults.filter(r=>r.action==="WAIT").length;
+  const avoids = wsResults.filter(r=>r.action==="AVOID").length;
+  document.getElementById("ws-enter-count").textContent = "🟢 " + enters + " ENTER";
+  document.getElementById("ws-wait-count").textContent  = "🟡 " + waits  + " WAIT";
+  document.getElementById("ws-avoid-count").textContent = "🔴 " + avoids + " AVOID";
+  const syms = wsResults.map(r=>r.sym);
+  const tickerDisplay = syms.length > 12
+    ? syms.slice(0,12).join(" · ") + " +" + (syms.length-12) + " more"
+    : syms.join(" · ");
+  document.getElementById("ws-tickers").textContent = wsResults.length + " analyzed: " + tickerDisplay;
+  topbar.style.display = "flex";
+
+  // Sort: ENTER first, then WAIT, then AVOID, within each by taScore
+  const order = {ENTER:0, WAIT:1, AVOID:2};
+  const sorted = [...wsResults].sort((a,b) => {
+    const od = (order[a.action]||1) - (order[b.action]||1);
+    return od !== 0 ? od : (b.taScore||0) - (a.taScore||0);
+  });
+
+  grid.innerHTML = sorted.map(s => {
+    // Action styling
+    const isEnter = s.action==="ENTER";
+    const isWait  = s.action==="WAIT";
+    const isAvoid = s.action==="AVOID";
+    const acColor = isEnter?"var(--green2)":isWait?"#FFB300":"var(--red)";
+    const acBg    = isEnter?"rgba(0,200,83,0.08)":isWait?"rgba(255,179,0,0.08)":"rgba(255,60,60,0.08)";
+    const acIcon  = isEnter?"🟢":isWait?"🟡":"🔴";
+    const borderColor = isEnter?"var(--green2)":isWait?"#FFB300":"var(--red)";
+
+    // Stage labels
+    const stageLabel = n => ["","① BASE","② BREAKOUT","③ MARKUP","④ DISTRIB","⑤ BREAKDOWN","⑥ MARKDOWN"][n] || ("Stage "+n);
+    const stageColor = n => n===2?"var(--green2)":n===3?"#64B5F6":n>=4?"var(--red)":"var(--muted2)";
+
+    // Alignment badge
+    const alignColor = s.alignment==="CONFIRMED"?"var(--green2)":s.alignment==="CONFLICT"?"#FFB300":"var(--red)";
+
+    // Trail bullets
+    const dTrail = s.trailBullishDaily  ? "🟢" : "🔴";
+    const wTrail = s.trailBullishWeekly ? "🟢" : "🔴";
+
+    // JAX bullets
+    const dJAX = s.jaxActiveDaily  ? "⚡" : "—";
+    const wJAX = s.jaxActiveWeekly ? "⚡" : "—";
+
+    // taScore badge color
+    const tsColor = (s.taScore||0)>=70?"#00C853":(s.taScore||0)>=50?"#FFB300":(s.taScore||0)>=30?"#FF6D00":"var(--muted2)";
+    const igFlag  = s.taIgniting ? " 🚀" : "";
+
+    // Change color
+    const chg = parseFloat(s.change||0);
+    const chgStr = (chg>=0?"▲":"▼")+Math.abs(chg).toFixed(2)+"%";
+    const chgColor = chg>=0?"var(--green2)":"var(--red)";
+
+    return `<div style="background:#0a1525;border:1px solid #1a3a4a;border-left:3px solid ${borderColor};border-radius:4px;padding:12px 14px;margin-bottom:10px;cursor:pointer"
+      onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
+
+      <!-- Header row -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:6px">${tickerLogo(s.sym,18)}<span style="font-size:16px;font-weight:700;color:#fff;font-family:var(--mono)">${s.sym}</span></div>
+        <span style="font-size:13px;font-weight:700;color:${chgColor};font-family:var(--mono)">${chgStr}</span>
+        <span style="font-size:11px;color:var(--muted2);font-family:var(--mono)">$${parseFloat(s.price||0).toFixed(2)}</span>
+        <span style="background:${tsColor};color:#000;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;font-family:var(--mono)">TA ${s.taScore||0}${igFlag}</span>
+        <span style="background:${acBg};color:${acColor};font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;border:1px solid ${acColor};font-family:var(--mono);margin-left:auto">${acIcon} ${s.action}</span>
+        <button onclick="event.stopPropagation();logToJournal({sym:'${s.sym}',price:${s.price||0},score:'W',source:'weinstein',session:getMarketSession(),greenArrow:${s.jaxActiveDaily||false},tradeType:'Weinstein'})"
+          style="background:#0d1f2b;border:1px solid var(--blue);color:var(--blue);font-family:var(--mono);font-size:8px;padding:3px 8px;cursor:pointer;border-radius:2px">📓 LOG</button>
+      </div>
+
+      <!-- Stage row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:8px">
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">DAILY</div>
+          <div style="font-size:11px;font-weight:700;color:${stageColor(s.dailyStage)};font-family:var(--mono)">${stageLabel(s.dailyStage)}</div>
+        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">WEEKLY</div>
+          <div style="font-size:11px;font-weight:700;color:${stageColor(s.weeklyStage)};font-family:var(--mono)">${stageLabel(s.weeklyStage)}</div>
+        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">ALIGN</div>
+          <div style="font-size:10px;font-weight:700;color:${alignColor};font-family:var(--mono)">${s.alignment||"—"}</div>
+        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">TRAIL D/W</div>
+          <div style="font-size:12px;font-family:var(--mono)">${dTrail} ${wTrail}</div>
+        </div>
+      </div>
+
+      <!-- RSI / Trail values row -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">D-RSI</div>
+          <div style="font-size:12px;font-weight:700;color:${(s.dailyRSI||0)<70?"var(--green2)":"var(--red)"};font-family:var(--mono)">${(s.dailyRSI||0).toFixed(1)}</div>
+        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">W-RSI</div>
+          <div style="font-size:12px;font-weight:700;color:${(s.weeklyRSI||0)<70?"#64B5F6":"var(--red)"};font-family:var(--mono)">${(s.weeklyRSI||0).toFixed(1)}</div>
+        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">JAX D/W</div>
+          <div style="font-size:12px;font-family:var(--mono)">${dJAX} ${wJAX}</div>
+        </div>
+        <div style="background:#0d1a25;border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">D-TRAIL</div>
+          <div style="font-size:11px;font-weight:700;color:var(--muted2);font-family:var(--mono)">$${parseFloat(s.dailyTrail||0).toFixed(2)}</div>
+        </div>
+      </div>
+
+      ${isEnter && s.entryZone ? `
+      <!-- Trade levels (ENTER only) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">
+        <div style="background:rgba(0,200,83,0.06);border:1px solid rgba(0,200,83,0.2);border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">ENTRY</div>
+          <div style="font-size:13px;font-weight:700;color:var(--green2);font-family:var(--mono)">$${parseFloat(s.entryZone||0).toFixed(2)}</div>
+        </div>
+        <div style="background:rgba(255,60,60,0.06);border:1px solid rgba(255,60,60,0.2);border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">STOP</div>
+          <div style="font-size:13px;font-weight:700;color:var(--red);font-family:var(--mono)">$${parseFloat(s.stop||0).toFixed(2)}</div>
+        </div>
+        <div style="background:rgba(100,181,246,0.06);border:1px solid rgba(100,181,246,0.2);border-radius:3px;padding:5px 8px">
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">TARGET</div>
+          <div style="font-size:13px;font-weight:700;color:#64B5F6;font-family:var(--mono)">$${parseFloat(s.target||0).toFixed(2)}</div>
+        </div>
+      </div>` : ""}
+
+      ${isWait && s.trigger ? `
+      <!-- Trigger (WAIT only) -->
+      <div style="background:rgba(255,179,0,0.08);border:1px solid rgba(255,179,0,0.25);border-radius:3px;padding:6px 10px;margin-bottom:8px;font-family:var(--mono);font-size:10px;color:#FFB300">
+        ⏳ TRIGGER: ${s.trigger}
+      </div>` : ""}
+
+      <!-- Summary + Key Risk -->
+      ${s.summary ? `<div style="font-family:var(--mono);font-size:10px;color:var(--muted2);margin-bottom:4px">${s.summary}</div>` : ""}
+      ${s.keyRisk  ? `<div style="font-family:var(--mono);font-size:9px;color:#FF6D00">⚠️ ${s.keyRisk}</div>` : ""}
+
+    </div>`;
+  }).join("");
+}
+
+</script>
+</body>
+</html>
 // ══════════════════════════════════════════════════════════
 // JAX SCANNER — Pure green arrow, no RSI restriction
 // ══════════════════════════════════════════════════════════
