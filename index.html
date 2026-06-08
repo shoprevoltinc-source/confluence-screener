@@ -60,7 +60,13 @@ function initFirebase(){
       const snap = await db.ref("screener/"+key).once("value");
       if(snap.exists()){
         const val = snap.val();
-        return { data: typeof val.data==="string"?JSON.parse(val.data):val.data, savedAt: val.savedAt, device: val.device };
+        let data = val.data;
+        if(typeof data === "string"){
+          // Strip markdown backticks if present
+          data = data.replace(/```json|```/g, "").trim();
+          try{ data = JSON.parse(data); }catch(e){ data = val.data; }
+        }
+        return { data, savedAt: val.savedAt, device: val.device };
       }
       return null;
     }catch(e){ console.warn("fbLoad failed:", e); return null; }
@@ -4620,9 +4626,8 @@ function loadWeeklyMonitor(){
         const banner = document.getElementById("wm-savedBanner");
         if(banner){ banner.style.display="block"; banner.textContent="💾 "+wmResults.length+" weekly signals · last scan"; }
         document.getElementById("wm-filterBar").style.display="flex";
-        document.getElementById("wm-t1").textContent       = wmResults.filter(r=>r.tier1).length;
-        document.getElementById("wm-t2").textContent       = wmResults.filter(r=>r.tier2&&!r.tier1).length;
         document.getElementById("wm-both").textContent     = wmResults.filter(r=>r.bothAligned).length;
+        const wkonly = document.getElementById("wm-wkonly"); if(wkonly) wkonly.textContent = wmResults.filter(r=>!r.bothAligned).length;
         document.getElementById("wm-fresh").textContent    = wmResults.filter(r=>r.isFresh).length;
         document.getElementById("wm-watching").textContent = wmResults.length;
         renderWeeklyMonitor();
@@ -4639,8 +4644,6 @@ function loadWeeklyMonitor(){
         const banner = document.getElementById("wm-savedBanner");
         if(banner){ banner.style.display="block"; banner.textContent="☁️ "+(fb.device||"cloud")+" · "+new Date(fb.savedAt).toLocaleString()+" — "+wmResults.length+" signals"; }
         document.getElementById("wm-filterBar").style.display="flex";
-        document.getElementById("wm-t1").textContent       = wmResults.filter(r=>r.tier1).length;
-        document.getElementById("wm-t2").textContent       = wmResults.filter(r=>r.tier2&&!r.tier1).length;
         document.getElementById("wm-both").textContent     = wmResults.filter(r=>r.bothAligned).length;
         document.getElementById("wm-fresh").textContent    = wmResults.filter(r=>r.isFresh).length;
         document.getElementById("wm-watching").textContent = wmResults.length;
@@ -5294,7 +5297,8 @@ ${jnlCtx}`;
 
     // Save both raw text AND rendered HTML — localStorage for speed, Firebase for cross-device sync
     try{
-      const briefData = { text: raw, html: body.innerHTML, time: new Date().toISOString(), isJson: true };
+      const cleanRaw = raw.replace(/```json|```/g, "").trim();
+      const briefData = { text: cleanRaw, html: body.innerHTML, time: new Date().toISOString(), isJson: true };
       localStorage.setItem("cs_agent_brief", JSON.stringify(briefData));
       fbSafeSave("agent_brief", briefData);
     }catch(e){}
