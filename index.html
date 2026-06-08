@@ -4689,14 +4689,20 @@ async function callClaude(systemPrompt, userPrompt, maxTokens=1500){
   if(!workerUrl){
     throw new Error("Claude proxy not configured. Set cs_claude_proxy in localStorage.");
   }
-  const response = await fetch(workerUrl+"/claude", {
+  console.log("CLAUDE PAYLOAD", {userLen: userPrompt?.length, userPreview: userPrompt?.slice(0,200)});
+  const response = await fetch(workerUrl, {
     method: "POST",
     cache: "no-store",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ system: systemPrompt, user: userPrompt, max_tokens: maxTokens, temperature: 0.1 })
   });
+  if(!response.ok){
+    let errBody = {};
+    try{ errBody = await response.json(); }catch(e){}
+    throw new Error(`Worker returned ${response.status}: ${errBody?.error?.message || errBody?.error || JSON.stringify(errBody)}`);
+  }
   const data = await response.json();
-  if(data.error) throw new Error(data.error.message);
+  if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
   return data.content[0].text;
 }
 
@@ -5004,14 +5010,19 @@ async function runMorningBrief(){
       if(data.jax_scan&&data.jax_scan.length) data.jax_scan.filter(r=>r.greenArrow).slice(0,10).forEach(r=>candidates.add(r.sym));
       if(data.recovery&&data.recovery.length) data.recovery.filter(r=>r.score>=5||r.greenArrow).slice(0,10).forEach(r=>candidates.add(r.sym));
       if(data.catalyst&&data.catalyst.length) data.catalyst.filter(r=>r.atrCoiling).slice(0,10).forEach(r=>candidates.add(r.sym));
-      // Fetch live quotes — max 30 to stay under Finnhub free tier
+      // Fetch live quotes in batches of 5 to avoid Finnhub 429 rate limit
       const syms = [...candidates].slice(0,30);
-      await Promise.all(syms.map(async sym=>{
-        try{
-          const q = await fetchLiveQuote(sym);
-          if(q && q.price > 0) livePrices[sym] = q;
-        }catch(e){}
-      }));
+      const BATCH = 5;
+      for(let i=0; i<syms.length; i+=BATCH){
+        const batch = syms.slice(i, i+BATCH);
+        await Promise.all(batch.map(async sym=>{
+          try{
+            const q = await fetchLiveQuote(sym);
+            if(q && q.price > 0) livePrices[sym] = q;
+          }catch(e){}
+        }));
+        if(i+BATCH < syms.length) await new Promise(r=>setTimeout(r, 300));
+      }
       console.log(`📡 Live prices fetched for ${Object.keys(livePrices).length} stocks`);
     }catch(e){ console.warn("Live price fetch error:", e); }
 
