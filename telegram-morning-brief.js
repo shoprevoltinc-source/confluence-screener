@@ -299,45 +299,168 @@ function buildMessage3(jaxScan, weinstein, weeklyMonitor) {
   return lines.join("\n");
 }
 
+// ── Claude API call ───────────────────────────────────────────────────────────
+
+async function callClaude(systemPrompt, userPrompt) {
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!ANTHROPIC_KEY) {
+    console.warn("⚠️  No ANTHROPIC_API_KEY — skipping agent brief generation");
+    return null;
+  }
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      model:      "claude-sonnet-4-5",
+      max_tokens: 2500,
+      temperature: 0.1,
+      system:     systemPrompt,
+      messages:   [{ role: "user", content: userPrompt }]
+    });
+    const req = https.request({
+      hostname: "api.anthropic.com",
+      path:     "/v1/messages",
+      method:   "POST",
+      headers:  {
+        "Content-Type":      "application/json",
+        "x-api-key":         ANTHROPIC_KEY,
+        "anthropic-version": "2023-06-01",
+        "Content-Length":    Buffer.byteLength(body)
+      }
+    }, res => {
+      let d = "";
+      res.on("data", c => d += c);
+      res.on("end", () => {
+        try {
+          const result = JSON.parse(d);
+          if (result.content && result.content[0]) {
+            resolve(result.content[0].text);
+          } else {
+            reject(new Error("No content in Claude response: " + d));
+          }
+        } catch (e) { reject(e); }
+      });
+    });
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+// ── Firebase PUT ──────────────────────────────────────────────────────────────
+
+function fbPut(path, payload) {
+  return new Promise((resolve, reject) => {
+    const url  = new URL(`${FIREBASE_DB_URL}/screener/${path}.json`);
+    const body = JSON.stringify(payload);
+    const req  = https.request({
+      hostname: url.hostname,
+      path:     url.pathname + url.search,
+      method:   "PUT",
+      headers:  { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) }
+    }, res => { let d = ""; res.on("data", c => d += c); res.on("end", () => resolve(d)); });
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
   console.log("📡 Fetching Firebase data...");
 
-  const [weeklyMonitor, jaxScan, weinstein, agentBriefRaw] = await Promise.all([
+  const [weeklyMonitor, jaxScan, weinstein] = await Promise.all([
     fbGet("weekly_monitor"),
     fbGet("jax_scan"),
-    fbGet("weinstein"),
-    fbGet("agent_brief")
+    fbGet("weinstein")
   ]);
 
-  // Parse agent brief — it's stored as {text, html, time, isJson}
+  const wm  = Array.isArray(weeklyMonitor) ? weeklyMonitor : [];
+  const jax = Array.isArray(jaxScan)       ? jaxScan       : [];
+  const ws  = Array.isArray(weinstein)     ? weinstein      : [];
+
+  console.log(`✅ Weekly: ${wm.length} | JAX: ${jax.filter(r => r.greenArrow).length} arrows | Weinstein: ${ws.length}`);
+
+  // ── Generate fresh agent brief via Claude API ────────────────────────────
   let agentBrief = null;
-  if (agentBriefRaw && agentBriefRaw.text) {
-    try {
-      let clean = agentBriefRaw.text.replace(/```json/gi, "").replace(/```/g, "").trim();
+  console.log("🤖 Generating agent brief via Claude...");
+  try {
+    const today = new Date().toLocaleDateString("en-US", {
+      timeZone: "America/New_York", weekday: "long", month: "short", day: "numeric"
+    });
+
+    const tier1    = wm.filter(r => r.tier1 || r.tierApp);
+    const tier2    = wm.filter(r => r.tier2 && !r.tier1 && !r.tierApp);
+    const greenArrows = jax.filter(r => r.greenArrow && (r.bullScore || 0) >= 4);
+    const wsEnters = ws.filter(r => r.action === "ENTER");
+
+    const systemPrompt = `You are a professional trading advisor. Respond ONLY with a raw JSON object, no markdown, no backticks. Start with { and end with }.
+Return this exact structure:
+{
+  "context": "one sentence market context",
+  "confidence": "X/10 — brief reason",
+  "avoid": "brief list of what to avoid today",
+  "trades": [
+    {
+      "sym": "TICKER",
+      "score": 8,
+      "action": "ENTER",
+      "entry": 123.45,
+      "stop": 120.00,
+      "target": 135.00,
+      "shares": 12,
+      "risk_pct": 1.0,
+      "win_rate_note": "brief signal description",
+      "notes": "score breakdown"
+    }
+  ],
+  "recommendation": "one paragraph summary",
+  "skipped": "brief note on skipped signals"
+}`;
+
+    const userPrompt = `Date: ${today}
+Account: $10000 | Risk: 1% ($100) | Max trades: 5
+
+WEEKLY MONITOR (${wm.length} signals):
+TIER 1 ENTER NOW: ${tier1.map(r => `${r.sym} $${Number(r.price||0).toFixed(2)} W-RSI:${Number(r.weeklyRsi||0).toFixed(0)} D-RSI:${Number(r.rsi||0).toFixed(0)} flip${r.weeksAgo}wk ${r.h4FlipRecent?"4H-JUST-FLIPPED":"4H-bull"}`).join(", ") || "none"}
+TIER 2 4H BULL: ${tier2.map(r => `${r.sym} $${Number(r.price||0).toFixed(2)} W-RSI:${Number(r.weeklyRsi||0).toFixed(0)}`).join(", ") || "none"}
+
+JAX GREEN ARROWS (bull 4-5/5): ${greenArrows.slice(0,10).map(r => `${r.sym} $${Number(r.price||0).toFixed(2)} bull${r.bullScore}/5 RSI${Number(r.rsi||0).toFixed(0)}`).join(", ") || "none"}
+
+WEINSTEIN ENTER: ${wsEnters.map(r => `${r.sym} $${Number(r.price||0).toFixed(2)}`).join(", ") || "none"}
+
+Give me my top 5 trades for today. Score each 0-10. ENTER only if score >= 4.`;
+
+    const raw = await callClaude(systemPrompt, userPrompt);
+    if (raw) {
+      let clean = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
       const start = clean.indexOf("{");
       const end   = clean.lastIndexOf("}");
       if (start !== -1 && end !== -1) {
         agentBrief = JSON.parse(clean.substring(start, end + 1));
+        console.log(`✅ Agent brief generated — ${agentBrief.trades?.length || 0} trades`);
+
+        // Save to Firebase so Agent tab auto-updates
+        await fbPut("agent_brief", {
+          data:    raw,
+          text:    raw,
+          html:    "",
+          time:    new Date().toISOString(),
+          isJson:  true,
+          savedAt: new Date().toISOString(),
+          device:  "github-actions"
+        });
+        console.log("✅ Agent brief saved to Firebase");
       }
-    } catch (e) {
-      console.warn("⚠️  Could not parse agent brief JSON:", e.message);
     }
+  } catch (e) {
+    console.warn("⚠️  Agent brief generation failed:", e.message);
   }
 
-  // Summary
-  const wm = Array.isArray(weeklyMonitor) ? weeklyMonitor : [];
-  const jax = Array.isArray(jaxScan) ? jaxScan : [];
-  const ws = Array.isArray(weinstein) ? weinstein : [];
-  console.log(`✅ Weekly: ${wm.length} | JAX: ${jax.filter(r => r.greenArrow).length} arrows | Weinstein: ${ws.length} | Agent brief: ${agentBrief ? "parsed" : "not available"}`);
-
-  // Build messages
+  // ── Build and send Telegram messages ────────────────────────────────────
   const msg1 = buildMessage1(agentBrief, wm);
   const msg2 = buildMessage2(wm);
   const msg3 = buildMessage3(jax, ws, wm);
 
-  // Send with 1s gap between messages
   console.log("📤 Sending Message 1 (Trades)...");
   await sendTelegram(msg1);
   await sleep(1000);
