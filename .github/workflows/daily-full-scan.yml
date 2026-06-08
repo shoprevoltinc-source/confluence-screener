@@ -2,31 +2,19 @@ name: Daily Full Scan
 
 on:
   schedule:
-    # 6:00am ET = 11:00 UTC (pre-market)
-    - cron: '0 11 * * 1-5'
-    # 9:45am ET = 14:45 UTC (first scan after open)
-    - cron: '45 14 * * 1-5'
-    # 3:30pm ET = 20:30 UTC (end of day)
-    - cron: '30 20 * * 1-5'
-
+    - cron: "0 12 * * 1-5"  # 8:00am ET Mon-Fri
   workflow_dispatch:
 
 jobs:
-  daily-full-scan:
+  scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Run daily full scan
+          node-version: "20"
+      - name: Run Daily Full Scan
         env:
-          TD_KEYS: ${{ secrets.TD_KEYS }}
+          TD_KEYS:         ${{ secrets.TD_KEYS }}
           FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
         run: node daily-full-scan.js
