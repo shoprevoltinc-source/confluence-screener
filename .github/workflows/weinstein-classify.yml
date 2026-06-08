@@ -1,20 +1,56 @@
 name: Weinstein Classifier
+
 on:
   schedule:
     - cron: "10 13 * * 1-5"  # 9:10am ET Mon-Fri (after daily scan)
   workflow_dispatch:
+    inputs:
+      source:
+        description: "Which scan(s) to pull from"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - jax
+          - weekly
+          - jax,weekly
+          - recovery
+          - catalyst
+      top_n:
+        description: "How many tickers to classify (sorted by taScore)"
+        required: false
+        default: "25"
+        type: string
+      dry_run:
+        description: "Dry run — classify but don't write to Firebase"
+        required: false
+        default: false
+        type: boolean
+
 jobs:
   classify:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
+
       - name: Run Weinstein Classifier
         env:
-          TD_KEYS:           ${{ secrets.TD_KEYS }}
           FIREBASE_URL:      ${{ secrets.FIREBASE_DB_URL }}
           FIREBASE_TOKEN:    ${{ secrets.FIREBASE_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: node weinstein-classify.js
+        run: |
+          ARGS="--source ${{ github.event.inputs.source || 'all' }} --top ${{ github.event.inputs.top_n || '25' }}"
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          echo "Running: node weinstein-classify.js $ARGS"
+          node weinstein-classify.js $ARGS
