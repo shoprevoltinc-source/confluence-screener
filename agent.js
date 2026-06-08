@@ -324,7 +324,22 @@ async function runMorningBrief(){
         `\n\nRULE: If live price is 5%+ above scan price = do NOT enter, wait for pullback. If 2-4% above = adjust stop/size. If below scan price = better entry than expected.`
       : "";
 
-    const system = `You are a professional trading advisor and technical analyst. You MUST respond with ONLY a raw JSON object. NO backticks, NO markdown, NO code fences, NO explanation before or after. Start your response with { and end with }. Any other format will cause a system error.
+    // Load calibration data from Firebase
+    let calibrationCtx = "";
+    try{
+      const cal = await window.fbLoad("calibration");
+      if(cal && cal.data && cal.data.active){
+        const d = cal.data;
+        const bestSrc = Object.entries(d.bySource||{}).sort((a,b)=>b[1].winRate-a[1].winRate)[0];
+        const bestDTE = Object.entries(d.byDTE||{}).sort((a,b)=>b[1].winRate-a[1].winRate)[0];
+        calibrationCtx = `\n\n🧠 AI CALIBRATION (${d.sampleSize} real options trades):\n` +
+          `Best source: ${bestSrc?bestSrc[0]+" "+bestSrc[1].winRate+"% WR":"—"} | ` +
+          `Best DTE: ${bestDTE?bestDTE[0]+" "+bestDTE[1].winRate+"% WR":"—"}\n` +
+          Object.entries(d.bySource||{}).map(([s,v])=>`${s}: ${v.winRate}% WR, avg ${v.avgPct>0?"+":""}${v.avgPct}% on ${v.total} trades`).join(" | ");
+      }
+    }catch(e){}
+
+    const system = \`You are a professional trading advisor and technical analyst. You MUST respond with ONLY a raw JSON object. NO backticks, NO markdown, NO code fences, NO explanation before or after. Start your response with { and end with }. Any other format will cause a system error.
 The trader has $${account} account, ${risk}% risk per trade ($${riskAmt.toFixed(0)} max risk), max ${maxT} trades.
 Market session: ${sess.toUpperCase()}.
 
@@ -406,7 +421,10 @@ TIER SYSTEM (priority order):
 ENTRY RULES:
 - Only recommend TIER 1 or TIER 2 as immediate entries
 - TIER 3 = enter on pullback to daily trail only
-- Position size = $${riskAmt.toFixed(0)} risk / (entry - stop) = shares
+- Options sizing: max premium spend = $${riskAmt.toFixed(0)} per trade. Typical 30-45 DTE call/put.
+- Contracts = floor($${riskAmt.toFixed(0)} / (premium_estimate * 100)), min 1 contract
+- Estimate premium as ~3-5% of underlying price for ATM 30-45 DTE options
+- Show BOTH: contracts count AND total premium cost ($)
 - Stop = just below the 4H trail stop value
 - Target = 2-3x the risk distance minimum
 - If no TIER 1/2 signals today = say so clearly, recommend WATCHING list
@@ -457,7 +475,12 @@ Return ONLY this exact JSON structure (no other text):
       "entry": 123.45,
       "stop": 120.00,
       "target": 135.00,
-      "shares": 12,
+      "option_type": "call",
+      "strike_guidance": "ATM or 1 strike OTM (e.g. $124C)",
+      "expiry_guidance": "30-45 DTE from today",
+      "est_premium": 2.50,
+      "contracts": 3,
+      "total_cost": 750,
       "risk_pct": 1.0,
       "win_rate_note": "weekly+4H+200EMA = A++ setup",
       "notes": "score breakdown: +3 weekly +2 today +2 bull5/5 +1 200EMA = 8/10"
@@ -471,7 +494,7 @@ Return ONLY this exact JSON structure (no other text):
 
 ${scanCtx}
 ${liveCtx}
-${jnlCtx}`;
+${jnlCtx}${calibrationCtx}`;
 
     const raw = await callClaude(system, user, 2500);
 
@@ -533,7 +556,7 @@ ${jnlCtx}`;
             📓 LOG
           </button>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px">
           <div style="background:#0a1a0f;border-radius:3px;padding:6px 8px">
             <div style="font-size:8px;color:var(--muted2);letter-spacing:1px">ENTRY</div>
             <div style="font-size:13px;font-weight:700;color:var(--green2)">$${t.entry||"—"}</div>
@@ -547,8 +570,12 @@ ${jnlCtx}`;
             <div style="font-size:13px;font-weight:700;color:#64B5F6">$${t.target||"—"}</div>
           </div>
           <div style="background:#0a1a0f;border-radius:3px;padding:6px 8px">
-            <div style="font-size:8px;color:var(--muted2);letter-spacing:1px">SIZE</div>
-            <div style="font-size:13px;font-weight:700;color:#fff">${t.shares||"—"} <span style="font-size:9px;color:var(--muted2)">shares</span></div>
+            <div style="font-size:8px;color:var(--muted2);letter-spacing:1px">OPTION</div>
+            <div style="font-size:11px;font-weight:700;color:#fff">${t.strike_guidance||"ATM"} <span style="font-size:9px;color:var(--muted2)">${t.option_type||"call"} · ${t.expiry_guidance||"30-45 DTE"}</span></div>
+          </div>
+          <div style="background:#0a1a0f;border-radius:3px;padding:6px 8px">
+            <div style="font-size:8px;color:var(--muted2);letter-spacing:1px">CONTRACTS</div>
+            <div style="font-size:13px;font-weight:700;color:#fff">${t.contracts||"—"} <span style="font-size:9px;color:var(--muted2)">× $${t.est_premium||"?"} = $${t.total_cost||"?"}</span></div>
           </div>
         </div>
         ${t.notes?`<div style="font-size:10px;color:var(--muted2);line-height:1.6;border-top:1px solid #1a3a20;padding-top:7px">${t.notes}</div>`:""}
@@ -700,7 +727,7 @@ ${symCtx}
 MY WIN RATES: ${winRateCtx}
 Account: $${account} | Max risk: $${riskAmt.toFixed(0)}
 
-Give: decision, one-line reason, stop level, target, exact shares, confidence.`;
+Give: decision, one-line reason, stop level on underlying, option guidance (strike, expiry, est premium, contracts), confidence.`;
 
     const response = await callClaude(system, user, 400);
     const isYes    = response.toLowerCase().startsWith("yes");
