@@ -1,26 +1,21 @@
-name: JAX Scanner — 12pm & 3:30pm ET
+name: JAX Scanner
 
 on:
   schedule:
-    - cron: '0 16 * * 1-5'
-    - cron: '30 19 * * 1-5'
+    - cron: "0 16 * * 1-5"   # 12:00pm ET Mon-Fri
+    - cron: "30 19 * * 1-5"  # 3:30pm ET Mon-Fri
   workflow_dispatch:
 
 jobs:
-  scan:
+  jax-scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: "20"
       - name: Run JAX Scanner
         env:
-          TD_KEYS: ${{ secrets.TD_KEYS }}
+          TD_KEYS:         ${{ secrets.TD_KEYS }}
           FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
         run: node jax-scanner.js
