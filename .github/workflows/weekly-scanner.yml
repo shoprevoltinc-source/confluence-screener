@@ -2,30 +2,20 @@ name: Weekly Candle Scanner
 
 on:
   schedule:
-    # Sunday 6pm ET = 23:00 UTC (primary run — before Monday open)
-    - cron: '0 23 * * 0'
-    # Wednesday 6pm ET = 23:00 UTC (midweek check — catches mid-week flips like IBM)
-    - cron: '0 23 * * 3'
-
-  # Manual trigger — run anytime from Actions tab
+    - cron: "0 23 * * 3"  # Wednesday 7:00pm ET
+    - cron: "0 22 * * 0"  # Sunday 6:00pm ET (fresh before Monday open)
   workflow_dispatch:
 
 jobs:
   weekly-scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Run weekly candle scanner
+          node-version: "20"
+      - name: Run Weekly Scanner
         env:
-          TD_KEYS: ${{ secrets.TD_KEYS }}
+          TD_KEYS:         ${{ secrets.TD_KEYS }}
           FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
         run: node weekly-scanner.js
