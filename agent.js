@@ -277,6 +277,13 @@ async function runMorningBrief(){
 
     updateAgentStats(data);
 
+    // ── Detect market regime before building brief ──────────────────────────
+    body.innerHTML = '<div class="agent-output loading">⏳ Reading market regime...</div>';
+    const regime = await detectRegime().catch(()=>null);
+    const regimeMaxTrades = regime ? Math.min(maxT, regime.maxTrades) : maxT;
+    const regimeMinScore  = regime ? regime.minScore : 4;
+    const regimeSizeMult  = regime ? regime.sizeMultiplier : 1.0;
+
     // ── Fetch live prices for top candidates before sending to Claude ──
     // Collects all candidate tickers from scan data, fetches Finnhub quotes
     // Claude sees scan price AND live price — knows if stock already moved
@@ -340,7 +347,15 @@ async function runMorningBrief(){
     }catch(e){}
 
     const system = \`You are a professional trading advisor and technical analyst. You MUST respond with ONLY a raw JSON object. NO backticks, NO markdown, NO code fences, NO explanation before or after. Start your response with { and end with }. Any other format will cause a system error.
-The trader has $${account} account, ${risk}% risk per trade ($${riskAmt.toFixed(0)} max risk), max ${maxT} trades.
+The trader has $${account} account, ${risk}% risk per trade ($${riskAmt.toFixed(0)} max risk), max ${regimeMaxTrades} trades.
+${regime ? `
+MARKET REGIME TODAY: ${regime.label}
+SPY: ${regime.spyMove>=0?"+":""}${regime.spyMove}% | VIX: ${regime.vixLevel} | Breadth: ${regime.adRatio}% sectors advancing
+Leading sectors: ${regime.leadingSectors}
+Lagging sectors: ${regime.laggingSectors}
+Regime advice: ${regime.advice}
+REGIME RULES: Only recommend setups scoring ${regimeMinScore}+/10 today. Max ${regimeMaxTrades} trades. Size multiplier: ${regimeSizeMult}x.
+` : ""}
 Market session: ${sess.toUpperCase()}.
 
 YOUR A+ SETUP RULES (derived from backtested winning trades NVTS, CRDO vs filtered-out BE, SMTC):
@@ -490,7 +505,7 @@ Return ONLY this exact JSON structure (no other text):
   "skipped": "brief note on why other signals were skipped"
 }`;
 
-    const user = `Here is today's scanner data and my trading history. Give me my morning brief with up to ${maxT} trades.
+    const user = `Here is today's scanner data and my trading history. Give me my morning brief with up to ${regimeMaxTrades} trades (regime-adjusted from ${maxT} max).
 
 ${scanCtx}
 ${liveCtx}
@@ -521,6 +536,8 @@ ${jnlCtx}${calibrationCtx}`;
       body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(raw)}</div>`;
       console.error("JSON parse failed:", ex.message, "\nRaw:", raw.substring(0,500));
       document.getElementById("agent-brief-time").textContent = new Date().toLocaleTimeString();
+    // Re-render regime banner (sits above brief)
+    if(window.currentRegime) renderRegimeBanner(window.currentRegime);
       document.getElementById("agent-lastrun").textContent = "Last brief: "+new Date().toLocaleTimeString();
       try{
         const briefData = {text:raw, html:body.innerHTML, time:new Date().toISOString(), isJson:false};
