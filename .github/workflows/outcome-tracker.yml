@@ -1,0 +1,25 @@
+name: Outcome Tracker
+
+on:
+  schedule:
+    - cron: "30 20 * * 1-5"  # 4:30pm ET Mon-Fri (after market close)
+  workflow_dispatch:
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run Outcome Tracker
+        env:
+          FIREBASE_URL:      ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_TOKEN:    ${{ secrets.FIREBASE_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FH_KEY:            ${{ secrets.FH_KEY }}
+        run: node outcome-tracker.js
