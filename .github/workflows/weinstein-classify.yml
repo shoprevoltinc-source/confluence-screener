@@ -1,10 +1,8 @@
 name: Weinstein Classifier
-
 on:
   schedule:
     - cron: "10 13 * * 1-5"  # 9:10am ET Mon-Fri (after daily scan)
   workflow_dispatch:
-
 jobs:
   classify:
     runs-on: ubuntu-latest
@@ -15,7 +13,8 @@ jobs:
           node-version: "20"
       - name: Run Weinstein Classifier
         env:
-          TD_KEYS:         ${{ secrets.TD_KEYS }}
-         FIREBASE_URL: ${{ secrets.FIREBASE_DB_URL }}
+          TD_KEYS:           ${{ secrets.TD_KEYS }}
+          FIREBASE_URL:      ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_TOKEN:    ${{ secrets.FIREBASE_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: node weinstein-classify.js
