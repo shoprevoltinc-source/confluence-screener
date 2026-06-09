@@ -346,7 +346,7 @@ async function runMorningBrief(){
       }
     }catch(e){}
 
-    const system = \`You are a professional trading advisor and technical analyst. You MUST respond with ONLY a raw JSON object. NO backticks, NO markdown, NO code fences, NO explanation before or after. Start your response with { and end with }. Any other format will cause a system error.
+    const system = `You are a professional trading advisor and technical analyst. You MUST respond with ONLY a raw JSON object. NO backticks, NO markdown, NO code fences, NO explanation before or after. Start your response with { and end with }. Any other format will cause a system error.
 The trader has $${account} account, ${risk}% risk per trade ($${riskAmt.toFixed(0)} max risk), max ${regimeMaxTrades} trades.
 ${regime ? `
 MARKET REGIME TODAY: ${regime.label}
