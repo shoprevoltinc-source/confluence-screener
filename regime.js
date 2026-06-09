@@ -77,14 +77,32 @@ async function fetchRegimeQuote(sym){
   }catch(e){ return null; }
 }
 
-// ── Fetch VIX ─────────────────────────────────────────────────────────────────
+// ── Fetch VIX proxy ──────────────────────────────────────────────────────────
+// Finnhub doesn't support ^VIX directly — use VIXY (ProShares VIX ETF) as proxy
+// VIXY price ~= VIX/3 roughly, so we scale it up
+// Alternatively infer VIX from SPY options spread — use VIXY for now
 async function fetchVIX(){
   try{
-    const d = await fetchRegimeQuote("^VIX");
-    if(d) return d;
-    // Fallback: VIX via Finnhub sometimes needs different symbol
-    const d2 = await fetchRegimeQuote("VIX");
-    return d2;
+    // Try VIXY — ProShares Short-Term VIX futures ETF
+    // VIXY typically trades at ~VIX/3, scale to get approximate VIX
+    const vixy = await fetchRegimeQuote("VIXY");
+    if(vixy && vixy.price > 0){
+      const approxVIX = vixy.price * 3.2; // rough scaling factor
+      return {
+        price:     parseFloat(approxVIX.toFixed(1)),
+        changePct: vixy.changePct,
+        high:      vixy.high * 3.2,
+        low:       vixy.low  * 3.2,
+        _source:   "VIXY proxy"
+      };
+    }
+    // Fallback: UVXY (2x VIX) — divide by 6
+    const uvxy = await fetchRegimeQuote("UVXY");
+    if(uvxy && uvxy.price > 0){
+      const approxVIX = uvxy.price * 1.6;
+      return { price: parseFloat(approxVIX.toFixed(1)), changePct: uvxy.changePct, _source: "UVXY proxy" };
+    }
+    return null;
   }catch(e){ return null; }
 }
 
@@ -113,23 +131,22 @@ async function fetchBreadth(){
 // ── Classify regime ───────────────────────────────────────────────────────────
 function classifyRegime(spy, vix, breadth){
   const spyMove  = spy?.changePct || 0;
-  const vixLevel = vix?.price     || 20;
   const adRatio  = breadth?.adRatio || 0.5;
+  const hasVIX   = vix && vix.price > 0;
+  const vixLevel = hasVIX ? vix.price : null;
 
-  // BEAR: SPY down hard OR VIX spiking + broad selling
-  if(spyMove < -1.5 || (vixLevel > 30 && spyMove < -0.5)){
-    return "BEAR";
-  }
-  // VOLATILE: VIX elevated, wide intraday range
-  const vixHigh = vix?.high||vixLevel;
-  const vixMove = vix ? ((vixHigh - vixLevel)/vixLevel*100) : 0;
-  if(vixLevel > 25 || (vixLevel > 20 && Math.abs(spyMove) > 1.2)){
-    return "VOLATILE";
-  }
-  // TRENDING: SPY up, broad participation, VIX calm
-  if(spyMove > 0.5 && adRatio > 0.6 && vixLevel < 18){
-    return "TRENDING";
-  }
+  // BEAR: SPY down hard, or VIX spiking + broad selling
+  if(spyMove < -1.5) return "BEAR";
+  if(hasVIX && vixLevel > 30 && spyMove < -0.5) return "BEAR";
+
+  // VOLATILE: VIX elevated OR big intraday swings
+  if(hasVIX && vixLevel > 25) return "VOLATILE";
+  if(hasVIX && vixLevel > 20 && Math.abs(spyMove) > 1.2) return "VOLATILE";
+  if(!hasVIX && Math.abs(spyMove) > 1.5) return "VOLATILE"; // no VIX fallback
+
+  // TRENDING: SPY up, broad participation, VIX calm (or unknown)
+  if(spyMove > 0.5 && adRatio > 0.6 && (!hasVIX || vixLevel < 20)) return "TRENDING";
+
   // CHOPPY: everything else
   return "CHOPPY";
 }
@@ -198,7 +215,7 @@ async function detectRegime(){
     }
 
     window.currentRegime = regime;
-    console.log(`🔍 Regime: ${type} | SPY ${spy?.changePct>=0?"+":""}${spy?.changePct?.toFixed(2)||"?"}% | VIX ${vix?.price?.toFixed(1)||"?"} | Breadth ${breadth.advancing}/${breadth.total}`);
+    console.log(`🔍 Regime: ${type} | SPY ${spy?.changePct>=0?"+":""}${spy?.changePct?.toFixed(2)||"?"}% | VIX ${vix?.price?.toFixed(1)||"? (unavailable)"} ${vix?._source?"("+vix._source+")":""} | Breadth ${breadth.advancing}/${breadth.total}`);
     renderRegimeBanner(regime);
     return regime;
 
