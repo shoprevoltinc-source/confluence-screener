@@ -82,36 +82,53 @@ function checkEarningsConflict(sym, earningsDate){
   return conflicts.length ? conflicts : null;
 }
 
-// ── Fetch upgrades/downgrades ─────────────────────────────────────────────────
+// ── Fetch analyst recommendation trends (FREE tier) ──────────────────────────
+// Uses /stock/recommendation endpoint — returns buy/hold/sell counts by month
 async function fetchUpgradeAlert(sym){
   try{
-    const url = `https://finnhub.io/api/v1/stock/upgrade-downgrade?symbol=${sym}&token=${FH_KEY}`;
+    const url = `https://finnhub.io/api/v1/stock/recommendation?symbol=${sym}&token=${FH_KEY}`;
     const r   = await fetch(url);
+    if(!r.ok) return null;
     const d   = await r.json();
     if(!d||!d.length) return null;
 
-    const cutoff = Date.now() - 7*24*60*60*1000;
-    const recent = d.filter(x=> new Date(x.gradeDate).getTime() >= cutoff);
-    if(!recent.length) return null;
+    // Get the two most recent months to detect trend change
+    const latest = d[0];
+    const prev   = d[1]||null;
+    if(!latest) return null;
 
-    recent.sort((a,b)=>new Date(b.gradeDate)-new Date(a.gradeDate));
-    const top = recent[0];
-    const bullish = ["buy","strong buy","outperform","overweight","positive","accumulate"].some(g=>(top.toGrade||"").toLowerCase().includes(g));
-    const bearish = ["sell","underperform","underweight","negative"].some(g=>(top.toGrade||"").toLowerCase().includes(g));
-    const daysAgo = Math.floor((Date.now()-new Date(top.gradeDate).getTime())/86400000);
+    const totalLatest = (latest.strongBuy||0)+(latest.buy||0)+(latest.hold||0)+(latest.sell||0)+(latest.strongSell||0);
+    const totalPrev   = prev ? (prev.strongBuy||0)+(prev.buy||0)+(prev.hold||0)+(prev.sell||0)+(prev.strongSell||0) : 0;
+    if(totalLatest < 3) return null; // not enough coverage
+
+    const bullLatest = ((latest.strongBuy||0)+(latest.buy||0))/totalLatest;
+    const bullPrev   = prev && totalPrev>0 ? ((prev.strongBuy||0)+(prev.buy||0))/totalPrev : null;
+
+    // Detect trend: improving or deteriorating
+    const improving    = bullPrev !== null && bullLatest > bullPrev + 0.05;
+    const deteriorating= bullPrev !== null && bullLatest < bullPrev - 0.05;
+
+    const bullPct = Math.round(bullLatest*100);
+    const sentiment = bullPct >= 70 ? "STRONG BUY" : bullPct >= 55 ? "BUY" : bullPct >= 40 ? "HOLD" : "SELL";
+    const isUpgrade   = improving && bullPct >= 55;
+    const isDowngrade = deteriorating && bullPct < 45;
+
+    // Only return if there's something noteworthy
+    if(!isUpgrade && !isDowngrade && bullPct < 65) return null;
 
     return {
       sym,
-      company:   top.company||"Analyst",
-      action:    top.action||"reiterated",
-      fromGrade: top.fromGrade||"",
-      toGrade:   top.toGrade||"",
-      date:      top.gradeDate,
-      daysAgo,
-      bullish,
-      bearish,
-      isUpgrade:   top.action==="upgrade"||bullish,
-      isDowngrade: top.action==="downgrade"||bearish
+      company:    `${totalLatest} analysts`,
+      action:     improving?"improving":deteriorating?"deteriorating":"consensus",
+      fromGrade:  prev ? `${Math.round(bullPrev*100)}% bullish` : "",
+      toGrade:    `${bullPct}% bullish`,
+      date:       latest.period||new Date().toISOString().split("T")[0],
+      daysAgo:    0,
+      bullish:    bullPct >= 55,
+      bearish:    bullPct < 40,
+      isUpgrade,
+      isDowngrade,
+      detail:     `${latest.strongBuy||0} strong buy · ${latest.buy||0} buy · ${latest.hold||0} hold · ${latest.sell||0} sell`
     };
   }catch(e){ return null; }
 }
