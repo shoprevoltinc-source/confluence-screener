@@ -1898,6 +1898,76 @@ function switchTab(tab){ _doSwitchTab(tab); }
   </div>
 </div>
 
+<!-- ── INTELLIGENCE ALERTS ───────────────────────────────────────────── -->
+<div style="margin-top:16px">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+    <div style="font-family:var(--sans);font-size:11px;font-weight:700;color:#fff;letter-spacing:1px">🧠 MARKET INTELLIGENCE</div>
+    <span id="alerts-last-run" style="font-size:8px;color:var(--muted);font-family:var(--mono)"></span>
+    <button onclick="runAlertsCheck()" style="margin-left:auto;font-size:8px;padding:4px 10px;background:linear-gradient(135deg,#4A148C,#6A1B9A);border:none;color:#fff;border-radius:2px;cursor:pointer;font-family:var(--mono)">🔄 REFRESH</button>
+  </div>
+
+  <!-- Progress bar -->
+  <div id="alerts-prog" style="display:none;margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+      <span id="alerts-prog-msg" style="font-size:8px;color:var(--muted2);font-family:var(--mono)"></span>
+      <span id="alerts-prog-pct" style="font-size:8px;color:var(--muted2);font-family:var(--mono)">0%</span>
+    </div>
+    <div style="height:2px;background:var(--bg3);border-radius:1px">
+      <div id="alerts-prog-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#6A1B9A,#AB47BC);border-radius:1px;transition:width 0.3s"></div>
+    </div>
+  </div>
+
+  <!-- Composite intelligence cards -->
+  <div id="alerts-intel-container"></div>
+
+  <!-- Three sections: Earnings | Upgrades | News -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">
+
+    <!-- Earnings Landmine -->
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:10px">
+      <div style="font-size:9px;font-weight:700;color:var(--red);letter-spacing:1px;margin-bottom:8px;font-family:var(--mono)">
+        💣 EARNINGS LANDMINES
+      </div>
+      <div id="alerts-earnings-list">
+        <div style="color:var(--muted);font-size:9px">Run scan to check</div>
+      </div>
+    </div>
+
+    <!-- Upgrades/Downgrades -->
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:10px">
+      <div style="font-size:9px;font-weight:700;color:var(--green2);letter-spacing:1px;margin-bottom:8px;font-family:var(--mono)">
+        📊 ANALYST ACTIONS
+      </div>
+      <div id="alerts-upgrades-list">
+        <div style="color:var(--muted);font-size:9px">Run scan to check</div>
+      </div>
+    </div>
+
+    <!-- Catalyst News -->
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:10px">
+      <div style="font-size:9px;font-weight:700;color:var(--yellow);letter-spacing:1px;margin-bottom:8px;font-family:var(--mono)">
+        📰 CATALYST NEWS
+      </div>
+      <div id="alerts-news-list">
+        <div style="color:var(--muted);font-size:9px">Run scan to check</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Reddit sentiment -->
+  <div style="margin-top:10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:10px">
+    <div style="font-size:9px;font-weight:700;color:var(--orange);letter-spacing:1px;margin-bottom:8px;font-family:var(--mono)">
+      🔴 REDDIT SENTIMENT — r/wallstreetbets · r/stocks · r/options · r/investing
+      <span style="font-size:7px;color:var(--muted);font-weight:400;margin-left:8px">Only checked for tickers with existing signals · 2h cache</span>
+    </div>
+    <div id="alerts-reddit-list">
+      <div style="color:var(--muted);font-size:9px">Run scan to check</div>
+    </div>
+  </div>
+
+</div>
+
 <div class="accordion">
   <div class="accordion-hdr" onclick="toggleAccordion('a-log-body','a-log-arrow')">
     <span>▸ SCAN LOG</span><span class="accordion-arrow" id="a-log-arrow">▾</span>
@@ -4932,6 +5002,7 @@ function _initApp(){
   try{ loadBacktest(); }catch(e){}
   try{ loadWeeklyMonitor(); }catch(e){}
   try{ loadPulseAlerts(); }catch(e){}
+  try{ loadAlertsTab(); }catch(e){ console.warn('loadAlertsTab:',e); }
   try{ loadAgent(); }catch(e){ console.warn("loadAgent:",e); }
   setTimeout(()=>{ try{ loadCalendar(); }catch(e){} }, 2000);
 }
@@ -4955,6 +5026,7 @@ try{
 <script src="journal.js"></script>
 <script src="weekly.js"></script>
 <script src="regime.js"></script>
+<script src="alerts.js"></script>
 <script src="agent.js"></script>
 <script>_initApp();</script>
 </body>
