@@ -36,8 +36,8 @@ async function archiveLegacyJournal(){
     journalEntries = [];
     localStorage.setItem("cs_journal", JSON.stringify([]));
     localStorage.setItem("cs_journal_archived_v2", new Date().toISOString());
-    localStorage.setItem("cs_journal_cleared", new Date().toISOString());
-    await window.fbSave("journal", []);
+    // Do NOT push [] to Firebase — that triggers a clear on all listening devices
+    // The archive is stored in journal_archive, active journal stays untouched in Firebase
     renderJournal();
     showToast(`📦 ${legacy.length} legacy entries archived — fresh start for options tracking`);
     console.log(`✅ Archived ${legacy.length} legacy journal entries to screener/journal_archive`);
@@ -64,16 +64,34 @@ function loadJournal(){
       await archiveLegacyJournal();
 
       window.fbListen("journal", (fb)=>{
-        if(fb.data !== undefined){
-          const localClearedStr = localStorage.getItem("cs_journal_cleared");
-          const localCleared = localClearedStr ? new Date(localClearedStr).getTime() : 0;
-          const fbSavedAt = new Date(fb.savedAt||0).getTime();
-          if(fb.data.length === 0 || (fb.data.length > 0 && fbSavedAt > localCleared)){
-            journalEntries = fb.data;
-            localStorage.setItem("cs_journal", JSON.stringify(journalEntries));
-            renderJournal();
-            if(fb.data.length === 0) showToast("📓 Journal cleared");
+        if(fb.data === undefined || fb.data === null) return;
+        const fbData    = Array.isArray(fb.data) ? fb.data : [];
+        const fbSavedAt = new Date(fb.savedAt||0).getTime();
+        const localClearedStr = localStorage.getItem("cs_journal_cleared");
+        const localCleared    = localClearedStr ? new Date(localClearedStr).getTime() : 0;
+
+        // Never overwrite local entries with empty array
+        // unless a deliberate user clear happened after the last local save
+        if(fbData.length === 0){
+          const deliberateClear = localCleared > 0 && localCleared >= fbSavedAt - 5000;
+          if(!deliberateClear){
+            console.log("📓 Ignoring empty Firebase journal — keeping local entries");
+            return;
           }
+          journalEntries = [];
+          localStorage.setItem("cs_journal", JSON.stringify([]));
+          renderJournal();
+          showToast("📓 Journal cleared");
+          return;
+        }
+
+        // Only overwrite local if Firebase has MORE entries or is meaningfully newer
+        const localSavedStr = localStorage.getItem("cs_journal_saved_at");
+        const localSavedAt  = localSavedStr ? new Date(localSavedStr).getTime() : 0;
+        if(fbData.length > journalEntries.length || fbSavedAt > localSavedAt + 2000){
+          journalEntries = fbData;
+          localStorage.setItem("cs_journal", JSON.stringify(journalEntries));
+          renderJournal();
         }
       });
     }catch(e){}
@@ -94,7 +112,10 @@ function saveJournal(){
       }
     }
   });
-  try{ localStorage.setItem("cs_journal", JSON.stringify(journalEntries)); }catch(e){}
+  try{
+    localStorage.setItem("cs_journal", JSON.stringify(journalEntries));
+    localStorage.setItem("cs_journal_saved_at", new Date().toISOString());
+  }catch(e){}
   fbSafeSave("journal", journalEntries);
   const el = document.getElementById("jnl-last-update");
   if(el) el.textContent = "last updated " + new Date().toLocaleTimeString();
