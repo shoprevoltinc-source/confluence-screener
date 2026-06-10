@@ -230,14 +230,17 @@ function renderRegimeBanner(regime){
   if(!regime) return;
   let banner = document.getElementById("regime-banner");
 
+  // Use dedicated slot inside Morning Brief card
+  const slot = document.getElementById("regime-banner-slot");
+
   // Create banner if it doesn't exist
   if(!banner){
     banner = document.createElement("div");
     banner.id = "regime-banner";
     banner.style.cssText = `
-      margin: 0 0 12px 0;
-      border-radius: 4px;
-      padding: 10px 14px;
+      margin: 0 0 0 0;
+      border-radius: 0 0 4px 4px;
+      padding: 8px 14px;
       font-family: var(--mono);
       font-size: 10px;
       cursor: pointer;
@@ -247,9 +250,13 @@ function renderRegimeBanner(regime){
       const detail = document.getElementById("regime-detail");
       if(detail) detail.style.display = detail.style.display==="none"?"block":"none";
     };
-    // Insert at top of agent tab body
-    const agentBody = document.getElementById("agent-brief-body")?.parentElement;
-    if(agentBody) agentBody.insertBefore(banner, agentBody.firstChild);
+    // Insert into dedicated slot
+    if(slot) slot.appendChild(banner);
+    else {
+      // Fallback: insert before agent-brief-body
+      const agentBody = document.getElementById("agent-brief-body");
+      if(agentBody) agentBody.parentElement.insertBefore(banner, agentBody);
+    }
   }
 
   banner.style.background   = regime.bg;
