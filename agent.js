@@ -279,10 +279,12 @@ async function runMorningBrief(){
 
     // ── Detect market regime before building brief ──────────────────────────
     body.innerHTML = '<div class="agent-output loading">⏳ Reading market regime...</div>';
-    const regime = await detectRegime().catch(()=>null);
-    const regimeMaxTrades = regime ? Math.min(maxT, regime.maxTrades) : maxT;
-    const regimeMinScore  = regime ? regime.minScore : 4;
-    const regimeSizeMult  = regime ? regime.sizeMultiplier : 1.0;
+    const regime         = await detectRegime().catch(()=>null);
+    const regimeOverride = document.getElementById("agent-regime-override")?.checked || false;
+    const regimeMaxTrades = regimeOverride ? maxT : (regime ? Math.min(maxT, regime.maxTrades) : maxT);
+    const regimeMinScore  = regimeOverride ? 4    : (regime ? regime.minScore : 4);
+    const regimeSizeMult  = regimeOverride ? 1.0  : (regime ? regime.sizeMultiplier : 1.0);
+    if(regimeOverride) log("⚠️ Regime override ON — showing all "+maxT+" trades regardless of market conditions","warn");
 
     // ── Fetch live prices for top candidates before sending to Claude ──
     // Collects all candidate tickers from scan data, fetches Finnhub quotes
@@ -354,7 +356,7 @@ SPY: ${regime.spyMove>=0?"+":""}${regime.spyMove}% | VIX: ${regime.vixLevel} | B
 Leading sectors: ${regime.leadingSectors}
 Lagging sectors: ${regime.laggingSectors}
 Regime advice: ${regime.advice}
-REGIME RULES: Only recommend setups scoring ${regimeMinScore}+/10 today. Max ${regimeMaxTrades} trades. Size multiplier: ${regimeSizeMult}x.
+REGIME RULES: Only recommend setups scoring ${regimeMinScore}+/10 today. Max ${regimeMaxTrades} trades. Size multiplier: ${regimeSizeMult}x.${regimeOverride?' USER HAS OVERRIDDEN REGIME — show all 5 trades but flag elevated risk on each.':''}
 ` : ""}
 Market session: ${sess.toUpperCase()}.
 
