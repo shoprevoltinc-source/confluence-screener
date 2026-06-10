@@ -513,7 +513,7 @@ ${scanCtx}
 ${liveCtx}
 ${jnlCtx}${calibrationCtx}`;
 
-    const raw = await callClaude(system, user, 2500);
+    const raw = await callClaude(system, user, 4000);
 
     // Parse JSON response — strip any markdown formatting Claude adds
     let brief;
