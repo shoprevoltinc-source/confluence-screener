@@ -2254,6 +2254,11 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <input type="number" class="agent-setting-input" id="agent-risk" value="1" min="0.5" max="5" step="0.5" style="width:60px">
   <span class="agent-setting-label">Max trades</span>
   <input type="number" class="agent-setting-input" id="agent-maxtrades" value="5" min="1" max="5" style="width:60px">
+  <span class="agent-setting-label" style="margin-left:8px">Override regime</span>
+  <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+    <input type="checkbox" id="agent-regime-override" style="cursor:pointer;width:14px;height:14px;accent-color:var(--orange)">
+    <span style="font-size:8px;color:var(--orange);font-family:var(--mono)">FULL 5 TRADES</span>
+  </label>
   <div style="margin-left:auto;display:flex;gap:6px">
     <button class="agent-btn" id="agent-brief-btn" onclick="runMorningBrief()">☀️ MORNING BRIEF</button>
     <button class="agent-btn blue" id="agent-review-btn" onclick="runWeeklyReview()">📊 WEEKLY REVIEW</button>
