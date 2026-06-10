@@ -264,17 +264,19 @@ function renderRegimeBanner(regime){
   banner.style.color        = regime.color;
 
   banner.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <span style="font-weight:700;font-size:11px;letter-spacing:1px">${regime.label}</span>
-      <span style="color:var(--muted2)">SPY ${regime.spyMove>=0?"+":""}${regime.spyMove??'?'}%</span>
-      <span style="color:var(--muted2)">VIX ${regime.vixLevel??'?'}</span>
-      <span style="color:var(--muted2)">Breadth ${regime.adRatio??'?'}%</span>
-      <span style="color:${regime.color};margin-left:auto;font-size:9px">${regime.advice}</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-weight:700;font-size:11px;letter-spacing:1px;color:${regime.color}">${regime.label}</span>
+        <span style="color:var(--muted2);font-size:10px">SPY&nbsp;${regime.spyMove>=0?"+":""}${regime.spyMove??'?'}%</span>
+        <span style="color:var(--muted2);font-size:10px">VIX&nbsp;${regime.vixLevel??'?'}</span>
+        <span style="color:var(--muted2);font-size:10px">Breadth&nbsp;${regime.adRatio??'?'}%</span>
+      </div>
+      <span style="color:${regime.color};font-size:9px;font-style:italic">${regime.advice}</span>
     </div>
     <div id="regime-detail" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid ${regime.border}">
-      <div style="color:var(--muted2);margin-bottom:4px">📈 Leading: <span style="color:var(--green2)">${regime.leadingSectors||'—'}</span></div>
-      <div style="color:var(--muted2);margin-bottom:4px">📉 Lagging: <span style="color:var(--red)">${regime.laggingSectors||'—'}</span></div>
-      <div style="color:var(--muted2)">🏦 ${regime.breadthAD} · Max trades today: <span style="color:${regime.color}">${regime.maxTrades}</span> · Min score: <span style="color:${regime.color}">${regime.minScore}/10</span></div>
+      <div style="color:var(--muted2);margin-bottom:4px;font-size:9px">📈 Leading: <span style="color:var(--green2)">${regime.leadingSectors||'—'}</span></div>
+      <div style="color:var(--muted2);margin-bottom:4px;font-size:9px">📉 Lagging: <span style="color:var(--red)">${regime.laggingSectors||'—'}</span></div>
+      <div style="color:var(--muted2);font-size:9px">🏦 ${regime.breadthAD} · Max trades: <span style="color:${regime.color};font-weight:700">${regime.maxTrades}</span> · Min score: <span style="color:${regime.color};font-weight:700">${regime.minScore}/10</span></div>
     </div>`;
 }
 
