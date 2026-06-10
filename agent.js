@@ -348,7 +348,7 @@ async function runMorningBrief(){
       }
     }catch(e){}
 
-    const system = `You are a professional trading advisor and technical analyst. You MUST respond with ONLY a raw JSON object. NO backticks, NO markdown, NO code fences, NO explanation before or after. Start your response with { and end with }. Any other format will cause a system error.
+    const system = `You are a trading advisor. OUTPUT ONLY VALID JSON. Your entire response must be a single JSON object starting with { and ending with }. No text before {. No text after }. No backticks. No markdown. No explanation. If you add ANY text outside the JSON object the system will crash.
 The trader has $${account} account, ${risk}% risk per trade ($${riskAmt.toFixed(0)} max risk), max ${regimeMaxTrades} trades.
 ${regime ? `
 MARKET REGIME TODAY: ${regime.label}
@@ -534,9 +534,20 @@ ${jnlCtx}${calibrationCtx}`;
       }
       brief = JSON.parse(clean);
     }catch(ex){
-      // Show parse error clearly so we can debug
-      body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(raw)}</div>`;
-      console.error("JSON parse failed:", ex.message, "\nRaw:", raw.substring(0,500));
+      // Try harder — find the outermost { } pair and parse that
+      try{
+        const s = raw.indexOf("{");
+        const e = raw.lastIndexOf("}");
+        if(s !== -1 && e !== -1){
+          let attempt = raw.substring(s, e+1);
+          // Fix common Claude JSON errors: trailing commas, unescaped newlines
+          attempt = attempt.replace(/,\s*([}\]])/g,"$1").replace(/[\n\r]/g," ");
+          brief = JSON.parse(attempt);
+          console.warn("JSON recovered on second attempt");
+        } else { throw ex; }
+      }catch(ex2){
+        body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(raw)}</div>`;
+        console.error("JSON parse failed:", ex2.message, "\nRaw:", raw.substring(0,500));
       document.getElementById("agent-brief-time").textContent = new Date().toLocaleTimeString();
     // Re-render regime banner (sits above brief)
     if(window.currentRegime) renderRegimeBanner(window.currentRegime);
@@ -548,6 +559,7 @@ ${jnlCtx}${calibrationCtx}`;
       }catch(e){}
       btn.disabled = false;
       return;
+      }
     }
 
     // Action color
