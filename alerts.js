@@ -531,3 +531,87 @@ function renderRedditSection(redditData){
     '</div>';
   }).join("");
 }
+
+// ── Individual ticker search ──────────────────────────────────────────────────
+async function searchAlertsTicker(){
+  const sym = document.getElementById("alerts-ticker-input")?.value.trim().toUpperCase();
+  if(!sym) return;
+  const panel    = document.getElementById("alerts-ticker-result");
+  const inner    = document.getElementById("alerts-ticker-result-inner");
+  const clearBtn = document.getElementById("alerts-clear-btn");
+  if(!panel||!inner) return;
+  panel.style.display = "block";
+  if(clearBtn) clearBtn.style.display = "inline-block";
+  inner.innerHTML = `<div style="color:var(--muted2);font-size:10px;font-family:var(--mono)">⏳ Checking ${sym}...</div>`;
+  try{
+    const [earn, upg, cat] = await Promise.all([
+      fetchEarningsAlert(sym),
+      fetchUpgradeAlert(sym),
+      fetchCatalystNews(sym)
+    ]);
+    const conflicts = earn ? checkEarningsConflict(sym, earn.date) : null;
+    const reddit    = await fetchRedditMentions(sym).catch(()=>null);
+    const composite = buildComposite(sym, earn||null, upg||null, cat||null, reddit||null);
+    const riskConfig = {
+      critical:{ color:"var(--red)",    bg:"rgba(255,23,68,0.06)",  border:"rgba(255,23,68,0.25)",  icon:"🚨" },
+      high:    { color:"var(--orange)", bg:"rgba(255,109,0,0.06)",  border:"rgba(255,109,0,0.2)",   icon:"⚠️" },
+      elevated:{ color:"var(--yellow)", bg:"rgba(255,179,0,0.06)",  border:"rgba(255,179,0,0.2)",   icon:"📊" },
+      normal:  { color:"var(--green2)", bg:"rgba(0,200,83,0.04)",   border:"rgba(0,200,83,0.15)",   icon:"✅" }
+    };
+    const cfg = riskConfig[composite.riskLevel]||riskConfig.normal;
+    let html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+      +'<span style="font-size:16px">'+cfg.icon+'</span>'
+      +'<span style="font-family:var(--sans);font-size:15px;font-weight:700;color:#fff">'+sym+'</span>'
+      +'<span style="font-size:8px;padding:2px 8px;border-radius:2px;background:'+cfg.bg+';border:1px solid '+cfg.border+';color:'+cfg.color+';text-transform:uppercase;letter-spacing:1px">'+composite.riskLevel+'</span>'
+      +'</div>';
+    // Earnings
+    if(earn){
+      const urg = earn.daysUntil<=7?"var(--red)":earn.daysUntil<=21?"var(--yellow)":"var(--muted2)";
+      html += '<div style="margin-bottom:6px;padding:6px 10px;background:rgba(0,0,0,0.2);border-radius:3px">'
+        +'<div style="font-size:9px;font-weight:700;color:var(--red);margin-bottom:3px">💣 EARNINGS</div>'
+        +'<div style="font-size:10px;color:'+urg+'">'+earn.date+' — <strong>'+earn.daysUntil+' days away</strong></div>'
+        +(conflicts?.length?'<div style="font-size:9px;color:var(--red);margin-top:3px">⚠️ '+conflicts[0].contract+' → '+conflicts[0].action+'</div>':"")
+        +'</div>';
+    } else { html += '<div style="margin-bottom:4px;font-size:9px;color:var(--muted2)">💣 No earnings in next 60 days</div>'; }
+    // Analyst
+    if(upg){
+      const c = upg.isUpgrade?"var(--green2)":upg.isDowngrade?"var(--red)":"var(--muted2)";
+      html += '<div style="margin-bottom:6px;padding:6px 10px;background:rgba(0,0,0,0.2);border-radius:3px">'
+        +'<div style="font-size:9px;font-weight:700;color:var(--green2);margin-bottom:3px">📊 ANALYST CONSENSUS</div>'
+        +'<div style="font-size:10px;color:'+c+'">'+upg.company+' — '+upg.toGrade+'</div>'
+        +(upg.detail?'<div style="font-size:8px;color:var(--muted2)">'+upg.detail+'</div>':"")
+        +'</div>';
+    } else { html += '<div style="margin-bottom:4px;font-size:9px;color:var(--muted2)">📊 No significant analyst activity</div>'; }
+    // News
+    if(cat){
+      html += '<div style="margin-bottom:6px;padding:6px 10px;background:rgba(0,0,0,0.2);border-radius:3px">'
+        +'<div style="font-size:9px;font-weight:700;color:var(--yellow);margin-bottom:3px">📰 CATALYST NEWS</div>'
+        +'<div style="font-size:9px;color:var(--text2);line-height:1.4">'+cat.topHeadline.slice(0,120)+'...</div>'
+        +'<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">'
+        +cat.topKeywords.slice(0,4).map(k=>'<span style="font-size:7px;padding:1px 5px;background:rgba(255,179,0,0.1);border:1px solid rgba(255,179,0,0.2);color:var(--yellow);border-radius:2px">'+k+'</span>').join("")
+        +'</div></div>';
+    } else { html += '<div style="margin-bottom:4px;font-size:9px;color:var(--muted2)">📰 No high-impact news in last 3 days</div>'; }
+    // Reddit
+    if(reddit && reddit.totalMentions > 0){
+      const sc = reddit.spikePct>=200?"var(--red)":reddit.spikePct>=100?"var(--orange)":"var(--muted2)";
+      html += '<div style="padding:6px 10px;background:rgba(0,0,0,0.2);border-radius:3px">'
+        +'<div style="font-size:9px;font-weight:700;color:var(--orange);margin-bottom:3px">🔴 REDDIT SENTIMENT</div>'
+        +'<div style="font-size:10px;color:'+sc+';font-weight:700">'+reddit.totalMentions+' mentions in 24h'
+        +(reddit.spikePct!==null?' ('+(reddit.spikePct>=0?"+":"")+reddit.spikePct+'% vs yesterday)':"")+'</div>'
+        +(reddit.posts?.slice(0,1).map(p=>'<div style="font-size:8px;color:var(--muted2);margin-top:2px">r/'+p.subreddit+': '+p.title.slice(0,80)+'...</div>').join("")||"")
+        +'</div>';
+    } else { html += '<div style="font-size:9px;color:var(--muted2)">🔴 No significant Reddit mentions</div>'; }
+    inner.innerHTML = html;
+  }catch(e){
+    inner.innerHTML = '<div style="color:var(--red);font-size:10px;font-family:var(--mono)">❌ Error: '+e.message+'</div>';
+  }
+}
+
+function clearAlertsSearch(){
+  const panel    = document.getElementById("alerts-ticker-result");
+  const input    = document.getElementById("alerts-ticker-input");
+  const clearBtn = document.getElementById("alerts-clear-btn");
+  if(panel)    panel.style.display = "none";
+  if(input)    input.value = "";
+  if(clearBtn) clearBtn.style.display = "none";
+}
