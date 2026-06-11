@@ -1900,10 +1900,28 @@ function switchTab(tab){ _doSwitchTab(tab); }
 
 <!-- ── INTELLIGENCE ALERTS ───────────────────────────────────────────── -->
 <div style="margin-top:16px">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
     <div style="font-family:var(--sans);font-size:11px;font-weight:700;color:#fff;letter-spacing:1px">🧠 MARKET INTELLIGENCE</div>
     <span id="alerts-last-run" style="font-size:8px;color:var(--muted);font-family:var(--mono)"></span>
-    <button onclick="runAlertsCheck()" style="margin-left:auto;font-size:8px;padding:4px 10px;background:linear-gradient(135deg,#4A148C,#6A1B9A);border:none;color:#fff;border-radius:2px;cursor:pointer;font-family:var(--mono)">🔄 REFRESH</button>
+
+    <!-- Individual ticker search -->
+    <div style="display:flex;gap:4px;align-items:center;margin-left:8px">
+      <input id="alerts-ticker-input" type="text" placeholder="Search ticker e.g. PENN"
+        style="width:130px;padding:4px 8px;background:#0d1520;border:1px solid #1a3a4a;color:var(--text);font-family:var(--mono);font-size:10px;border-radius:3px;text-transform:uppercase"
+        onkeydown="if(event.key==='Enter') searchAlertsTicker()">
+      <button onclick="searchAlertsTicker()"
+        style="padding:4px 10px;background:linear-gradient(135deg,#1565C0,#1976D2);border:none;color:#fff;font-family:var(--mono);font-size:9px;border-radius:3px;cursor:pointer">
+        🔍
+      </button>
+      <button onclick="clearAlertsSearch()" id="alerts-clear-btn" style="display:none;padding:4px 8px;background:transparent;border:1px solid var(--border);color:var(--muted2);font-family:var(--mono);font-size:9px;border-radius:3px;cursor:pointer">✕</button>
+    </div>
+
+    <button onclick="runAlertsCheck()" style="margin-left:auto;font-size:8px;padding:4px 10px;background:linear-gradient(135deg,#4A148C,#6A1B9A);border:none;color:#fff;border-radius:2px;cursor:pointer;font-family:var(--mono)">🔄 FULL SCAN</button>
+  </div>
+
+  <!-- Individual ticker result panel (shown above main scan, non-destructive) -->
+  <div id="alerts-ticker-result" style="display:none;margin-bottom:12px;background:#0a1525;border:1px solid #1a3a4a;border-radius:4px;padding:12px 16px">
+    <div id="alerts-ticker-result-inner"></div>
   </div>
 
   <!-- Progress bar -->
@@ -2447,25 +2465,51 @@ function switchTab(tab){ _doSwitchTab(tab); }
 <div class="agent-header">
   <div>
     <div class="agent-title">📊 Weinstein Stage Analysis</div>
-    <div class="agent-sub" id="ws-sub">TOP 10 · DAILY + WEEKLY · DESKTOP AGENT POWERED</div>
+    <div class="agent-sub" id="ws-sub">DAILY + WEEKLY · STAGE 1-4 CLASSIFICATION</div>
   </div>
   <div style="margin-left:auto;font-family:var(--mono);font-size:8px;color:var(--muted2)" id="ws-lastrun"></div>
 </div>
 
-<div style="padding:0 16px 8px">
-  <div id="ws-topbar" style="display:none;background:#0a1525;border:1px solid #1a3a4a;border-radius:4px;padding:8px 14px;margin-bottom:10px;font-family:var(--mono);font-size:10px;display:flex;gap:16px;align-items:center">
+<!-- ── Weinstein controls bar ─────────────────────────────────────────── -->
+<div style="padding:0 16px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+
+  <!-- Ticker search -->
+  <div style="display:flex;gap:4px;align-items:center">
+    <input id="ws-search-input" type="text" placeholder="Search ticker e.g. PENN"
+      style="width:130px;padding:5px 8px;background:#0d1520;border:1px solid #1a3a4a;color:var(--text);font-family:var(--mono);font-size:10px;border-radius:3px;text-transform:uppercase"
+      onkeydown="if(event.key==='Enter') searchWeinstein()">
+    <button onclick="searchWeinstein()"
+      style="padding:5px 10px;background:linear-gradient(135deg,#1565C0,#1976D2);border:none;color:#fff;font-family:var(--mono);font-size:9px;border-radius:3px;cursor:pointer;letter-spacing:1px">
+      🔍 SEARCH
+    </button>
+  </div>
+
+  <!-- Divider -->
+  <span style="color:var(--border);font-size:12px">|</span>
+
+  <!-- Run classifier button -->
+  <button onclick="triggerWeinsteinRun()"
+    style="padding:5px 12px;background:linear-gradient(135deg,#4A148C,#6A1B9A);border:none;color:#fff;font-family:var(--mono);font-size:9px;border-radius:3px;cursor:pointer;letter-spacing:1px">
+    ▶ RUN CLASSIFIER
+  </button>
+  <span id="ws-run-status" style="font-size:8px;color:var(--muted2);font-family:var(--mono)"></span>
+
+  <!-- Stats bar -->
+  <div id="ws-topbar" style="display:none;background:#0a1525;border:1px solid #1a3a4a;border-radius:4px;padding:6px 14px;font-family:var(--mono);font-size:10px;display:flex;gap:16px;align-items:center;margin-left:auto">
     <span id="ws-enter-count" style="color:var(--green2)">🟢 — ENTER</span>
     <span id="ws-wait-count" style="color:#FFB300">🟡 — WAIT</span>
     <span id="ws-avoid-count" style="color:var(--red)">🔴 — AVOID</span>
-    <span id="ws-tickers" style="color:var(--muted2);margin-left:auto"></span>
+    <span id="ws-tickers" style="color:var(--muted2)"></span>
   </div>
 </div>
 
+<!-- Ticker search result panel -->
+<div id="ws-search-result" style="display:none;margin:0 16px 10px;background:#0a1525;border:1px solid #1a3a4a;border-radius:4px;padding:12px 16px"></div>
+
 <div id="ws-grid" style="padding:0 16px 80px">
   <div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:40px 20px;text-align:center;line-height:1.8">
-    No Weinstein analysis yet.<br>
-    <span style="color:#FFB300">Open desktop Claude → run Prompt 1 with Firebase + TradingView MCP connected.</span><br>
-    <span style="font-size:9px;color:var(--muted2)">Results write to screener/weinstein and appear here automatically.</span>
+    No Weinstein analysis yet — run classifier or search a ticker above.<br>
+    <span style="font-size:9px;color:var(--muted)">Scheduled: runs automatically Mon-Fri at 9:10am ET after daily scan</span>
   </div>
 </div>
 
