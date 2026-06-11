@@ -1523,12 +1523,14 @@ function switchTab(tab){ _doSwitchTab(tab); }
 <div class="filter-bar" id="r-filterBar">
   <span class="filter-label">SCORE</span>
   <button class="chip on" onclick="setRFilter('all',this)">ALL</button>
+  <button class="chip" onclick="setRFilter('axx',this)" style="color:#FF6D00;border-color:#FF6D00">🔥 A++</button>
+  <button class="chip" onclick="setRFilter('aplus',this)" style="color:#00E676;border-color:#00E676">⭐ A+</button>
   <button class="chip" onclick="setRFilter(6,this)">6/6</button>
   <button class="chip" onclick="setRFilter(5,this)">5/6</button>
   <button class="chip" onclick="setRFilter(4,this)">4/6</button>
-  <button class="chip" onclick="setRFilter(3,this)">3/6</button>
   <button class="chip" onclick="setRFilter('jax',this)">🟢 JAX</button>
   <button class="chip" onclick="setRFilter('c7',this)">📉 DEEP</button>
+  <button class="chip" onclick="setRFilter('mag7',this)">🤖 MAG7</button>
   <select class="sort-select" id="r-sortSel" onchange="renderRecovery()">
     <option value="jax">🟢 JAX First</option>
     <option value="score">Best Score</option>
@@ -2597,7 +2599,10 @@ async function runWorker(keyIndex, tickers, minScore, isCatalyst, maxPrice, minV
         if(result.score>=3) onResult(result, true);
         else onResult(result, false);
       } else {
-        result = scoreRecovery(sym, candles.closes, candles.highs, candles.lows);
+        // Fetch 4H data for enhanced scoring
+        let fourHData = null;
+        try{ fourHData = await fetch4HCandles(sym, keyIndex); }catch(e){}
+        result = scoreRecovery(sym, candles.closes, candles.highs, candles.lows, candles.volumes||[], fourHData);
         // Overlay live quote for pre-market price
         const lq = await fetchLiveQuote(sym);
         if(lq&&lq.price>0){ result.price=lq.price; result.change=lq.changePct||result.change; result.liveQuote=lq; result.session=getMarketSession(); }
@@ -3869,6 +3874,15 @@ function setRFilter(v,btn){
 
 // taScore badge — chart-quality triage score (0-100). Hidden if absent (old data).
 function taBadge(s){
+  // Show combined grade if available, else taScore
+  if(s.grade){
+    const gc = s.grade.includes("A++")?"#FF6D00":s.grade==="A+"?"#00E676":s.grade==="A"?"var(--green2)":s.grade==="B"?"#00BCD4":s.grade==="WATCH"?"#FFB300":"var(--muted2)";
+    const gradeHTML = `<span style="font-size:8px;padding:1px 5px;border-radius:2px;background:${gc}22;border:1px solid ${gc}55;color:${gc};font-weight:700;font-family:var(--mono)">${s.grade}</span>`;
+    if(typeof s.taScore==="number"){
+      return gradeHTML + ` <span style="font-size:7px;color:var(--muted2);font-family:var(--mono)">${s.taScore}/100</span>`;
+    }
+    return gradeHTML;
+  }
   if(typeof s.taScore!=="number") return "";
   const v=s.taScore;
   const col=v>=70?"#00C853":v>=50?"#FFB300":v>=30?"#FF6D00":"var(--muted2)";
@@ -3878,13 +3892,26 @@ function taBadge(s){
 }
 
 function renderRecovery(){
+const gradeColor = s=>{
+  const g = s.grade||"";
+  if(g.includes("A++"))  return "#FF6D00";
+  if(g==="A+")           return "#00E676";
+  if(g==="A")            return "var(--green2)";
+  if(g==="B")            return "#00BCD4";
+  if(g==="WATCH")        return "#FFB300";
+  if(g==="Watchlist")    return "var(--yellow)";
+  return "var(--muted2)";
+};
   const min=parseInt(document.getElementById("minSel").value);
   const sort=document.getElementById("r-sortSel")?.value||"jax";
   const tickerSearch=(document.getElementById("r-tickerSearch")?.value||"").toUpperCase().trim();
   let f=rResults.filter(r=>r.score>=min || r.c7); // C7 deep bounce always shows
-  if(rFilter==="jax")     f=f.filter(r=>r.greenArrow);
-  else if(rFilter==="c7") f=f.filter(r=>r.c7);
-  else if(rFilter!=="all") f=f.filter(r=>r.score===rFilter);
+  if(rFilter==="axx")    f=f.filter(r=>(r.grade||"").includes("A++"));
+  else if(rFilter==="aplus") f=f.filter(r=>r.grade==="A+"||r.grade==="A++ 🔥");
+  else if(rFilter==="jax")  f=f.filter(r=>r.greenArrow);
+  else if(rFilter==="c7")   f=f.filter(r=>r.c7);
+  else if(rFilter==="mag7") f=f.filter(r=>r.isMag7Chain);
+  else if(rFilter!=="all")  f=f.filter(r=>r.score===rFilter);
   if(tickerSearch) f=f.filter(r=>r.sym.includes(tickerSearch));
   f.sort((a,b)=>{
     if(sort==="jax")      return (b.greenArrow?1:0)-(a.greenArrow?1:0)||b.bullScore-a.bullScore||b.score-a.score;
@@ -3993,6 +4020,16 @@ async function debugRecovery(sym){
       p(s.c6,"C6 -25% off 52w Hi  ",s.pctHi.toFixed(1)+"%  Hi: $"+s.high52.toFixed(2)),
       "",
       "SCORE: "+s.score+"/6  "+[s.c1,s.c2,s.c3,s.c4,s.c5,s.c6].map((c,i)=>"C"+(i+1)+":"+(c?"✅":"❌")).join(" "),
+      "",
+      "── NEW taScore: "+s.taScore+"/100  GRADE: "+s.grade+" ──",
+      "  200EMA reclaim:  "+(s.taBreakdown?.reclaim200||0)+"pts "+(s.reclaim200?"✅ JUST RECLAIMED":"—"),
+      "  Oversold bounce: "+(s.taBreakdown?.oversoldBounce||0)+"pts",
+      "  Daily trend:     "+(s.taBreakdown?.dailyTrend||0)+"pts",
+      "  4H alignment:    "+(s.taBreakdown?.fourHour||0)+"pts",
+      "  Fibonacci zone:  "+(s.taBreakdown?.fibonacci||0)+"pts "+(s.fibZone?"at "+s.fibZone:"—"),
+      "  Volume RVOL:     "+(s.taBreakdown?.volume||0)+"pts "+(s.taBreakdown?.rvol?"RVOL:"+s.taBreakdown.rvol:"—"),
+      "  Not extended:    "+(s.taBreakdown?.notExtended||0)+"pts "+(s.taBreakdown?.pctAbove200!==undefined?s.taBreakdown.pctAbove200+"% above 200EMA":"—"),
+      "  Mag7 bonus:      "+(s.taBreakdown?.mag7bonus||0)+"pts "+(s.isMag7Chain?"✅ SUPPLY CHAIN":"—"),
       "",
       "── C7 DEEP VALUE BOUNCE "+(s.c7?"✅ CONFIRMED":"❌ Not triggered")+" ──",
       "  -50%+ crash:      "+(s.deepCrash?"✅ YES ("+s.pctHi.toFixed(1)+"% off hi)":"❌ NO ("+s.pctHi.toFixed(1)+"% off hi, needs -50%)"),
@@ -5041,6 +5078,238 @@ function loadJAX(){
   if(window.firebaseReady){ _doJAXFirebase(); } else { document.addEventListener("firebaseReady", _doJAXFirebase, {once:true}); }
 }
 
+
+
+// ── scoreRecovery UPGRADE — overrides indicators.js version ─────────────────
+// ── scoreRecovery UPGRADED ────────────────────────────────────────────────────
+// Dual system: Original C1-C7 (pass/fail) + New taScore (0-100 points)
+// Combined grade: A++/A+/A/B/WATCH/Watchlist/Avoid
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MAG7_SUPPLY_CHAIN = new Set([
+  // AI Infrastructure
+  "VRT","ANET","ETN","PWR","LITE","MRVL","MU","CSCO","SMCI","DELL",
+  "HPE","NTAP","PSTG","PYCR","COHR","IIVI","IPGP","FNSR",
+  // Cloud/Data
+  "SNOW","MDB","NET","DDOG","ZS","CRWD","PANW","OKTA",
+  // Semiconductors
+  "AVGO","AMD","QCOM","LRCX","KLAC","AMAT","ASML","TSM","ON","WOLF",
+  // Power/Grid
+  "FSLR","ENPH","GE","NEE","AEE","XEL","EIX","PCG",
+  // Robotics/Automation
+  "ISRG","ABB","ROK","EMR","HON","PH","AME"
+]);
+
+function scoreRecovery(sym, closes, highs, lows, volumes=[], fourH=null){
+  const n = closes.length;
+  if(n < 50) return { sym, score:0, taScore:0, grade:"Avoid", error:"Not enough bars" };
+
+  const price   = closes[n-1];
+  const high52  = Math.max(...highs.slice(-252));
+  const low52   = Math.min(...lows.slice(-252));
+  const pctHi   = ((price - high52) / high52) * 100;
+
+  // ── Indicators ────────────────────────────────────────────────────────────
+  const ema200arr = calcEMA(closes, 200);
+  const ema21arr  = calcEMA(closes, 21);
+  const ema20arr  = calcEMA(closes, 20);
+  const rsiArr    = calcRSI(closes, 14);
+  const wrArr     = calcWilliamsR(highs, lows, closes, 14);
+  const macdObj   = calcMACD(closes, 12, 26, 9);
+
+  const ema200    = ema200arr[n-1];
+  const ema21     = ema21arr[n-1];
+  const ema20     = ema20arr[n-1];
+  const rsi       = rsiArr[n-1];
+  const wr        = wrArr[n-1];
+  const macdHist  = macdObj?.histogram?.[n-1] || 0;
+  const macdHistPrev = macdObj?.histogram?.[n-2] || 0;
+
+  const emaRising = ema21arr[n-1] > ema21arr[n-5];
+  const pctEMA    = ((price - ema21) / ema21) * 100;
+
+  // ── SYSTEM 1: Original C1-C7 (pass/fail) ──────────────────────────────────
+  const c1 = rsi < 45;
+  const c2 = wr < -65;
+  const c3 = price > ema21;
+  const c4 = emaRising;
+  const c5 = Math.abs(pctEMA) <= 10;
+  const c6 = pctHi <= -25;
+
+  // C7 deep value bounce
+  const rsi30     = rsiArr.slice(-30);
+  const minRSI30  = Math.min(...rsi30);
+  const rsiWasLow = minRSI30 < 45;
+  const rsi5ago   = rsiArr[n-6] || rsi;
+  const rsiTurningUp = rsi > rsi5ago;
+  const deepCrash = pctHi <= -50;
+  const c7 = deepCrash && rsiWasLow && rsiTurningUp;
+
+  const score = [c1,c2,c3,c4,c5,c6].filter(Boolean).length;
+
+  // ── SYSTEM 2: New taScore (0-100 points) ──────────────────────────────────
+  let taScore = 0;
+  let taBreakdown = {};
+
+  // 1. EMA200 reclaim within last 5 candles (25 pts)
+  // Current price above EMA200, and at least one of last 5 candles was below
+  const recentlyBelow200 = closes.slice(-6,-1).some((c,i) => c < ema200arr[n-6+i]);
+  const above200now      = price > ema200;
+  const reclaim200       = above200now && recentlyBelow200;
+  if(reclaim200){ taScore += 25; taBreakdown.reclaim200 = 25; }
+  else if(above200now && ((price-ema200)/ema200*100) < 5){
+    // Close to 200EMA but didn't just cross — give partial credit
+    taScore += 10; taBreakdown.reclaim200 = 10;
+  }
+
+  // 2. Oversold bounce (15 pts)
+  // RSI was under 40 in last 10 bars, now curling up, still under 65
+  const rsi10     = rsiArr.slice(-10);
+  const wasOversold = Math.min(...rsi10) < 40;
+  const rsiCurling  = rsi > rsiArr[n-4] && rsi < 65;
+  if(wasOversold && rsiCurling){ taScore += 15; taBreakdown.oversoldBounce = 15; }
+  else if(wasOversold || rsiCurling){ taScore += 7; taBreakdown.oversoldBounce = 7; }
+
+  // 3. Daily trend confirmation (10 pts)
+  // Close > EMA20, EMA20 rising, MACD histogram improving
+  const ema20Rising    = ema20arr[n-1] > ema20arr[n-5];
+  const macdImproving  = macdHist > macdHistPrev;
+  const dailyBullish   = price > ema20 && ema20Rising && macdImproving;
+  if(dailyBullish){ taScore += 10; taBreakdown.dailyTrend = 10; }
+  else if(price > ema20 && ema20Rising){ taScore += 5; taBreakdown.dailyTrend = 5; }
+
+  // 4. 4H trend confirmation (20 pts)
+  let fourHScore = 0;
+  let fourHBullish = false;
+  if(fourH && fourH.closes && fourH.closes.length >= 50){
+    const fh    = fourH.closes;
+    const fhN   = fh.length;
+    const fhEMA20 = calcEMA(fh, 20);
+    const fhEMA50 = calcEMA(fh, 50);
+    const fhRSI   = calcRSI(fh, 14);
+    const fhMACD  = calcMACD(fh, 12, 26, 9);
+    const fhLast  = fh[fhN-1];
+    const fhAboveEMA20 = fhLast > fhEMA20[fhN-1];
+    const fhEMA20AboveEMA50 = fhEMA20[fhN-1] > fhEMA50[fhN-1];
+    const fhRSIBull = fhRSI[fhN-1] > 50;
+    const fhMACDBull = fhMACD?.histogram?.[fhN-1] > 0;
+    fourHBullish = fhAboveEMA20 && fhEMA20AboveEMA50 && fhRSIBull;
+    if(fourHBullish && fhMACDBull){ fourHScore = 20; }
+    else if(fourHBullish){ fourHScore = 15; }
+    else if(fhAboveEMA20){ fourHScore = 8; }
+  } else {
+    // No 4H data — use daily momentum as proxy
+    fourHScore = (price > ema20 && rsi > 50) ? 12 : 6;
+  }
+  taScore += fourHScore;
+  taBreakdown.fourHour = fourHScore;
+
+  // 5. Fibonacci support zone (10 pts)
+  // Use 52w high/low as swing points
+  let fibScore = 0;
+  const fibRange  = high52 - low52;
+  const fib382    = high52 - fibRange * 0.382;
+  const fib500    = high52 - fibRange * 0.500;
+  const fib618    = high52 - fibRange * 0.618;
+  const fibBuffer = fibRange * 0.03; // 3% tolerance
+  const atFib382  = Math.abs(price - fib382) <= fibBuffer;
+  const atFib500  = Math.abs(price - fib500) <= fibBuffer;
+  const atFib618  = Math.abs(price - fib618) <= fibBuffer;
+  const fibZone   = atFib618 ? "61.8%" : atFib500 ? "50%" : atFib382 ? "38.2%" : null;
+  if(atFib618){ fibScore = 10; }
+  else if(atFib500){ fibScore = 10; }
+  else if(atFib382){ fibScore = 7; }
+  else if(price >= fib618 && price <= fib382){ fibScore = 5; } // between levels
+  taScore += fibScore;
+  taBreakdown.fibonacci = fibScore;
+
+  // 6. Volume confirmation (10 pts)
+  let volScore = 0;
+  if(volumes && volumes.length >= 20){
+    const vol20avg  = volumes.slice(-21,-1).reduce((a,b)=>a+b,0) / 20;
+    const volToday  = volumes[n-1];
+    const rvol      = vol20avg > 0 ? volToday / vol20avg : 0;
+    if(rvol >= 1.5){ volScore = 10; }
+    else if(rvol >= 1.0){ volScore = 5; }
+    taBreakdown.volume = volScore;
+    taBreakdown.rvol   = parseFloat(rvol.toFixed(2));
+  } else {
+    taScore += 5; taBreakdown.volume = 5; // no volume data — neutral
+  }
+  taScore += volScore;
+
+  // 7. Not extended (10 pts)
+  // Price less than 10% above EMA200
+  let extScore = 0;
+  if(above200now){
+    const pctAbove200 = ((price - ema200) / ema200) * 100;
+    if(pctAbove200 <= 5){ extScore = 10; }
+    else if(pctAbove200 <= 10){ extScore = 7; }
+    else if(pctAbove200 <= 15){ extScore = 3; }
+    // > 15% above = 0 pts (extended)
+    taBreakdown.notExtended = extScore;
+    taBreakdown.pctAbove200 = parseFloat(pctAbove200.toFixed(1));
+  } else {
+    extScore = 5; // below 200EMA — not extended but not reclaimed
+    taBreakdown.notExtended = extScore;
+  }
+  taScore += extScore;
+
+  // 8. Mag 7 supply chain bonus (+10 pts)
+  const isMag7Chain = MAG7_SUPPLY_CHAIN.has(sym.toUpperCase());
+  if(isMag7Chain){ taScore += 10; taBreakdown.mag7bonus = 10; }
+
+  // Cap at 100
+  taScore = Math.min(100, taScore);
+
+  // ── Combined grade ────────────────────────────────────────────────────────
+  const bothSystems = (score >= 4 || c7) && taScore >= 80;
+  const grade =
+    bothSystems && taScore >= 90           ? "A++ 🔥" :
+    bothSystems && taScore >= 80           ? "A+"     :
+    taScore >= 90                          ? "A"      :
+    taScore >= 80                          ? "B"      :
+    (score >= 4 || c7) && taScore >= 70    ? "WATCH"  :
+    taScore >= 70                          ? "Watchlist" :
+                                             "Avoid";
+
+  // JAX data (calculated separately — keep existing logic)
+  const jaxHasData = n >= 70;
+  let bullScore = 0, greenArrow = false, trailVal = 0;
+  let jaxEmaStack=false, jaxMacdBull=false, jaxRsiBull=false, jaxWrBull=false, jaxStBull=false;
+  let jaxUtBuy=false, jaxStFlip=false;
+  if(jaxHasData){
+    try{
+      const jax = calcJAXPRO(closes, highs, lows, 10, 3.5, 1, 2);
+      bullScore  = jax.bullScore;
+      greenArrow = jax.greenArrow;
+      trailVal   = jax.trailVal;
+      jaxEmaStack= jax.emaStack;
+      jaxMacdBull= jax.macdBull;
+      jaxRsiBull = jax.rsiBull;
+      jaxWrBull  = jax.wrBull;
+      jaxStBull  = jax.stBull;
+      jaxUtBuy   = jax.utBuy;
+      jaxStFlip  = jax.stFlip;
+    }catch(e){}
+  }
+
+  return {
+    sym, price, high52, low52, pctHi,
+    // System 1
+    score, c1, c2, c3, c4, c5, c6, c7,
+    rsi, wr, ema21, emaRising, pctEMA,
+    deepCrash, rsiWasLow, rsiTurningUp, minRSI30, rsi5ago,
+    // System 2
+    taScore, grade, taBreakdown,
+    reclaim200, fibZone, isMag7Chain,
+    // JAX overlay
+    greenArrow, bullScore, trailVal, jaxHasData,
+    jaxEmaStack, jaxMacdBull, jaxRsiBull, jaxWrBull, jaxStBull, jaxUtBuy, jaxStFlip,
+    // Change
+    change: 0
+  };
+}
 
 
 // ── Init called from final script tag after all external scripts load ───────
