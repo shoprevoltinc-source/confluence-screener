@@ -576,7 +576,7 @@ ${jnlCtx}${calibrationCtx}`;
     const tradesHTML = (brief.trades||[]).filter(t=>t.action!=="SKIP").map((t,i)=>`
       <div style="background:#0d1f14;border:1px solid #1a3a20;border-radius:4px;padding:12px 14px;margin-bottom:10px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-          <span style="font-size:15px;font-weight:700;color:#fff">${i+1}. ${t.sym}</span>
+          <span style="font-size:15px;font-weight:700;color:#fff;cursor:pointer" onclick="window.open('https://www.tradingview.com/chart/?symbol='+'${t.sym}','_blank')" title="Open in TradingView">${i+1}. ${t.sym} <span style="font-size:8px;color:var(--muted2)">↗</span></span>
           <span style="font-size:9px;font-weight:700;letter-spacing:1px;padding:2px 8px;border-radius:2px;background:${actionColor(t.action)};color:#000">${t.action||"ENTER"}</span>
           ${t.score?`<span style="font-size:10px;font-weight:700;color:${scoreColor(t.score)};padding:2px 6px;background:rgba(0,0,0,0.3);border-radius:2px">${t.score}/10</span>`:""}
           ${t.risk_pct?`<span style="font-size:9px;color:var(--muted2)">${t.risk_pct}% risk</span>`:""}
