@@ -1290,3 +1290,120 @@ function renderWeinstein(){
     </div>`;
   }).join("");
 }
+
+// ── Weinstein ticker search ───────────────────────────────────────────────────
+async function searchWeinstein(){
+  const sym = document.getElementById("ws-search-input")?.value.trim().toUpperCase();
+  if(!sym){ return; }
+  const panel = document.getElementById("ws-search-result");
+  if(!panel) return;
+  panel.style.display = "block";
+  panel.innerHTML = `<div style="color:var(--muted2);font-size:10px;font-family:var(--mono)">⏳ Analysing ${sym}...</div>`;
+
+  try{
+    // Check if already in weinstein Firebase results
+    const existing = await window.fbLoad("weinstein");
+    if(existing && existing.data){
+      const data = Array.isArray(existing.data) ? existing.data : [];
+      const found = data.find(s=>s.sym===sym);
+      if(found){
+        panel.innerHTML = renderWeinsteinCard(found, true);
+        return;
+      }
+    }
+    // Fetch fresh data and classify
+    panel.innerHTML = `<div style="color:var(--muted2);font-size:10px;font-family:var(--mono)">📡 Fetching data for ${sym}...</div>`;
+    const [daily, weekly] = await Promise.all([
+      fetchCandlesWithKey(sym, 0).catch(()=>null),
+      fetchWeeklyCandles(sym, 0).catch(()=>null)
+    ]);
+    if(!daily || !weekly){
+      panel.innerHTML = `<div style="color:var(--red);font-size:10px;font-family:var(--mono)">❌ No data found for ${sym}</div>`;
+      return;
+    }
+    const classified = classifyWeinsteinTicker(sym, daily, weekly);
+    if(!classified){
+      panel.innerHTML = `<div style="color:var(--red);font-size:10px;font-family:var(--mono)">❌ Could not classify ${sym}</div>`;
+      return;
+    }
+    panel.innerHTML = renderWeinsteinCard(classified, true);
+  }catch(e){
+    panel.innerHTML = `<div style="color:var(--red);font-size:10px;font-family:var(--mono)">❌ Error: ${e.message}</div>`;
+  }
+}
+
+// ── Classify a single ticker inline ──────────────────────────────────────────
+function classifyWeinsteinTicker(sym, daily, weekly){
+  try{
+    const closes  = daily.closes;
+    const wCloses = weekly.closes;
+    if(!closes?.length || !wCloses?.length) return null;
+
+    // Daily stage
+    const ema30d  = calcEMA(closes, 30);
+    const ema10d  = calcEMA(closes, 10);
+    const rsiD    = calcRSI(closes, 14);
+    const lastD   = closes[closes.length-1];
+    const lastEMA30d = ema30d[ema30d.length-1];
+    const lastRSID   = rsiD[rsiD.length-1];
+    const dailyUp    = lastD > lastEMA30d;
+    const dailyMom   = ema10d[ema10d.length-1] > lastEMA30d;
+    const dailyStage = dailyUp && dailyMom ? 2 : dailyUp ? 1 : !dailyUp && !dailyMom ? 4 : 3;
+
+    // Weekly stage
+    const ema30w  = calcEMA(wCloses, 30);
+    const rsiW    = calcRSI(wCloses, 14);
+    const lastW   = wCloses[wCloses.length-1];
+    const lastEMA30w = ema30w[ema30w.length-1];
+    const lastRSIW   = rsiW[rsiW.length-1];
+    const weeklyUp   = lastW > lastEMA30w;
+    const weeklyMom  = calcEMA(wCloses,10)[calcEMA(wCloses,10).length-1] > lastEMA30w;
+    const weeklyStage = weeklyUp && weeklyMom ? 2 : weeklyUp ? 1 : !weeklyUp && !weeklyMom ? 4 : 3;
+
+    const alignment = dailyStage===2 && weeklyStage===2 ? "BULLISH" :
+                      dailyStage===4 && weeklyStage===4 ? "BEARISH" : "MIXED";
+    const action    = alignment==="BULLISH" ? "ENTER" :
+                      alignment==="BEARISH" ? "AVOID" : "WAIT";
+
+    return { sym, dailyStage, weeklyStage, alignment, action,
+             rsi: lastRSID?.toFixed(1), weeklyRsi: lastRSIW?.toFixed(1),
+             price: lastD?.toFixed(2) };
+  }catch(e){ return null; }
+}
+
+// ── Render single Weinstein card ──────────────────────────────────────────────
+function renderWeinsteinCard(s, isSearch=false){
+  const stageColor = n => n===2?"var(--green2)":n===1?"#00BCD4":n===3?"var(--yellow)":"var(--red)";
+  const stageLabel = n => n===2?"Stage 2 ▲":n===1?"Stage 1 →":n===3?"Stage 3 ↓":"Stage 4 ▼";
+  const actionColor = s.action==="ENTER"?"var(--green2)":s.action==="WAIT"?"var(--yellow)":"var(--red)";
+  const actionIcon  = s.action==="ENTER"?"🟢":s.action==="WAIT"?"🟡":"🔴";
+  return `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-family:var(--sans);font-size:${isSearch?"16px":"13px"};font-weight:700;color:#fff">${s.sym}</span>
+    ${s.price?`<span style="font-size:11px;color:var(--muted2)">$${s.price}</span>`:""}
+    <span style="font-size:11px;font-weight:700;color:${actionColor}">${actionIcon} ${s.action}</span>
+    <span style="font-size:9px;padding:2px 8px;border-radius:2px;background:${actionColor}20;border:1px solid ${actionColor}40;color:${actionColor}">${s.alignment}</span>
+    <div style="display:flex;gap:16px;margin-left:auto">
+      <div style="text-align:center">
+        <div style="font-size:8px;color:var(--muted2)">DAILY</div>
+        <div style="font-size:11px;font-weight:700;color:${stageColor(s.dailyStage)}">${stageLabel(s.dailyStage)}</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:8px;color:var(--muted2)">WEEKLY</div>
+        <div style="font-size:11px;font-weight:700;color:${stageColor(s.weeklyStage)}">${stageLabel(s.weeklyStage)}</div>
+      </div>
+      ${s.rsi?`<div style="text-align:center"><div style="font-size:8px;color:var(--muted2)">D-RSI</div><div style="font-size:11px;color:var(--text)">${s.rsi}</div></div>`:""}
+      ${s.weeklyRsi?`<div style="text-align:center"><div style="font-size:8px;color:var(--muted2)">W-RSI</div><div style="font-size:11px;color:var(--text)">${s.weeklyRsi}</div></div>`:""}
+    </div>
+  </div>`;
+}
+
+// ── Trigger GitHub Actions run via API ────────────────────────────────────────
+async function triggerWeinsteinRun(){
+  const statusEl = document.getElementById("ws-run-status");
+  if(statusEl) statusEl.textContent = "⏳ Triggering...";
+
+  // Note: GitHub Actions API requires a PAT token — show instructions instead
+  if(statusEl) statusEl.innerHTML = `
+    <span style="color:var(--yellow)">Go to GitHub → Actions → Weinstein Classifier → Run workflow</span>
+    <span style="color:var(--muted2);margin-left:8px">Results appear here automatically when done</span>`;
+}
