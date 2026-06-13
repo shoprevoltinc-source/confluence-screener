@@ -89,7 +89,7 @@ function isFreshBrief(savedAt){
 }
 
 // ── Generate fresh brief via Claude (fallback only) ───────────────────────────
-async function generateFreshBrief(wm, jax, ws, regime, rec=[], cat=[], conf=[], triggers=[]){
+async function generateFreshBrief(wm, jax, ws, regime, rec=[], cat=[], conf=[], triggers=[], preFetchedPrices={}, preFetchedExtended=[]){
   if(!ANTHROPIC_KEY){ console.warn("⚠️  No ANTHROPIC_API_KEY"); return null; }
 
   const today      = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",weekday:"long",month:"short",day:"numeric"});
@@ -99,42 +99,29 @@ async function generateFreshBrief(wm, jax, ws, regime, rec=[], cat=[], conf=[], 
   const wsEnters   = ws.filter(r=>r.action==="ENTER");
   const regimeCtx  = regime ? `\nMARKET REGIME: ${regime.type} | SPY ${regime.spyMove>=0?"+":""}${regime.spyMove}% | Breadth ${regime.adRatio}% | ${regime.advice}\nMax trades: ${regime.maxTrades} | Min score: ${regime.minScore}/10` : "";
 
-  // ── Fetch live prices for top candidates ──────────────────────────────────
-  const topSyms = [...new Set([
-    ...tier1.map(r=>r.sym), ...tier2.slice(0,10).map(r=>r.sym),
-    ...arrows.slice(0,8).map(r=>r.sym)
-  ])].slice(0,20);
-
-  const livePrices = {};
-  const extendedSyms = [];
-  for(const sym of topSyms){
-    try{
-      const q = await fetchQuote(sym);
-      if(q && q.price > 0){
-        livePrices[sym] = q;
-        // Find scan price from weekly monitor
-        const wmEntry = wm.find(r=>r.sym===sym);
-        const scanPrice = wmEntry?.price || 0;
-        if(scanPrice > 0){
-          const pctMove = ((q.price - scanPrice) / scanPrice * 100);
-          if(Math.abs(pctMove) > 5) extendedSyms.push(`${sym} (${pctMove>=0?"+":""}${pctMove.toFixed(1)}% from scan)`);
-        }
-      }
-      await new Promise(r=>setTimeout(r,150));
-    }catch(e){}
-  }
+  // Use pre-fetched prices from main flow
+  const livePrices   = preFetchedPrices;
+  const extendedSyms = preFetchedExtended;
   const liveCtx = Object.keys(livePrices).length > 0
-    ? `\n\nLIVE PRICES (use these, not scan prices):\n`
-      + Object.entries(livePrices).map(([s,q])=>`${s}: $${q.price.toFixed(2)} (${q.changePct>=0?"+":""}${q.changePct.toFixed(1)}% today)`).join(", ")
-      + (extendedSyms.length ? `\n⚠️ EXTENDED >5% from scan — avoid entering: ${extendedSyms.join(", ")}` : "")
-    : "";
+    ? `\n\nLIVE PRICES (use these as entry prices, not scan prices):\n`
+      + Object.entries(livePrices).map(([s,q])=>`${s}: $${q.price.toFixed(2)} (${q.changePct>=0?"+":""}${q.changePct.toFixed(1)}% today)`).join("\n")
+      + (extendedSyms.length ? `\n\n⚠️ EXTENDED >5% from scan price — DO NOT recommend these as entries today: ${extendedSyms.join(", ")}` : "")
+    : "\n\n⚠️ No live prices available — add note to verify prices before trading";
 
   const system = `You are a professional trading advisor specializing in options. Respond ONLY with a raw JSON object. No markdown, no backticks. Start with { end with }.
+
+CRITICAL PRICE RULES:
+- The scan prices in the data below may be DAYS OLD
+- You MUST assume prices have moved since the scan
+- DO NOT recommend entry if a stock is a well-known momentum name that likely moved significantly
+- Flag any entry with "entry price may be stale — verify before trading"
+- If live prices are provided below, USE THOSE as the entry price, not scan prices
+- If no live prices provided, add a note that price must be verified at market open
 Return exactly:
 {
   "context": "one sentence market context",
   "confidence": "X/10 — brief reason",
-  "avoid": "what to avoid today",
+  "avoid": "what to avoid today — do NOT include any ticker here that you also have in trades array",
   "trades": [{
     "sym": "TICKER",
     "score": 7,
@@ -372,11 +359,42 @@ async function main(){
 
   console.log(`✅ Weekly: ${wm.length} | JAX: ${jax.filter(r=>r.greenArrow).length} arrows | Weinstein: ${ws.length} | Recovery: ${rec.length} | Catalyst: ${cat.length} | Confluence: ${conf.length} | Triggers: ${triggers.length} | Regime: ${regime?.type||"unknown"}`);
 
+  // ── Fetch live prices directly in main flow ───────────────────────────────
+  console.log("📡 Fetching live prices...");
+  const mainLivePrices = {};
+  const mainExtended   = [];
+  const checkSyms = [...new Set([
+    ...(wm.filter(r=>r.tier1||r.tierApp||r.tier2).slice(0,15).map(r=>r.sym)),
+    ...(jax.filter(r=>r.greenArrow&&(r.bullScore||0)>=4).slice(0,8).map(r=>r.sym))
+  ])].slice(0,20);
+
+  for(const sym of checkSyms){
+    try{
+      const q = await fetchQuote(sym);
+      if(q && q.price > 0){
+        mainLivePrices[sym] = q;
+        const wmEntry   = wm.find(r=>r.sym===sym);
+        const scanPrice = wmEntry?.price || 0;
+        if(scanPrice > 0){
+          const pctMove = ((q.price - scanPrice) / scanPrice * 100);
+          if(Math.abs(pctMove) > 5){
+            mainExtended.push(sym + " " + (pctMove>=0?"+":"") + pctMove.toFixed(1) + "%");
+            console.log("  ⚠️  " + sym + ": live $" + q.price.toFixed(2) + " vs scan $" + scanPrice.toFixed(2) + " = " + pctMove.toFixed(1) + "% — EXTENDED");
+          } else {
+            console.log("  ✅ " + sym + ": $" + q.price.toFixed(2) + " (" + (pctMove>=0?"+":"") + pctMove.toFixed(1) + "% from scan)");
+          }
+        }
+      }
+      await new Promise(r=>setTimeout(r,150));
+    }catch(e){ console.warn("  Quote failed " + sym + ":", e.message); }
+  }
+  console.log("📡 Live prices: " + Object.keys(mainLivePrices).length + "/" + checkSyms.length + " fetched | Extended: " + mainExtended.length);
+
   // ── Always generate fresh brief with live prices ────────────────────────────
   let brief = null;
   console.log("🔄 Generating fresh brief with live prices...");
 
-  brief = await generateFreshBrief(wm, jax, ws, regime, rec, cat, conf, triggers).catch(e=>{
+  brief = await generateFreshBrief(wm, jax, ws, regime, rec, cat, conf, triggers, mainLivePrices, mainExtended).catch(e=>{
     console.warn("Brief generation failed:", e.message);
     return null;
   });
