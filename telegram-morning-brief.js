@@ -372,45 +372,27 @@ async function main(){
 
   console.log(`✅ Weekly: ${wm.length} | JAX: ${jax.filter(r=>r.greenArrow).length} arrows | Weinstein: ${ws.length} | Recovery: ${rec.length} | Catalyst: ${cat.length} | Confluence: ${conf.length} | Triggers: ${triggers.length} | Regime: ${regime?.type||"unknown"}`);
 
-  // ── Use saved brief if fresh (from today), otherwise generate new one ──────
+  // ── Always generate fresh brief with live prices ────────────────────────────
   let brief = null;
+  console.log("🔄 Generating fresh brief with live prices...");
 
-  // Check if agent_brief was saved today by the web app
-  const savedBriefRaw = await fetchJSON(`${FIREBASE_DB_URL}/screener/agent_brief.json`).catch(()=>null);
-  const savedAt       = savedBriefRaw?.savedAt || savedBriefRaw?.time;
-  const briefIsFresh  = isFreshBrief(savedAt);
+  brief = await generateFreshBrief(wm, jax, ws, regime, rec, cat, conf, triggers).catch(e=>{
+    console.warn("Brief generation failed:", e.message);
+    return null;
+  });
 
-  if(briefIsFresh && agentBriefRaw?.trades){
-    brief = agentBriefRaw;
-    console.log(`✅ Using today's saved brief from Firebase (${savedAt}) — ${brief.trades?.length||0} trades`);
-  } else {
-    console.log(`⚠️  No fresh brief in Firebase (savedAt: ${savedAt||"never"}) — generating new one`);
-
-    // Fetch SPY for regime if not already in Firebase
-    let liveRegime = regime;
-    if(!liveRegime){
-      const spy = await fetchQuote("SPY");
-      if(spy) console.log(`SPY: ${spy.changePct>=0?"+":""}${spy.changePct.toFixed(2)}%`);
-    }
-
-    brief = await generateFreshBrief(wm, jax, ws, liveRegime, rec, cat, conf, triggers).catch(e=>{
-      console.warn("Brief generation failed:", e.message);
-      return null;
+  // Save to Firebase so web app shows same data
+  if(brief){
+    await fbPut("agent_brief", {
+      data:    JSON.stringify(brief),
+      text:    JSON.stringify(brief),
+      html:    "",
+      time:    new Date().toISOString(),
+      isJson:  true,
+      savedAt: new Date().toISOString(),
+      device:  "telegram-action"
     });
-
-    // Save fresh brief to Firebase so web app shows same data
-    if(brief){
-      await fbPut("agent_brief", {
-        data:    JSON.stringify(brief),
-        text:    JSON.stringify(brief),
-        html:    "",
-        time:    new Date().toISOString(),
-        isJson:  true,
-        savedAt: new Date().toISOString(),
-        device:  "telegram-action"
-      });
-      console.log("✅ Fresh brief saved to Firebase");
-    }
+    console.log(`✅ Fresh brief saved to Firebase — ${brief.trades?.length||0} trades`);
   }
 
   // ── Build and send messages ───────────────────────────────────────────────
