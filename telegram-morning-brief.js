@@ -75,9 +75,17 @@ function getTodayET(){
 // ── Detect if brief is from today ─────────────────────────────────────────────
 function isFreshBrief(savedAt){
   if(!savedAt) return false;
-  const savedDate = new Date(savedAt).toLocaleDateString("en-US",{timeZone:"America/New_York"});
-  const today     = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York"});
-  return savedDate === today;
+  const now        = new Date();
+  const etNow      = new Date(now.toLocaleString("en-US",{timeZone:"America/New_York"}));
+  const dayOfWeek  = etNow.getDay();
+  const isWeekend  = dayOfWeek === 0 || dayOfWeek === 6;
+  // On weekends always generate fresh — no saved brief is current
+  if(isWeekend) return false;
+  const savedDate  = new Date(savedAt).toLocaleDateString("en-US",{timeZone:"America/New_York"});
+  const today      = now.toLocaleDateString("en-US",{timeZone:"America/New_York"});
+  // Also check it was saved within last 8 hours — prevents stale same-day briefs
+  const ageHours   = (now - new Date(savedAt)) / 3600000;
+  return savedDate === today && ageHours < 8;
 }
 
 // ── Generate fresh brief via Claude (fallback only) ───────────────────────────
@@ -90,6 +98,36 @@ async function generateFreshBrief(wm, jax, ws, regime, rec=[], cat=[], conf=[], 
   const arrows     = jax.filter(r=>r.greenArrow&&(r.bullScore||0)>=4);
   const wsEnters   = ws.filter(r=>r.action==="ENTER");
   const regimeCtx  = regime ? `\nMARKET REGIME: ${regime.type} | SPY ${regime.spyMove>=0?"+":""}${regime.spyMove}% | Breadth ${regime.adRatio}% | ${regime.advice}\nMax trades: ${regime.maxTrades} | Min score: ${regime.minScore}/10` : "";
+
+  // ── Fetch live prices for top candidates ──────────────────────────────────
+  const topSyms = [...new Set([
+    ...tier1.map(r=>r.sym), ...tier2.slice(0,10).map(r=>r.sym),
+    ...arrows.slice(0,8).map(r=>r.sym)
+  ])].slice(0,20);
+
+  const livePrices = {};
+  const extendedSyms = [];
+  for(const sym of topSyms){
+    try{
+      const q = await fetchQuote(sym);
+      if(q && q.price > 0){
+        livePrices[sym] = q;
+        // Find scan price from weekly monitor
+        const wmEntry = wm.find(r=>r.sym===sym);
+        const scanPrice = wmEntry?.price || 0;
+        if(scanPrice > 0){
+          const pctMove = ((q.price - scanPrice) / scanPrice * 100);
+          if(Math.abs(pctMove) > 5) extendedSyms.push(`${sym} (${pctMove>=0?"+":""}${pctMove.toFixed(1)}% from scan)`);
+        }
+      }
+      await new Promise(r=>setTimeout(r,150));
+    }catch(e){}
+  }
+  const liveCtx = Object.keys(livePrices).length > 0
+    ? `\n\nLIVE PRICES (use these, not scan prices):\n`
+      + Object.entries(livePrices).map(([s,q])=>`${s}: $${q.price.toFixed(2)} (${q.changePct>=0?"+":""}${q.changePct.toFixed(1)}% today)`).join(", ")
+      + (extendedSyms.length ? `\n⚠️ EXTENDED >5% from scan — avoid entering: ${extendedSyms.join(", ")}` : "")
+    : "";
 
   const system = `You are a professional trading advisor specializing in options. Respond ONLY with a raw JSON object. No markdown, no backticks. Start with { end with }.
 Return exactly:
@@ -141,6 +179,8 @@ ${conf.filter(r=>(r.taScore||r.score||0)>=55).slice(0,6).map(r=>`${r.sym} $${Num
 
 DAILY TRIGGERS fired today (${triggers.length}):
 ${triggers.slice(0,6).map(r=>`${r.sym} ${r.trigger||""} ${r.price?`$${Number(r.price).toFixed(2)}`:""}`).join("\n")||"none"}
+
+${liveCtx}
 
 Options sizing: max premium spend $${regime?.maxTrades>=4?100:75} per trade. Estimate ATM 30-45 DTE premium as ~3-5% of underlying. Show contracts AND total cost.
 Give top ${regime?.maxTrades||5} trades. Only ENTER if score >= ${regime?.minScore||5}/10.`;
