@@ -110,13 +110,12 @@ async function generateFreshBrief(wm, jax, ws, regime, rec=[], cat=[], conf=[], 
 
   const system = `You are a professional trading advisor specializing in options. Respond ONLY with a raw JSON object. No markdown, no backticks. Start with { end with }.
 
-CRITICAL PRICE RULES:
-- The scan prices in the data below may be DAYS OLD
-- You MUST assume prices have moved since the scan
-- DO NOT recommend entry if a stock is a well-known momentum name that likely moved significantly
-- Flag any entry with "entry price may be stale — verify before trading"
-- If live prices are provided below, USE THOSE as the entry price, not scan prices
-- If no live prices provided, add a note that price must be verified at market open
+CRITICAL PRICE RULES — NON-NEGOTIABLE:
+- Any ticker marked ⚠️EXTENDED in the data below is BANNED from the trades array — do not recommend it under any circumstances
+- If live price is >5% above scan price, that ticker is EXTENDED — skip it completely
+- ALWAYS use the LIVE price as the entry price, never the scan price
+- If no live price available for a ticker, note "verify price before entry" in the notes field
+- Do not recommend a ticker just because it has strong signals if it is marked EXTENDED
 Return exactly:
 {
   "context": "one sentence market context",
@@ -145,13 +144,29 @@ Return exactly:
   const user = `Date: ${today} | Account: $10,000 | Risk: 0.75% ($75) per TIER 2, 1% ($100) TIER 1 | Max trades: ${regime?.maxTrades||5}${regimeCtx}
 
 WEEKLY MONITOR — TIER 1 ENTER NOW (${tier1.length}):
-${tier1.map(r=>`${r.sym} $${Number(r.price||0).toFixed(2)} W-RSI:${Number(r.weeklyRsi||0).toFixed(0)} D-RSI:${Number(r.rsi||0).toFixed(0)} flip${r.weeksAgo}wk ${r.weeklyJAXRecent?"WkJAX":""}${r.h4FlipRecent?" 4H-JUST-FLIPPED":" 4H-bull"}`).join("\n")||"none"}
+${tier1.map(r=>{
+  const live = livePrices[r.sym];
+  const liveStr = live ? ` LIVE:$${live.price.toFixed(2)}(${live.changePct>=0?"+":""}${live.changePct.toFixed(1)}%)` : " LIVE:unknown";
+  const scanPct = live&&r.price ? ((live.price-r.price)/r.price*100) : 0;
+  const extFlag = Math.abs(scanPct)>5 ? ` ⚠️EXTENDED${scanPct>=0?"+":""}${scanPct.toFixed(1)}%` : "";
+  return r.sym+" scan:$"+Number(r.price||0).toFixed(2)+liveStr+extFlag+" W-RSI:"+Number(r.weeklyRsi||0).toFixed(0)+" D-RSI:"+Number(r.rsi||0).toFixed(0)+" flip"+r.weeksAgo+"wk "+(r.weeklyJAXRecent?"WkJAX":"")+(r.h4FlipRecent?" 4H-JUST-FLIPPED":" 4H-bull");
+}).join("\n")||"none"}
 
 WEEKLY MONITOR — TIER 2 4H BULL (${tier2.length}):
-${tier2.slice(0,10).map(r=>`${r.sym} $${Number(r.price||0).toFixed(2)} W-RSI:${Number(r.weeklyRsi||0).toFixed(0)} D-RSI:${Number(r.rsi||0).toFixed(0)} flip${r.weeksAgo}wk ${r.weeklyJAXRecent?"WkJAX":""}`).join("\n")||"none"}
+${tier2.slice(0,10).map(r=>{
+  const live = livePrices[r.sym];
+  const liveStr = live ? ` LIVE:$${live.price.toFixed(2)}(${live.changePct>=0?"+":""}${live.changePct.toFixed(1)}%)` : " LIVE:unknown";
+  const scanPct = live&&r.price ? ((live.price-r.price)/r.price*100) : 0;
+  const extFlag = Math.abs(scanPct)>5 ? ` ⚠️EXTENDED${scanPct>=0?"+":""}${scanPct.toFixed(1)}%` : "";
+  return r.sym+" scan:$"+Number(r.price||0).toFixed(2)+liveStr+extFlag+" W-RSI:"+Number(r.weeklyRsi||0).toFixed(0)+" D-RSI:"+Number(r.rsi||0).toFixed(0)+" flip"+r.weeksAgo+"wk "+(r.weeklyJAXRecent?"WkJAX":"");
+}).join("\n")||"none"}
 
 JAX GREEN ARROWS bull 4-5/5 (${arrows.length}):
-${arrows.slice(0,10).map(r=>`${r.sym} $${Number(r.price||0).toFixed(2)} bull${r.bullScore}/5 RSI${Number(r.rsi||0).toFixed(0)}`).join("\n")||"none"}
+${arrows.slice(0,10).map(r=>{
+  const live = livePrices[r.sym];
+  const liveStr = live ? " LIVE:$"+live.price.toFixed(2) : "";
+  return r.sym+" scan:$"+Number(r.price||0).toFixed(2)+liveStr+" bull"+r.bullScore+"/5 RSI"+Number(r.rsi||0).toFixed(0);
+}).join("\n")||"none"}
 
 WEINSTEIN ENTER (${wsEnters.length}): ${wsEnters.map(r=>r.sym).join(", ")||"none"}
 
