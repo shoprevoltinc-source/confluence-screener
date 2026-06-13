@@ -380,8 +380,10 @@ async function main(){
   const mainExtended   = [];
   const checkSyms = [...new Set([
     ...(wm.filter(r=>r.tier1||r.tierApp||r.tier2).slice(0,15).map(r=>r.sym)),
-    ...(jax.filter(r=>r.greenArrow&&(r.bullScore||0)>=4).slice(0,8).map(r=>r.sym))
-  ])].slice(0,20);
+    ...(jax.filter(r=>r.greenArrow&&(r.bullScore||0)>=4).slice(0,8).map(r=>r.sym)),
+    ...(triggers.slice(0,6).map(r=>r.sym).filter(Boolean)),  // ← ADD daily triggers
+    ...(ws.filter(r=>r.action==="ENTER").slice(0,5).map(r=>r.sym))  // ← ADD weinstein enters
+  ])].slice(0,25);
 
   for(const sym of checkSyms){
     try{
