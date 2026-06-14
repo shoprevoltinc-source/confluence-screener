@@ -994,10 +994,23 @@ function loadAgent(){
     if(saved && body){
       if(saved.html){
         body.innerHTML = saved.html;
-      } else if(saved.isJson){
-        body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--muted2);padding:10px">📋 Last brief from ${new Date(saved.time).toLocaleTimeString()} — tap MORNING BRIEF to refresh.</div>`;
+      } else if(saved.isJson || saved.data){
+        // Brief from Telegram action — parse JSON and render cards
+        try{
+          const raw = saved.data || saved.text || "";
+          const clean = typeof raw === "string" ? raw.replace(/```json|```/g,"").trim() : "";
+          const brief = typeof raw === "object" ? raw : JSON.parse(clean);
+          if(brief && brief.trades){
+            renderBriefCards(brief, body);
+            if(window.currentRegime) renderRegimeBanner(window.currentRegime);
+          } else {
+            body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--muted2);padding:10px">📋 Last brief from ${new Date(saved.time||saved.savedAt).toLocaleTimeString()} — tap ☀️ MORNING BRIEF to refresh.</div>`;
+          }
+        }catch(e){
+          body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--muted2);padding:10px">📋 Last brief from ${new Date(saved.time||saved.savedAt).toLocaleTimeString()} — tap ☀️ MORNING BRIEF to refresh.</div>`;
+        }
       } else {
-        body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(saved.text)}</div>`;
+        body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(saved.text||"")}</div>`;
       }
       if(timeEl)  timeEl.textContent  = new Date(saved.time).toLocaleTimeString();
       if(lastRun) lastRun.textContent = "Last brief: "+new Date(saved.time).toLocaleTimeString();
