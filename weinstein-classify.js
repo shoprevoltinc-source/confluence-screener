@@ -15,8 +15,8 @@
 const https = require("https");
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const FIREBASE_URL   = process.env.FIREBASE_URL;
-const FIREBASE_TOKEN = process.env.FIREBASE_TOKEN || "";
+const FIREBASE_URL   = process.env.FIREBASE_URL;   // https://YOUR-PROJECT-default-rtdb.firebaseio.com
+const FIREBASE_TOKEN = process.env.FIREBASE_TOKEN || ""; // optional — only needed if rules require auth
 const ANTHROPIC_KEY  = process.env.ANTHROPIC_API_KEY;
 
 // ── Args ──────────────────────────────────────────────────────────────────────
@@ -24,17 +24,13 @@ const args   = process.argv.slice(2);
 const getArg = (flag, def) => { const i = args.indexOf(flag); return i >= 0 && args[i+1] ? args[i+1] : def; };
 const hasArg = (flag)      => args.includes(flag);
 
-const SOURCE  = getArg("--source", "all");
-const TOP_N   = parseInt(getArg("--top", "25"), 10);
-const DRY_RUN = hasArg("--dry-run");
+const SOURCE   = getArg("--source", "all");   // all | jax | weekly | recovery | catalyst | jax,weekly etc.
+const TOP_N    = parseInt(getArg("--top", "25"), 10);
+const DRY_RUN  = hasArg("--dry-run");
 
 // ── Validation ────────────────────────────────────────────────────────────────
 if (!FIREBASE_URL) { console.error("❌ FIREBASE_URL env var not set"); process.exit(1); }
-if (isNaN(TOP_N) || TOP_N < 1) { console.error("❌ --top must be a positive integer"); process.exit(1); }
 if (!ANTHROPIC_KEY) { console.warn("⚠️  ANTHROPIC_API_KEY not set — summaries will be skipped"); }
-
-// ── Bool coercion helper — handles string "true"/"1", boolean true, number 1 ──
-const bool = v => v === true || v === 1 || v === "true" || v === "1";
 
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
 function fbRequest(method, path, body) {
@@ -63,13 +59,13 @@ function fbRequest(method, path, body) {
   });
 }
 
-function fbRead(path)        { return fbRequest("GET", path, null); }
-function fbWrite(path, body) { return fbRequest("PUT", path, body); }
+function fbRead(path)        { return fbRequest("GET",  path, null); }
+function fbWrite(path, body) { return fbRequest("PUT",  path, body); }
 
 function anthropicCall(messages, system, maxTokens = 1000) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({
-      model:      "claude-sonnet-4-5",
+      model:      "claude-sonnet-4-20250514",
       max_tokens: maxTokens,
       system,
       messages
@@ -101,57 +97,72 @@ function anthropicCall(messages, system, maxTokens = 1000) {
   });
 }
 
-// ── Stage classification logic ────────────────────────────────────────────────
+// ── Stage classification logic ─────────────────────────────────────────────────
+// Deterministic from existing Firebase fields — no extra API calls needed.
+//
+// WEEKLY STAGE — driven by weeklyBullish, weeklyRsi, weeklyJAX, weeklyJAXRecent
+//   Stage 2 (breakout): weeklyBullish=true, weeklyRsi 50-72, weeklyJAX or weeklyJAXRecent
+//   Stage 1 (base):     weeklyBullish=false, weeklyRsi 42-54 (coiling)
+//   Stage 3 (markup):   weeklyBullish=true, weeklyRsi >72 (extended)
+//   Stage 4 (distrib):  weeklyBullish weakening — trail still up but RSI rolling over
+//   Stage 5/6:          weeklyBullish=false, weeklyRsi <45
 
-// WEEKLY STAGE
 function classifyWeeklyStage(s) {
-  const wRsi  = s.weeklyRsi || 0;
-  const wBull = bool(s.weeklyBullish);
-  const wJAX  = bool(s.weeklyJAX);
-  const wJAXr = bool(s.weeklyJAXRecent);
+  const wRsi  = s.weeklyRsi  || 0;
+  const wBull = s.weeklyBullish  === true || s.weeklyBullish  === 1;
+  const wJAX  = s.weeklyJAX     === true || s.weeklyJAX     === 1;
+  const wJAXr = s.weeklyJAXRecent === true || s.weeklyJAXRecent === 1;
 
   if (wBull && (wJAX || wJAXr) && wRsi >= 48 && wRsi <= 74) return 2; // breakout zone
   if (wBull && wRsi > 74)                                    return 3; // extended markup
-  if (wBull && wRsi >= 45 && !(wJAX || wJAXr))              return 4; // distribution risk
-  if (!wBull && wRsi < 36)                                   return 6; // markdown  ← FIXED: was after < 44
-  if (!wBull && wRsi < 44)                                   return 5; // breakdown
+  if (wBull && wRsi >= 45 && !(wJAX || wJAXr))              return 4; // distribution risk (bull but no JAX, RSI neutral)
   if (!wBull && wRsi >= 44 && wRsi <= 56)                   return 1; // base / coiling
+  if (!wBull && wRsi < 44)                                  return 5; // breakdown
+  if (!wBull && wRsi < 36)                                  return 6; // markdown
   return wBull ? 3 : 1; // fallback
 }
 
-// DAILY STAGE
+// DAILY STAGE — driven by dailyJAX, rsi, emaRising, dailyAbove200, dailyTrail
+//   Stage 2: dailyJAX active, RSI 50-70, emaRising, above 200
+//   Stage 1: !dailyJAX, RSI 45-55, emaRising=false/neutral
+//   Stage 3: RSI >70, above 200 but extended
+//   Stage 4: trail flattening — RSI 55-65, no fresh JAX
+//   Stage 5/6: below 200, RSI declining
+
 function classifyDailyStage(s) {
-  const rsi       = s.rsi || 0;
-  const dJAX      = bool(s.dailyJAX) || bool(s.greenArrow);
-  const emaRising = bool(s.emaRising);
-  const above200  = bool(s.dailyAbove200);
+  const rsi       = s.rsi           || 0;
+  const dJAX      = s.dailyJAX      === true || s.dailyJAX    === 1 || s.greenArrow === true || s.greenArrow === 1;
+  const emaRising = s.emaRising     === true || s.emaRising   === 1;
+  const above200  = s.dailyAbove200 === true || s.dailyAbove200 === 1;
+  const bullScore = s.dailyBullScore || s.bullScore || 0;
 
   if (dJAX && rsi >= 48 && rsi <= 70 && emaRising)       return 2; // breakout
   if (above200 && rsi > 70 && emaRising)                  return 3; // extended
-  if (!dJAX && rsi >= 44 && rsi <= 58 && emaRising)      return 1; // basing, ema rising
+  if (!dJAX && rsi >= 44 && rsi <= 58 && emaRising)      return 1; // basing (ema rising but no JAX yet)
   if (above200 && rsi >= 55 && !dJAX && !emaRising)      return 4; // distribution risk
-  if (above200 && rsi >= 44 && rsi < 55 && !dJAX)        return 1; // basing above 200
+  if (above200 && rsi >= 44 && rsi < 55 && !dJAX)        return 1; // basing above 200, coiling
   if (!above200 && rsi >= 40)                             return 5; // breakdown
   if (!above200 && rsi < 40)                              return 6; // markdown
-  return above200 ? 1 : 5; // fallback
+  return above200 ? 1 : 5; // fallback — above 200 without clear signal = basing, not breakout
 }
 
 // ALIGNMENT
-function classifyAlignment(dailyStage, weeklyStage) {
+function classifyAlignment(dailyStage, weeklyStage, s) {
+  const bothAligned = s.bothAligned === true || s.bothAligned === 1;
   if (dailyStage === 2 && weeklyStage === 2) return "CONFIRMED";
-  if (dailyStage === 2 && weeklyStage === 1) return "WAIT";
-  if (dailyStage === 1 && weeklyStage === 2) return "WAIT";
+  if (dailyStage === 2 && weeklyStage === 1) return "WAIT";       // daily ready, weekly still basing
+  if (dailyStage === 1 && weeklyStage === 2) return "WAIT";       // weekly leading, daily lagging
   if (dailyStage >= 4 || weeklyStage >= 4)   return "BEARISH";
   return "CONFLICT";
 }
 
 // ACTION
 function classifyAction(dailyStage, weeklyStage, alignment) {
-  if (alignment === "CONFIRMED")             return "ENTER";
-  if (alignment === "WAIT")                  return "WAIT";
-  if (alignment === "BEARISH")               return "AVOID";
-  if (dailyStage === 3 && weeklyStage === 2) return "WAIT";
-  if (dailyStage === 2 && weeklyStage === 3) return "WAIT";
+  if (alignment === "CONFIRMED")                            return "ENTER";
+  if (alignment === "WAIT")                                 return "WAIT";
+  if (alignment === "BEARISH")                              return "AVOID";
+  if (dailyStage === 3 && weeklyStage === 2)                return "WAIT";  // late daily, still ok weekly
+  if (dailyStage === 2 && weeklyStage === 3)                return "WAIT";  // extended weekly
   return "AVOID";
 }
 
@@ -163,56 +174,51 @@ function buildTrigger(s, dailyStage, weeklyStage) {
   return "Wait for Stage 2 alignment on both timeframes";
 }
 
-// KEY RISK
-function buildKeyRisk(s, dailyStage, weeklyStage) {
-  const risks = [];
-  if (weeklyStage >= 3)                                        risks.push("Weekly extended — late markup");
-  if ((s.rsi || 0) > 68)                                      risks.push(`Daily RSI ${s.rsi} — overbought`);
-  if (s.taExtended)                                            risks.push("taScore flags extended");
-  if (typeof s.pctHi === "number" && s.pctHi > -3)            risks.push("Near 52w high — limited upside"); // FIXED: was (s.pctHi || 0) > -3
-  if (s.weeksAgo && s.weeksAgo > 8)                           risks.push(`Weekly flip ${s.weeksAgo}w ago — may be Stage 3`);
-  return risks.length ? risks.join("; ") : "Confirm position sizing before entry";
-}
-
 // ── Classify a single ticker ──────────────────────────────────────────────────
 function classifyTicker(s) {
   const weeklyStage = classifyWeeklyStage(s);
   const dailyStage  = classifyDailyStage(s);
-  const alignment   = classifyAlignment(dailyStage, weeklyStage);
+  const alignment   = classifyAlignment(dailyStage, weeklyStage, s);
   const action      = classifyAction(dailyStage, weeklyStage, alignment);
 
-  // Stop: prioritize dailyTrail → trailVal → weeklyTrail → 95% of price
-  // FIXED: coerce to Number() first to avoid .toFixed crash on string values from Firebase
-  const stopRaw = Number(s.dailyTrail) || Number(s.trailVal) || Number(s.weeklyTrail) || (s.price * 0.95) || 0;
-
   return {
-    sym:                s.sym,
-    price:              s.price  || 0,
-    change:             s.change || 0,
-    taScore:            s.taScore || s.bullScore || 0,
+    sym:               s.sym,
+    price:             s.price   || 0,
+    change:            s.change  || 0,
+    taScore:           s.taScore || 0,
     dailyStage,
     weeklyStage,
     alignment,
     action,
-    trigger:            action === "WAIT"  ? buildTrigger(s, dailyStage, weeklyStage) : null,
-    entryZone:          action === "ENTER" ? (s.price || 0)                           : null,
-    stop:               action === "ENTER" ? parseFloat(stopRaw.toFixed(2))           : null,
-    target:             action === "ENTER" ? parseFloat(((s.price || 0) * 1.15).toFixed(2)) : null,
-    keyRisk:            buildKeyRisk(s, dailyStage, weeklyStage),
-    dailyRSI:           s.rsi         || 0,
-    weeklyRSI:          s.weeklyRsi   || 0,
-    dailyTrail:         Number(s.dailyTrail)  || Number(s.trailVal)   || 0,
-    weeklyTrail:        Number(s.weeklyTrail) || 0,
-    trailBullishDaily:  bool(s.dailyJAX)  || bool(s.greenArrow),
-    trailBullishWeekly: bool(s.weeklyBullish),
-    jaxActiveDaily:     bool(s.dailyJAX)  || bool(s.greenArrow),
-    jaxActiveWeekly:    bool(s.weeklyJAX) || bool(s.weeklyJAXRecent),
-    taIgniting:         bool(s.taIgniting),
-    summary:            null  // filled by Anthropic for ENTER only
+    trigger:           action === "WAIT"  ? buildTrigger(s, dailyStage, weeklyStage) : null,
+    entryZone:         action === "ENTER" ? s.price  || 0  : null,
+    stop:              action === "ENTER" ? parseFloat(((s.dailyTrail || s.trailVal || s.price * 0.95) || 0).toFixed(2)) : null,
+    target:            action === "ENTER" ? parseFloat(((s.price || 0) * 1.15).toFixed(2)) : null,
+    keyRisk:           buildKeyRisk(s, dailyStage, weeklyStage),
+    dailyRSI:          s.rsi         || 0,
+    weeklyRSI:         s.weeklyRsi   || 0,
+    dailyTrail:        s.dailyTrail  || s.trailVal || 0,
+    weeklyTrail:       s.weeklyTrail || 0,
+    trailBullishDaily:  s.dailyJAX   === true || s.dailyJAX   === 1 || s.greenArrow === true,
+    trailBullishWeekly: s.weeklyBullish === true || s.weeklyBullish === 1,
+    jaxActiveDaily:    s.dailyJAX    === true || s.dailyJAX    === 1 || s.greenArrow === true,
+    jaxActiveWeekly:   s.weeklyJAX   === true || s.weeklyJAX   === 1 || s.weeklyJAXRecent === true,
+    taIgniting:        s.taIgniting  === true || s.taIgniting  === 1,
+    summary:           null  // filled by Anthropic call below for ENTER only
   };
 }
 
-// ── Anthropic summaries for ENTER tickers only ────────────────────────────────
+function buildKeyRisk(s, dailyStage, weeklyStage) {
+  const risks = [];
+  if (weeklyStage >= 3) risks.push("Weekly extended — late markup");
+  if ((s.rsi || 0) > 68) risks.push(`Daily RSI ${s.rsi} — overbought`);
+  if (s.taExtended)      risks.push("taScore flags extended");
+  if ((s.pctHi || 0) > -3) risks.push("Near 52w high — limited upside");
+  if (s.weeksAgo && s.weeksAgo > 8) risks.push(`Weekly flip ${s.weeksAgo}w ago — may be Stage 3`);
+  return risks.length ? risks.join("; ") : "Confirm position sizing before entry";
+}
+
+// ── Anthropic summaries for ENTER tickers only ───────────────────────────────
 async function generateSummaries(enters) {
   if (!ANTHROPIC_KEY || !enters.length) return;
 
@@ -220,13 +226,14 @@ async function generateSummaries(enters) {
     `${t.sym}: daily Stage ${t.dailyStage}, weekly Stage ${t.weeklyStage}, RSI ${t.dailyRSI}/${t.weeklyRSI}, taScore ${t.taScore}, JAX daily=${t.jaxActiveDaily} weekly=${t.jaxActiveWeekly}, risk="${t.keyRisk}"`
   ).join("\n");
 
-  const system  = `You are a concise trading analyst. For each ticker given, write ONE sentence (max 18 words) describing the setup quality and what makes it actionable. Focus on the stage alignment and momentum confirmation. No fluff, no disclaimers. Return JSON only: {"SYM": "one sentence", ...}`;
+  const system = `You are a concise trading analyst. For each ticker given, write ONE sentence (max 18 words) describing the setup quality and what makes it actionable. Focus on the stage alignment and momentum confirmation. No fluff, no disclaimers. Return JSON only: {"SYM": "one sentence", ...}`;
+
   const userMsg = `Write one-sentence summaries for these ENTER setups:\n${tickerList}`;
 
   console.log(`📝 Generating Anthropic summaries for ${enters.length} ENTER tickers...`);
   try {
-    const raw    = await anthropicCall([{ role: "user", content: userMsg }], system, 400);
-    const clean  = raw.replace(/```json|```/g, "").trim();
+    const raw = await anthropicCall([{ role: "user", content: userMsg }], system, 400);
+    const clean = raw.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
     enters.forEach(t => { if (parsed[t.sym]) t.summary = parsed[t.sym]; });
     console.log(`   ✅ Summaries generated`);
@@ -245,9 +252,10 @@ function parseFirebaseNode(val) {
       return Array.isArray(d) ? d : Object.values(d).filter(Boolean);
     } catch { return []; }
   }
-  const keys    = Object.keys(val);
+  const keys = Object.keys(val);
   const numKeys = keys.filter(k => !isNaN(k));
   if (numKeys.length) return numKeys.map(k => val[k]).filter(Boolean);
+  // keyed by sym
   return Object.values(val).filter(v => v && typeof v === "object" && v.sym);
 }
 
@@ -255,26 +263,27 @@ async function readSources(sourceArg) {
   const sources = sourceArg === "all"
     ? ["recovery", "catalyst", "jax_scan", "weekly_monitor"]
     : sourceArg.split(",").map(s => s.trim()).map(s => {
-        if (s === "jax")      return "jax_scan";
-        if (s === "weekly")   return "weekly_monitor";
+        // normalize shorthand
+        if (s === "jax")     return "jax_scan";       // now includes weekly fields
+        if (s === "weekly")  return "weekly_monitor";
         if (s === "recovery") return "recovery";
         if (s === "catalyst") return "catalyst";
-        if (s === "jax_live") return "jax_cron_alerts";
+        if (s === "jax_live") return "jax_cron_alerts";  // alias
         return s;
       });
 
   const combined = [];
-  const seen     = new Set();
+  const seen = new Set();
 
   for (const node of sources) {
     console.log(`📡 Reading screener/${node}...`);
     try {
-      const val   = await fbRead(`screener/${node}`);
+      const val = await fbRead(`screener/${node}`);
       const items = parseFirebaseNode(val);
-      let added   = 0;
+      let added = 0;
       for (const item of items) {
         if (!item.sym) continue;
-        if (seen.has(item.sym)) continue;
+        if (seen.has(item.sym)) continue; // dedupe — first source wins
         seen.add(item.sym);
         combined.push(item);
         added++;
@@ -289,6 +298,29 @@ async function readSources(sourceArg) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
+
+// ── Send Telegram notification ────────────────────────────────────────────────
+function sendTelegram(text){
+  const token  = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if(!token || !chatId){
+    console.log("ℹ️  No Telegram credentials — skipping notification");
+    return Promise.resolve();
+  }
+  return new Promise((res, rej) => {
+    const body = JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" });
+    const req  = https.request({
+      hostname: "api.telegram.org",
+      path:     `/bot${token}/sendMessage`,
+      method:   "POST",
+      headers:  { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) }
+    }, r => { let d=""; r.on("data",c=>d+=c); r.on("end",()=>res(d)); });
+    req.on("error", rej);
+    req.write(body);
+    req.end();
+  });
+}
+
 async function main() {
   console.log(`\n🏗️  Weinstein Classifier`);
   console.log(`   Source:  ${SOURCE}`);
@@ -301,17 +333,17 @@ async function main() {
   if (!allItems.length) { console.error("❌ No tickers read from Firebase. Exiting."); process.exit(1); }
   console.log(`\n📊 Total unique tickers: ${allItems.length}`);
 
-  // 2 — Sort by taScore (falls back to bullScore), take top N
+  // 2 — Sort by taScore, take top N
   const ranked = allItems
     .filter(s => s.sym)
-    .sort((a, b) => (b.taScore || b.bullScore || 0) - (a.taScore || a.bullScore || 0))
+    .sort((a, b) => (b.taScore || 0) - (a.taScore || 0))
     .slice(0, TOP_N);
-  console.log(`🎯 Classifying top ${ranked.length} (min score: ${ranked.at(-1)?.taScore || ranked.at(-1)?.bullScore || 0}, max: ${ranked[0]?.taScore || ranked[0]?.bullScore || 0})\n`);
+  console.log(`🎯 Classifying top ${ranked.length} by taScore (min: ${ranked.at(-1)?.taScore || 0}, max: ${ranked[0]?.taScore || 0})\n`);
 
   // 3 — Classify each ticker deterministically
   const classified = ranked.map(s => {
     const result = classifyTicker(s);
-    const icon   = result.action === "ENTER" ? "🟢" : result.action === "WAIT" ? "🟡" : "🔴";
+    const icon = result.action === "ENTER" ? "🟢" : result.action === "WAIT" ? "🟡" : "🔴";
     console.log(`   ${icon} ${result.sym.padEnd(6)} D${result.dailyStage}/W${result.weeklyStage} ${result.alignment.padEnd(9)} ${result.action}`);
     return result;
   });
@@ -349,6 +381,35 @@ async function main() {
     await fbWrite("screener/weinstein", payload);
     console.log(`✅ Done — ${classified.length} tickers written`);
     console.log(`   ENTER: ${enters.map(t => t.sym).join(", ") || "none"}`);
+
+    // ── Send Telegram summary ───────────────────────────────────────────────
+    const today   = new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",weekday:"short",month:"short",day:"numeric"});
+    const enterDetails = enters.slice(0,5).map(t => {
+      const stop   = t.stop   ? ` | Stop $${Number(t.stop).toFixed(2)}`     : "";
+      const target = t.target ? ` | Target $${Number(t.target).toFixed(2)}` : "";
+      const price  = t.price  ? ` $${Number(t.price).toFixed(2)}`           : "";
+      const summ   = t.summary ? `\n   <i>${t.summary.slice(0,100)}</i>`   : "";
+      return `• <b>${t.sym}</b>${price} D${t.dailyStage}/W${t.weeklyStage}${stop}${target}${summ}`;
+    }).join("\n");
+
+    const waitList  = waits.slice(0,8).map(t=>`${t.sym}(D${t.dailyStage}/W${t.weeklyStage})`).join(", ");
+    const avoidList = avoids.slice(0,5).map(t=>t.sym).join(", ");
+
+    const msg = `📊 <b>WEINSTEIN CLASSIFIER — ${today}</b>\n`
+      + `${classified.length} tickers analyzed · Source: ${SOURCE}\n\n`
+      + (enters.length > 0
+        ? `🟢 <b>ENTER (${enters.length}):</b>\n${enterDetails}`
+        : `🟢 <b>ENTER:</b> none`)
+      + (waits.length > 0  ? `\n\n🟡 <b>WAIT (${waits.length}):</b> ${waitList}${waits.length>8?" +more":""}` : "")
+      + (avoids.length > 0 ? `\n🔴 <b>AVOID (${avoids.length}):</b> ${avoidList}${avoids.length>5?" +more":""}` : "");
+
+    try{
+      await sendTelegram(msg);
+      console.log("✅ Telegram notification sent");
+    }catch(e){
+      console.warn("⚠️  Telegram failed:", e.message);
+    }
+
   } catch (e) {
     console.error(`❌ Firebase write failed: ${e.message}`);
     process.exit(1);
