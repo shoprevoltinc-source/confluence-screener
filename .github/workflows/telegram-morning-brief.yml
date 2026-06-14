@@ -1,0 +1,26 @@
+name: Telegram Morning Brief
+
+on:
+  schedule:
+    - cron: "15 13 * * 1-5"  # 9:15am ET Mon-Fri (5 min after Weinstein finishes)
+  workflow_dispatch:
+
+jobs:
+  morning-brief:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Send Morning Brief
+        env:
+          FIREBASE_DB_URL:     ${{ secrets.FIREBASE_DB_URL }}
+          TELEGRAM_BOT_TOKEN:  ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:    ${{ secrets.TELEGRAM_CHAT_ID }}
+          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
+          FH_KEY:              ${{ secrets.FH_KEY }}
+        run: node telegram-morning-brief.js
