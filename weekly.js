@@ -421,9 +421,21 @@ async function startWeeklyMonitor(){
           if(dy && dy.closes.length >= 70){
             const jax = calcJAXPRO(dy.closes, dy.highs, dy.lows);
             if(jax){
-              dailyJAX       = jax.greenArrow;
               dailyBullScore = jax.bullScore;
               dailyTrail     = jax.trailVal;
+
+              // ── JAX lookback: check last 3 daily bars for green arrow ────
+              // Fixes stale signal issue — arrow on prior bar still counts
+              let dailyJAXRecent = false;
+              for(let rb = 0; rb < 3 && rb < dy.closes.length; rb++){
+                const sliced = calcJAXPRO(
+                  dy.closes.slice(0, dy.closes.length - rb),
+                  dy.highs.slice(0,  dy.closes.length - rb),
+                  dy.lows.slice(0,   dy.closes.length - rb)
+                );
+                if(sliced && sliced.greenArrow){ dailyJAXRecent = true; break; }
+              }
+              dailyJAX = jax.greenArrow || dailyJAXRecent;
             }
             rsiVal   = calcRSI(dy.closes, 14);
             const high52 = Math.max(...dy.highs);
