@@ -113,13 +113,14 @@ function classifyWeeklyStage(s) {
   const wJAX  = s.weeklyJAX     === true || s.weeklyJAX     === 1;
   const wJAXr = s.weeklyJAXRecent === true || s.weeklyJAXRecent === 1;
 
-  if (wBull && (wJAX || wJAXr) && wRsi >= 48 && wRsi <= 74) return 2; // breakout zone
   if (wBull && wRsi > 74)                                    return 3; // extended markup
-  if (wBull && wRsi >= 45 && !(wJAX || wJAXr))              return 4; // distribution risk (bull but no JAX, RSI neutral)
+  if (wBull && (wJAX || wJAXr) && wRsi >= 48 && wRsi <= 74) return 2; // JAX-confirmed Stage 2
+  if (wBull && wRsi >= 48 && wRsi <= 74)                    return 2; // trail-only Stage 2 — trail IS the signal
+  if (wBull && wRsi >= 40 && wRsi < 48)                     return 1; // basing, weekly not ignited yet
   if (!wBull && wRsi >= 44 && wRsi <= 56)                   return 1; // base / coiling
   if (!wBull && wRsi < 44)                                  return 5; // breakdown
   if (!wBull && wRsi < 36)                                  return 6; // markdown
-  return wBull ? 3 : 1; // fallback
+  return wBull ? 2 : 1; // fallback
 }
 
 // DAILY STAGE — driven by dailyJAX, rsi, emaRising, dailyAbove200, dailyTrail
@@ -134,16 +135,18 @@ function classifyDailyStage(s) {
   const dJAX      = s.dailyJAX      === true || s.dailyJAX    === 1 || s.greenArrow === true || s.greenArrow === 1;
   const emaRising = s.emaRising     === true || s.emaRising   === 1;
   const above200  = s.dailyAbove200 === true || s.dailyAbove200 === 1;
-  const bullScore = s.dailyBullScore || s.bullScore || 0;
+  const price     = s.price || 0;
+  const trail     = s.dailyTrail || s.trailVal || 0;
+  const trailBull = trail > 0 && trail < price; // ATR trail below price = bullish trend
 
-  if (dJAX && rsi >= 48 && rsi <= 70 && emaRising)       return 2; // breakout
-  if (above200 && rsi > 70 && emaRising)                  return 3; // extended
-  if (!dJAX && rsi >= 44 && rsi <= 58 && emaRising)      return 1; // basing (ema rising but no JAX yet)
-  if (above200 && rsi >= 55 && !dJAX && !emaRising)      return 4; // distribution risk
-  if (above200 && rsi >= 44 && rsi < 55 && !dJAX)        return 1; // basing above 200, coiling
-  if (!above200 && rsi >= 40)                             return 5; // breakdown
-  if (!above200 && rsi < 40)                              return 6; // markdown
-  return above200 ? 1 : 5; // fallback — above 200 without clear signal = basing, not breakout
+  if (dJAX && rsi >= 48 && rsi <= 70 && (emaRising || trailBull)) return 2; // breakout — emaRising OR trail confirms
+  if (above200 && rsi > 70 && (emaRising || trailBull))            return 3; // extended
+  if (!dJAX && rsi >= 44 && rsi <= 58 && emaRising)               return 1; // basing, ema rising but no JAX yet
+  if (above200 && rsi >= 55 && !dJAX && !emaRising)               return 4; // distribution risk
+  if (above200 && rsi >= 44 && rsi < 55 && !dJAX)                 return 1; // coiling above 200
+  if (!above200 && rsi >= 40)                                      return 5; // breakdown
+  if (!above200 && rsi < 40)                                       return 6; // markdown
+  return above200 ? 1 : 5;
 }
 
 // ALIGNMENT
@@ -199,7 +202,7 @@ function classifyTicker(s) {
     weeklyRSI:         s.weeklyRsi   || 0,
     dailyTrail:        s.dailyTrail  || s.trailVal || 0,
     weeklyTrail:       s.weeklyTrail || 0,
-    trailBullishDaily:  s.dailyJAX   === true || s.dailyJAX   === 1 || s.greenArrow === true,
+    trailBullishDaily:  (s.dailyTrail || s.trailVal || 0) > 0 && (s.dailyTrail || s.trailVal) < (s.price || Infinity),
     trailBullishWeekly: s.weeklyBullish === true || s.weeklyBullish === 1,
     jaxActiveDaily:    s.dailyJAX    === true || s.dailyJAX    === 1 || s.greenArrow === true,
     jaxActiveWeekly:   s.weeklyJAX   === true || s.weeklyJAX   === 1 || s.weeklyJAXRecent === true,
