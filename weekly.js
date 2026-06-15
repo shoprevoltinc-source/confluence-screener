@@ -12,7 +12,7 @@ async function fetchWeeklyCandles(sym, keyIndex){
   const key = TD_KEYS[keyIndex % TD_KEYS.length];
   const url  = "https://api.twelvedata.com/time_series?symbol="+sym
                +"&interval=1week&outputsize=260&apikey="+key;
-  const r = await fetch(url);
+  const r = await fetch(url, {cache:"no-store"});
   if(!r.ok) throw new Error("HTTP "+r.status);
   const d = await r.json();
   if(d.status==="error"){
