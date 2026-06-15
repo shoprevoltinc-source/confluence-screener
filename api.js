@@ -152,7 +152,7 @@ async function fetchCandlesWithKey(sym, keyIndex, retries=3){
     const key = TD_KEYS[keyIndex % TD_KEYS.length];
     const url = "https://api.twelvedata.com/time_series?symbol="+sym+"&interval=1day&outputsize=260&apikey="+key;
     try{
-      const r = await fetch(url);
+      const r = await fetch(url, {cache:"no-store"});
       const d = await r.json();
       if(d.status==="error"){
         if(d.message&&d.message.includes("API credits")){ await sleep(2000); continue; }
@@ -180,7 +180,7 @@ async function fetchCandlesWithKey(sym, keyIndex, retries=3){
 async function fetch4HCandles(sym, keyIndex){
   const key = TD_KEYS[keyIndex % TD_KEYS.length];
   const url = "https://api.twelvedata.com/time_series?symbol="+sym+"&interval=4h&outputsize=500&apikey="+key;
-  const r = await fetch(url);
+  const r = await fetch(url, {cache:"no-store"});
   if(!r.ok) throw new Error("HTTP "+r.status);
   const d = await r.json();
   if(d.status==="error"){
