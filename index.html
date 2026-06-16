@@ -2496,12 +2496,13 @@ function switchTab(tab){ _doSwitchTab(tab); }
   </button>
   <span id="ws-run-status" style="font-size:8px;color:var(--muted2);font-family:var(--mono)"></span>
 
-  <!-- Stats bar -->
-  <div id="ws-topbar" style="display:none;background:#0a1525;border:1px solid #1a3a4a;border-radius:4px;padding:6px 14px;font-family:var(--mono);font-size:10px;display:flex;gap:16px;align-items:center;margin-left:auto">
-    <span id="ws-enter-count" style="color:var(--green2)">🟢 — ENTER</span>
-    <span id="ws-wait-count" style="color:#FFB300">🟡 — WAIT</span>
-    <span id="ws-avoid-count" style="color:var(--red)">🔴 — AVOID</span>
-    <span id="ws-tickers" style="color:var(--muted2)"></span>
+  <!-- Stats bar / filter chips -->
+  <div id="ws-topbar" style="display:none;background:#0a1525;border:1px solid #1a3a4a;border-radius:4px;padding:6px 14px;font-family:var(--mono);font-size:10px;display:flex;gap:10px;align-items:center;margin-left:auto;flex-wrap:wrap">
+    <span id="ws-filter-ALL"  onclick="setWSFilter('ALL')"   style="cursor:pointer;padding:3px 10px;border-radius:3px;border:1px solid currentColor;color:var(--muted2);opacity:1;transition:opacity .15s">ALL</span>
+    <span id="ws-enter-count" onclick="setWSFilter('ENTER')" style="cursor:pointer;padding:3px 10px;border-radius:3px;border:1px solid transparent;color:var(--green2);opacity:0.45;transition:opacity .15s">🟢 — ENTER</span>
+    <span id="ws-wait-count"  onclick="setWSFilter('WAIT')"  style="cursor:pointer;padding:3px 10px;border-radius:3px;border:1px solid transparent;color:#FFB300;opacity:0.45;transition:opacity .15s">🟡 — WAIT</span>
+    <span id="ws-avoid-count" onclick="setWSFilter('AVOID')" style="cursor:pointer;padding:3px 10px;border-radius:3px;border:1px solid transparent;color:var(--red);opacity:0.45;transition:opacity .15s">🔴 — AVOID</span>
+    <span id="ws-tickers" style="color:var(--muted2);margin-left:8px"></span>
   </div>
 </div>
 
