@@ -65,7 +65,7 @@ function fbWrite(path, body) { return fbRequest("PUT",  path, body); }
 function anthropicCall(messages, system, maxTokens = 1000) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({
-      model:      "claude-sonnet-4-20250514",
+      model:      "claude-sonnet-4-6",
       max_tokens: maxTokens,
       system,
       messages
@@ -177,6 +177,44 @@ function buildTrigger(s, dailyStage, weeklyStage) {
   return "Wait for Stage 2 alignment on both timeframes";
 }
 
+// ── Stop calculation — options-aware ─────────────────────────────────────────
+// Rules:
+//  1. Raw stop = dailyTrail or trailVal
+//  2. SANITY CHECK: trail must be BELOW price. If trail >= price (bearish trail
+//     still above price), it is NOT a valid stop — fall back to swing low or 8%.
+//  3. OPTIONS CAP: stop must be within 8% of entry. If ATR trail is wider, cap it.
+//  4. Swing low fallback: use weeklyTrail if tighter than the 8% cap.
+function calcStop(s) {
+  const price = s.price || 0;
+  if (!price) return 0;
+
+  const rawTrail  = s.dailyTrail || s.trailVal || 0;
+  const weekTrail = s.weeklyTrail || 0;
+
+  // Max allowed distance below entry for options (8%)
+  const maxStopPct = 0.08;
+  const floorPrice = parseFloat((price * (1 - maxStopPct)).toFixed(2));
+
+  // Step 1: is the daily trail valid (below price)?
+  let stop = 0;
+  if (rawTrail > 0 && rawTrail < price) {
+    stop = rawTrail;
+  } else {
+    // Trail is above price or missing: bearish / unreliable, use 5% default
+    stop = parseFloat((price * 0.95).toFixed(2));
+  }
+
+  // Step 2: apply weekly trail as swing low if tighter than floorPrice
+  if (weekTrail > 0 && weekTrail < price && weekTrail > floorPrice) {
+    stop = weekTrail;
+  }
+
+  // Step 3: cap stop to options max (8% below entry)
+  if (stop < floorPrice) stop = floorPrice;
+
+  return parseFloat(stop.toFixed(2));
+}
+
 // ── Classify a single ticker ──────────────────────────────────────────────────
 function classifyTicker(s) {
   const weeklyStage = classifyWeeklyStage(s);
@@ -195,7 +233,7 @@ function classifyTicker(s) {
     action,
     trigger:           action === "WAIT"  ? buildTrigger(s, dailyStage, weeklyStage) : null,
     entryZone:         action === "ENTER" ? s.price  || 0  : null,
-    stop:              action === "ENTER" ? parseFloat(((s.dailyTrail || s.trailVal || s.price * 0.95) || 0).toFixed(2)) : null,
+    stop:              action === "ENTER" ? calcStop(s) : null,
     target:            action === "ENTER" ? parseFloat(((s.price || 0) * 1.15).toFixed(2)) : null,
     keyRisk:           buildKeyRisk(s, dailyStage, weeklyStage),
     dailyRSI:          s.rsi         || 0,
