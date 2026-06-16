@@ -1106,6 +1106,26 @@ function toggleAccordion(bodyId, arrowId){
 
 // ── Weinstein Tab ─────────────────────────────────────────────────────────────
 let wsResults = [];
+let wsFilter  = "ALL"; // ALL | ENTER | WAIT | AVOID
+
+function setWSFilter(val) {
+  wsFilter = val;
+  // Reset all chips
+  const chips = {
+    ALL:   { id: "ws-filter-ALL",  activeColor: "var(--muted2)" },
+    ENTER: { id: "ws-enter-count", activeColor: "var(--green2)" },
+    WAIT:  { id: "ws-wait-count",  activeColor: "#FFB300"       },
+    AVOID: { id: "ws-avoid-count", activeColor: "var(--red)"    },
+  };
+  Object.entries(chips).forEach(([key, cfg]) => {
+    const el = document.getElementById(cfg.id);
+    if (!el) return;
+    const isActive = key === wsFilter;
+    el.style.opacity     = isActive ? "1"             : "0.45";
+    el.style.borderColor = isActive ? "currentColor"  : "transparent";
+  });
+  renderWeinstein();
+}
 
 function loadWeinstein(){
   const grid = document.getElementById("ws-grid");
@@ -1177,6 +1197,13 @@ function renderWeinstein(){
   document.getElementById("ws-tickers").textContent = wsResults.length + " analyzed: " + tickerDisplay;
   topbar.style.display = "flex";
 
+  // Ensure ALL chip is visually active on first load (setWSFilter handles re-renders)
+  const allChip = document.getElementById("ws-filter-ALL");
+  if (allChip && wsFilter === "ALL") {
+    allChip.style.opacity = "1";
+    allChip.style.borderColor = "currentColor";
+  }
+
   // Sort: ENTER first, then WAIT, then AVOID, within each by taScore
   const order = {ENTER:0, WAIT:1, AVOID:2};
   const sorted = [...wsResults].sort((a,b) => {
@@ -1184,7 +1211,15 @@ function renderWeinstein(){
     return od !== 0 ? od : (b.taScore||0) - (a.taScore||0);
   });
 
-  grid.innerHTML = sorted.map(s => {
+  // Apply active filter
+  const filtered = wsFilter === "ALL" ? sorted : sorted.filter(r => r.action === wsFilter);
+
+  if (!filtered.length) {
+    grid.innerHTML = `<div style="color:var(--muted2);font-family:var(--mono);font-size:11px;padding:40px 20px;text-align:center">No ${wsFilter} signals found.</div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(s => {
     // Action styling
     const isEnter = s.action==="ENTER";
     const isWait  = s.action==="WAIT";
