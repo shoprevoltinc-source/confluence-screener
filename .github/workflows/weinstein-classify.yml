@@ -49,6 +49,7 @@ jobs:
           ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
           TELEGRAM_BOT_TOKEN:  ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:    ${{ secrets.TELEGRAM_CHAT_ID }}
+          TD_KEYS:             ${{ secrets.TD_KEYS }}
         run: |
           TOP="${{ github.event.inputs.top_n || '0' }}"
           if [ "$TOP" = "0" ]; then TOP="9999"; fi
