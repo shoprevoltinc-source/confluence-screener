@@ -2022,6 +2022,8 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <div class="wm-stat"><div class="wm-stat-v" id="jnl-avgloss" style="color:var(--red)">—</div><div class="wm-stat-l">Avg Loss</div></div>
 </div>
 
+<div id="jnl-dashboard" style="background:var(--bg2);border-bottom:1px solid var(--border);font-family:var(--mono)"></div>
+
 <div class="jnl-breakdown" id="jnl-breakdown" style="display:none">
   <div class="jnl-breakdown-title">Win rate by signal source</div>
   <div class="jnl-source-grid" id="jnl-source-grid"></div>
@@ -2575,13 +2577,20 @@ async function fetchCandlesWithKey(sym, keyIndex, retries=3){
 }
 
 async function runWorker(keyIndex, tickers, minScore, isCatalyst, maxPrice, minVolSpike, onResult, onProgress){
-  const DELAY = 8500; // 8.5s between calls = 7 calls/min per key (safe under 8 limit)
+  const DELAY = 8500; // 8.5s between calls = ~7 calls/min per key (safe under 8 limit)
+  // Stagger worker starts: each key waits keyIndex * 1200ms so all 7 don't fire at once
+  if(keyIndex > 0) await sleep(keyIndex * 1200);
   for(let i=0; i<tickers.length; i++){
     if(stopReq) break;
     const sym = tickers[i];
     onProgress(sym, keyIndex);
     try{
       const candles = await fetchCandlesWithKey(sym, keyIndex);
+      // Guard: if candles failed (rate limit / bad ticker), skip gracefully
+      if(!candles || !candles.closes || !candles.closes.length){
+        onResult({sym, error:"No candle data — rate limited or unavailable"}, false);
+        continue;
+      }
       let result;
       if(isCatalyst){
         const earnings = await fetchEarningsDate(sym);
@@ -5349,6 +5358,13 @@ try{
 <script src="regime.js"></script>
 <script src="alerts.js"></script>
 <script src="agent.js"></script>
-<script>_initApp();</script>
+<script>
+// Wait for all external scripts to finish loading before init
+// Guards against Service Worker cache serving scripts out of order
+window.addEventListener("load", function(){
+  if(typeof _initApp === "function") _initApp();
+  else console.error("_initApp still not defined after load — check script errors");
+});
+</script>
 </body>
 </html>
