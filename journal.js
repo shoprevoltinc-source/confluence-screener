@@ -395,6 +395,86 @@ function setJnlFilter(mode, btn){
   renderJournal();
 }
 
+// ── $1k Goal Dashboard ────────────────────────────────────────────────────────
+const MONTHLY_GOAL = 1000;
+
+function renderDashboard(trades, closed, wins, losses, totalPnL){
+  const el = document.getElementById("jnl-dashboard");
+  if(!el) return;
+
+  // Month progress
+  const now       = new Date();
+  const daysInMo  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const dayOfMo   = now.getDate();
+  const daysPct   = Math.round(dayOfMo / daysInMo * 100);
+
+  // P&L progress toward goal
+  const goalPct   = Math.min(100, Math.round(Math.max(0, totalPnL) / MONTHLY_GOAL * 100));
+  const remaining = Math.max(0, MONTHLY_GOAL - totalPnL);
+  const onPace    = totalPnL > 0 ? (totalPnL / dayOfMo * daysInMo) : 0;
+  const paceClr   = onPace >= MONTHLY_GOAL ? "var(--green2)" : onPace >= MONTHLY_GOAL * 0.7 ? "var(--yellow)" : "var(--red)";
+
+  // Win rate
+  const wr        = closed.length ? Math.round(wins.length / closed.length * 100) : null;
+  const wrClr     = wr >= 60 ? "var(--green2)" : wr >= 50 ? "var(--yellow)" : "var(--red)";
+
+  // Trades needed to hit goal (rough estimate based on avg win)
+  const getResult = e => parseFloat(e.optionResult||e.result||0);
+  const avgWinDollar = wins.length
+    ? wins.reduce((a,e)=>{ const r=getResult(e)/100; const cost=(parseFloat(e.premiumPaid)||0)*(parseInt(e.contracts)||1)*100; return a+(cost*r); },0) / wins.length
+    : 0;
+  const tradesNeeded = avgWinDollar > 0 ? Math.ceil(remaining / avgWinDollar) : "—";
+
+  // Month label
+  const monthName = now.toLocaleString("en-US", {month:"long"});
+
+  el.innerHTML = `
+    <div style="padding:14px 18px 10px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--green2);letter-spacing:.05em">🎯 ${monthName} Goal — $${MONTHLY_GOAL.toLocaleString()}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted2)">Day ${dayOfMo} of ${daysInMo}</div>
+      </div>
+
+      <!-- Goal progress bar -->
+      <div style="background:var(--bg3);border-radius:3px;height:8px;margin-bottom:4px;overflow:hidden">
+        <div style="height:100%;width:${goalPct}%;background:${goalPct>=100?"var(--green2)":goalPct>=60?"var(--yellow)":"var(--blue)"};border-radius:3px;transition:width .4s"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--muted2);margin-bottom:12px">
+        <span style="color:${totalPnL>0?"var(--green2)":totalPnL<0?"var(--red)":"var(--muted2)"}">${totalPnL>0?"+$":"−$"}${Math.abs(totalPnL).toFixed(0)} earned</span>
+        <span>${goalPct}% of goal</span>
+        <span style="color:var(--muted2)">$${remaining.toFixed(0)} to go</span>
+      </div>
+
+      <!-- Time progress bar -->
+      <div style="background:var(--bg3);border-radius:3px;height:4px;margin-bottom:4px;overflow:hidden">
+        <div style="height:100%;width:${daysPct}%;background:var(--border2);border-radius:3px"></div>
+      </div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);margin-bottom:12px">
+        ${daysPct}% of month elapsed
+      </div>
+
+      <!-- Key metrics row -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+        <div style="background:var(--bg3);border-radius:3px;padding:8px 10px;text-align:center">
+          <div style="font-family:var(--mono);font-size:14px;font-weight:500;color:${paceClr}">$${Math.round(onPace).toLocaleString()}</div>
+          <div style="font-size:9px;color:var(--muted2);margin-top:2px">projected</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:3px;padding:8px 10px;text-align:center">
+          <div style="font-family:var(--mono);font-size:14px;font-weight:500;color:${wrClr}">${wr!==null?wr+"%":"—"}</div>
+          <div style="font-size:9px;color:var(--muted2);margin-top:2px">win rate</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:3px;padding:8px 10px;text-align:center">
+          <div style="font-family:var(--mono);font-size:14px;font-weight:500;color:var(--text)">${closed.length}</div>
+          <div style="font-size:9px;color:var(--muted2);margin-top:2px">closed</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:3px;padding:8px 10px;text-align:center">
+          <div style="font-family:var(--mono);font-size:14px;font-weight:500;color:var(--yellow)">${tradesNeeded}</div>
+          <div style="font-size:9px;color:var(--muted2);margin-top:2px">trades left</div>
+        </div>
+      </div>
+    </div>`;
+}
+
 // ── Render journal ────────────────────────────────────────────────────────────
 function renderJournal(){
   const body      = document.getElementById("jnl-body");
@@ -428,6 +508,8 @@ function renderJournal(){
   });
 
   const calibStatus = closed.filter(e=>e._isOptions).length;
+  // Render $1k goal dashboard
+  renderDashboard(trades, closed, wins, losses, totalPnL);
   const calibPct    = Math.min(100, Math.round(calibStatus/CALIBRATION_THRESHOLD*100));
 
   if(statsEl) statsEl.innerHTML = `
