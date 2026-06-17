@@ -62,6 +62,35 @@ function fbRequest(method, path, body) {
 function fbRead(path)        { return fbRequest("GET",  path, null); }
 function fbWrite(path, body) { return fbRequest("PUT",  path, body); }
 
+// ── TwelveData: fetch last 10 daily candles → return swing low ────────────────
+// Only called for ENTER tickers — 1 credit per ticker
+function fetchSwingLow(sym) {
+  const key = process.env.TD_KEYS ? process.env.TD_KEYS.split(",")[0].trim() : "";
+  if (!key) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const path = `/v1/time_series?symbol=${sym}&interval=1day&outputsize=15&apikey=${key}`;
+    const req = https.request({
+      hostname: "api.twelvedata.com",
+      path,
+      method:  "GET",
+      headers: { "Content-Type": "application/json" }
+    }, res => {
+      let raw = "";
+      res.on("data", c => raw += c);
+      res.on("end", () => {
+        try {
+          const d = JSON.parse(raw);
+          if (d.status === "error" || !d.values || !d.values.length) return resolve(null);
+          const lows = d.values.slice(0, 10).map(v => parseFloat(v.low)).filter(Boolean);
+          resolve(lows.length ? Math.min(...lows) : null);
+        } catch { resolve(null); }
+      });
+    });
+    req.on("error", () => resolve(null));
+    req.end();
+  });
+}
+
 function anthropicCall(messages, system, maxTokens = 1000) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({
@@ -177,14 +206,14 @@ function buildTrigger(s, dailyStage, weeklyStage) {
   return "Wait for Stage 2 alignment on both timeframes";
 }
 
-// ── Stop calculation — options-aware ─────────────────────────────────────────
-// Rules:
-//  1. Raw stop = dailyTrail or trailVal
-//  2. SANITY CHECK: trail must be BELOW price. If trail >= price (bearish trail
-//     still above price), it is NOT a valid stop — fall back to swing low or 8%.
-//  3. OPTIONS CAP: stop must be within 8% of entry. If ATR trail is wider, cap it.
-//  4. Swing low fallback: use weeklyTrail if tighter than the 8% cap.
-function calcStop(s) {
+// ── Stop calculation — options-aware with real swing low ──────────────────────
+// Priority order:
+//  1. 10-day swing low  (real OHLC — most precise)
+//  2. Daily ATR trail   (if valid and tighter than swing low)
+//  3. Weekly trail      (fallback swing)
+//  4. 5% default        (last resort)
+//  Always cap at 8% max below entry for options
+function calcStop(s, swingLow) {
   const price = s.price || 0;
   if (!price) return 0;
 
@@ -195,28 +224,40 @@ function calcStop(s) {
   const maxStopPct = 0.08;
   const floorPrice = parseFloat((price * (1 - maxStopPct)).toFixed(2));
 
-  // Step 1: is the daily trail valid (below price)?
   let stop = 0;
-  if (rawTrail > 0 && rawTrail < price) {
+
+  // Step 1: use real 10-day swing low if available and valid
+  if (swingLow && swingLow > 0 && swingLow < price) {
+    stop = parseFloat(swingLow.toFixed(2));
+    console.log(`   📊 ${s.sym}: swing low $${stop} (from OHLC)`);
+  }
+  // Step 2: daily ATR trail — use if valid and tighter than swing low
+  else if (rawTrail > 0 && rawTrail < price) {
     stop = rawTrail;
-  } else {
-    // Trail is above price or missing: bearish / unreliable, use 5% default
+    console.log(`   📊 ${s.sym}: ATR trail $${stop}`);
+  }
+  // Step 3: weekly trail fallback
+  else if (weekTrail > 0 && weekTrail < price) {
+    stop = parseFloat((weekTrail).toFixed(2));
+    console.log(`   📊 ${s.sym}: weekly trail $${stop}`);
+  }
+  // Step 4: 5% default
+  else {
     stop = parseFloat((price * 0.95).toFixed(2));
+    console.log(`   📊 ${s.sym}: 5% default $${stop}`);
   }
 
-  // Step 2: apply weekly trail as swing low if tighter than floorPrice
-  if (weekTrail > 0 && weekTrail < price && weekTrail > floorPrice) {
-    stop = weekTrail;
+  // Always cap: never wider than 8% for options
+  if (stop < floorPrice) {
+    console.log(`   ⚠️  ${s.sym}: stop $${stop} capped to $${floorPrice} (8% max)`);
+    stop = floorPrice;
   }
-
-  // Step 3: cap stop to options max (8% below entry)
-  if (stop < floorPrice) stop = floorPrice;
 
   return parseFloat(stop.toFixed(2));
 }
 
 // ── Classify a single ticker ──────────────────────────────────────────────────
-function classifyTicker(s) {
+function classifyTicker(s, swingLow) {
   const weeklyStage = classifyWeeklyStage(s);
   const dailyStage  = classifyDailyStage(s);
   const alignment   = classifyAlignment(dailyStage, weeklyStage, s);
@@ -233,7 +274,9 @@ function classifyTicker(s) {
     action,
     trigger:           action === "WAIT"  ? buildTrigger(s, dailyStage, weeklyStage) : null,
     entryZone:         action === "ENTER" ? s.price  || 0  : null,
-    stop:              action === "ENTER" ? calcStop(s) : null,
+    stop:              action === "ENTER" ? calcStop(s, swingLow) : null,
+    stopSource:        action === "ENTER" ? (swingLow && swingLow > 0 && swingLow < s.price ? "swing-low" : "trail") : null,
+    swingLow:          swingLow || null,
     target:            action === "ENTER" ? parseFloat(((s.price || 0) * 1.15).toFixed(2)) : null,
     keyRisk:           buildKeyRisk(s, dailyStage, weeklyStage),
     dailyRSI:          s.rsi         || 0,
@@ -381,9 +424,9 @@ async function main() {
     .slice(0, TOP_N);
   console.log(`🎯 Classifying top ${ranked.length} by taScore (min: ${ranked.at(-1)?.taScore || 0}, max: ${ranked[0]?.taScore || 0})\n`);
 
-  // 3 — Classify each ticker deterministically
+  // 3 — Classify each ticker deterministically (no candle data yet)
   const classified = ranked.map(s => {
-    const result = classifyTicker(s);
+    const result = classifyTicker(s, null); // swing low added in step 3b
     const icon = result.action === "ENTER" ? "🟢" : result.action === "WAIT" ? "🟡" : "🔴";
     console.log(`   ${icon} ${result.sym.padEnd(6)} D${result.dailyStage}/W${result.weeklyStage} ${result.alignment.padEnd(9)} ${result.action}`);
     return result;
@@ -393,6 +436,31 @@ async function main() {
   const waits  = classified.filter(t => t.action === "WAIT");
   const avoids = classified.filter(t => t.action === "AVOID");
   console.log(`\n   Summary: ${enters.length} ENTER · ${waits.length} WAIT · ${avoids.length} AVOID`);
+
+  // 3b — Fetch real swing lows for ENTER tickers only (1 credit each)
+  if (process.env.TD_KEYS && enters.length) {
+    console.log(`\n📊 Fetching 10-day swing lows for ${enters.length} ENTER tickers...`);
+    for (const t of enters) {
+      try {
+        const swingLow = await fetchSwingLow(t.sym);
+        if (swingLow && swingLow > 0 && swingLow < t.price) {
+          const oldStop = t.stop;
+          // Recompute stop with real swing low
+          const s = ranked.find(r => r.sym === t.sym) || {};
+          s.price = t.price;
+          t.stop      = calcStop(s, swingLow);
+          t.swingLow  = parseFloat(swingLow.toFixed(2));
+          t.stopSource = "swing-low";
+          if (oldStop !== t.stop) {
+            console.log(`   ✅ ${t.sym}: stop updated $${oldStop} → $${t.stop} (swing low $${t.swingLow})`);
+          }
+        }
+        await new Promise(r => setTimeout(r, 500)); // 500ms between calls — stay under rate limit
+      } catch(e) {
+        console.warn(`   ⚠️  ${t.sym}: swing low fetch failed — ${e.message}`);
+      }
+    }
+  }
 
   // 4 — Anthropic summaries for ENTER only (single API call)
   await generateSummaries(enters);
