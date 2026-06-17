@@ -9,17 +9,17 @@ const _indicators = (() => {
 
   function calcMACD(closes, fast=12, slow=26, signal=9){
     if(closes.length < slow + signal) return {macdLine:0, signalLine:0, hist:0};
-    const emaFast = calcEMA(closes, fast);
-    const emaSlow = calcEMA(closes, slow);
-    const macdLine = emaFast - emaSlow;
+    // FIX Bug3: i < closes.length (was i <= closes.length — ran one extra iteration)
+    // FIX Bug4: macdLine derived from series last entry, not separate full-array EMA
     const macdSeries = [];
-    for(let i=slow; i<=closes.length; i++){
-      const ef = calcEMA(closes.slice(0,i), fast);
-      const es = calcEMA(closes.slice(0,i), slow);
+    for(let i=slow; i<closes.length; i++){
+      const ef = calcEMA(closes.slice(0,i+1), fast);
+      const es = calcEMA(closes.slice(0,i+1), slow);
       macdSeries.push(ef - es);
     }
     const signalLine = calcEMA(macdSeries, signal);
-    const hist = macdLine - signalLine;
+    const macdLine   = macdSeries[macdSeries.length - 1];
+    const hist       = macdLine - signalLine;
     return {macdLine, signalLine, hist};
   }
 
@@ -75,24 +75,26 @@ const _indicators = (() => {
       const slice = atrVals.slice(Math.max(0,idx-period), idx);
       return slice.reduce((a,b)=>a+b,0)/Math.max(slice.length,1);
     };
-    let trail = closes[0], tdir = 0;
+    // FIX: init tdir=1 (assume bullish) so first bar never emits dir:0
+    let trail = closes[0], tdir = 1;
     const trailHistory = [];
     for(let i=1; i<closes.length; i++){
       const atrV  = getATR(i);
       const nLoss = mult * atrV;
       const trailUp   = closes[i] - nLoss;
       const trailDown = closes[i] + nLoss;
-      const prevTrail = trail;
       if(closes[i] > trail && closes[i-1] > trail)       trail = Math.max(trail, trailUp);
       else if(closes[i] < trail && closes[i-1] < trail)  trail = Math.min(trail, trailDown);
       else if(closes[i] > trail)                          trail = trailUp;
       else                                                trail = trailDown;
       const prevDir = tdir;
-      tdir = trail > prevTrail ? 1 : trail < prevTrail ? -1 : tdir;
+      // FIX: direction = trail below price (bullish=1) vs trail above price (bearish=-1)
+      // Previously tracked trail movement direction which diverges from price-relative position on crossover bars
+      tdir = closes[i] > trail ? 1 : closes[i] < trail ? -1 : tdir;
       trailHistory.push({trail, tdir, prevDir});
     }
     const last = trailHistory[trailHistory.length-1];
-    const prev = trailHistory[trailHistory.length-2]||{tdir:0};
+    const prev = trailHistory[trailHistory.length-2]||{tdir:1};
     return {
       dir:last.tdir, prevDir:prev.tdir,
       utBuy:  last.tdir===1  && prev.tdir===-1,
@@ -202,6 +204,7 @@ const _indicators = (() => {
     return {
       sym, price, change, rsi, wr, ema21, emaRising, high52, pctHi, pctEMA,
       c1, c2, c3, c4, c5, c6, score, conds,
+      // FIX: removed duplicate deepCrash key (was defined twice)
       deepBounce, deepCrash:c7crash, c7crash, c7rsiWas, c7rsiUp, minRSI30, rsi5ago,
       jax, greenArrow, bullScore,
       trailVal: jax ? jax.trailVal : 0,
@@ -212,8 +215,6 @@ const _indicators = (() => {
       jaxStBull:   jax ? jax.stBull    : false,
       jaxUtBuy:    jax ? jax.atrTS.utBuy  : false,
       jaxStFlip:   jax ? jax.st.flipped   : false,
-      // aliases for debug/render compatibility
-      deepCrash:   c7crash,
       rsiWasLow:   c7rsiWas,
       rsiTurningUp:c7rsiUp,
       jaxHasData:  jax !== null,
@@ -241,25 +242,23 @@ const _indicators = (() => {
     const change  = ((price-prev)/prev)*100;
 
     // ── ATR Coil (from your Python logic) ────────────────────
-    // ATR shrinking = volatility compressing = spring loading
     const atrCoiling  = atrData ? atrData.isCoiling : false;
     const currentATR  = atrData ? atrData.currentATR : 0;
     const avgATR20    = atrData ? atrData.avgATR20 : 0;
     const atrRatio    = avgATR20 > 0 ? currentATR/avgATR20 : 1;
 
-    // ── 15-min RVOL (same time slot — your Python logic) ─────
-    // Volume exploding at this exact time vs normal = ignition
+    // ── 15-min RVOL ───────────────────────────────────────────
     const rvolNow     = rvol15m || 0;
-    const isIgniting  = rvolNow >= 2.5;  // 2.5x+ = IGNITION
+    const isIgniting  = rvolNow >= 2.5;
     const isWakingUp  = rvolNow >= 1.5 && rvolNow < 2.5;
 
-    // ── Daily volume (fallback when market closed) ────────────
+    // ── Daily volume ──────────────────────────────────────────
     const todayVol    = volumes[volumes.length-1];
     const avgVol20    = volumes.slice(-21,-1).reduce((a,b)=>a+b,0)/20;
     const dailySpike  = avgVol20 > 0 ? todayVol/avgVol20 : 0;
     const volDryUp    = (volumes.slice(-6,-1).reduce((a,b)=>a+b,0)/5) < avgVol20*0.6;
 
-    // ── Price coiling (backup measure) ───────────────────────
+    // ── Price coiling ─────────────────────────────────────────
     const last15H     = Math.max(...highs.slice(-15));
     const last15L     = Math.min(...lows.slice(-15));
     const rangeWidth  = last15H > 0 ? (last15H-last15L)/last15L*100 : 999;
@@ -293,23 +292,23 @@ const _indicators = (() => {
     // ══════════════════════════════════════════════════════════
     // 6 CONDITIONS — ATR + 15m RVOL upgraded system
     // ══════════════════════════════════════════════════════════
-    const c1 = price >= 2 && price <= maxPrice;                    // Price in range ($2 min, UI-controlled max)
-    const c2 = atrCoiling || (isTight && flatDaysCount >= 8);      // ATR coiling OR price tight
-    const c3 = isIgniting || dailySpike >= minVolSpike || volDryUp; // 15m ignition OR daily spike OR dry-up
-    const c4 = hasEarnings || breakout || change > 8;              // Catalyst present
-    const c5 = nearLow || pctFromHigh < -20;                       // Deep pullback
-    const c6 = rsi < 55;                                           // Not overbought
+    const c1 = price >= 2 && price <= maxPrice;
+    const c2 = atrCoiling || (isTight && flatDaysCount >= 8);
+    const c3 = isIgniting || dailySpike >= minVolSpike || volDryUp;
+    const c4 = hasEarnings || breakout || change > 8;
+    const c5 = nearLow || pctFromHigh < -20;
+    const c6 = rsi < 55;
 
     const conds = [c1,c2,c3,c4,c5,c6];
     const score = conds.filter(Boolean).length;
 
-    // ── Heat score — stacked signals = higher conviction ──────
+    // ── Heat score ────────────────────────────────────────────
     let heat = score;
-    if(isIgniting && atrCoiling)       heat += 3; // 🚀 IGNITION — ATR coil + RVOL spike
-    else if(isIgniting)                heat += 2; // 👀 WAKING UP — volume only
-    else if(atrCoiling && volDryUp)    heat += 2; // ⏳ COILING — classic NVTS/AMPX setup
-    if(hasEarnings && earningsDays<=7) heat += 1; // earnings this week
-    if(breakout && rvolNow>=1.5)       heat += 1; // breakout with volume
+    if(isIgniting && atrCoiling)       heat += 3;
+    else if(isIgniting)                heat += 2;
+    else if(atrCoiling && volDryUp)    heat += 2;
+    if(hasEarnings && earningsDays<=7) heat += 1;
+    if(breakout && rvolNow>=1.5)       heat += 1;
 
     // ── Status label ──────────────────────────────────────────
     const status = isIgniting && atrCoiling ? "🚀 IGNITION"
@@ -318,53 +317,41 @@ const _indicators = (() => {
                  : atrCoiling               ? "⏳ WATCHING"
                  : "📡 MONITOR";
 
-    // ── JAX PRO — C7 (green arrow = ignition confirmed) ────
+    // ── JAX PRO ───────────────────────────────────────────────
     const jax = closes.length >= 70 ? calcJAXPRO(closes, highs, lows) : null;
-    const greenArrow = jax ? jax.greenArrow : false;
-    const bullScore  = jax ? jax.bullScore  : 0;
-    // Flatten all JAX fields so they survive JSON/Firebase serialization
+    const greenArrow  = jax ? jax.greenArrow     : false;
+    const bullScore   = jax ? jax.bullScore      : 0;
     const jaxRsiBull  = jax ? jax.rsiBull        : false;
     const jaxWrBull   = jax ? jax.wrBull         : false;
-    const jaxEmaStack = jax ? jax.emaStack        : false;
-    const jaxMacdBull = jax ? jax.macdBull        : false;
-    const jaxStBull   = jax ? jax.stBull          : false;
-    const jaxUtBuy    = jax ? jax.atrTS.utBuy     : false;
-    const jaxStFlip   = jax ? jax.st.flipped      : false;
-    const jaxTrail    = jax ? jax.trailVal        : 0;
+    const jaxEmaStack = jax ? jax.emaStack       : false;
+    const jaxMacdBull = jax ? jax.macdBull       : false;
+    const jaxStBull   = jax ? jax.stBull         : false;
+    const jaxUtBuy    = jax ? jax.atrTS.utBuy    : false;
+    const jaxStFlip   = jax ? jax.st.flipped     : false;
+    const jaxTrail    = jax ? jax.trailVal       : 0;
     const jaxHasData  = jax !== null;
 
-    // Upgrade heat score if JAX fires
     if(greenArrow) heat += 3;
 
     const finalStatus = greenArrow && isIgniting ? "🚀🟢 IGNITION + JAX"
       : greenArrow ? "🟢 JAX SIGNAL"
       : status;
 
+    // FIX: removed duplicate keys (atrCoiling, greenArrow, rsi, rvolNow each appeared twice)
     return {
       sym, price, change, status:finalStatus, heat, score, conds,
-      // ATR data
       atrCoiling, currentATR, avgATR20, atrRatio,
-      // Volume data
       rvolNow, isIgniting, isWakingUp, dailySpike, volDryUp,
-      // Price data
       isTight, rangeWidth, flatDays:flatDaysCount, breakout,
       high20, high52, low52, pctFromHigh, pctFromLow, nearLow,
-      // Catalyst data
       hasEarnings, earningsDays,
-      // JAX PRO — all flat fields (survive JSON serialization perfectly)
       greenArrow, bullScore, jaxHasData,
       jaxRsiBull, jaxWrBull, jaxEmaStack, jaxMacdBull,
       jaxStBull, jaxUtBuy, jaxStFlip, jaxTrail,
-      // Indicators
       rsi, avgVol:avgVol20, todayVol,
-      // condition flags
       c1, c2, c3, c4, c5, c6,
-      // direct fields needed by debug/render
-      atrCoiling, greenArrow, hasEarnings,
-      rsi, earnings: earnings||null,
-      // aliases
+      earnings: earnings||null,
       volSpike: dailySpike,
-      rvolNow:  rvolNow||0,
       trailVal: jax ? jax.trailVal : 0,
     };
   }
@@ -413,15 +400,11 @@ const _indicators = (() => {
     const ema21old = calcEMA(closes.slice(0,-5), 21);
     const rsi    = jax.rsi14 || calcRSI(closes, 14);
 
-    // ── Deep Recovery conditions (DIFFERENT from standard) ─────────────────
-    // RSI ceiling raised to 80 (vs 70 standard)
-    // Must still be -20%+ off 52w high (genuinely beaten down)
-    // Must be above EMA20 (trend turning)
     const deepGreenArrow = (jax.atrTS.utBuy || jax.st.flipped)
       && jax.bullScore >= 1
-      && rsi < 80          // ← relaxed from 70
-      && pctHi < -20       // ← still deep in the hole
-      && price > jax.ema20; // ← trend turning up
+      && rsi < 80
+      && pctHi < -20
+      && price > jax.ema20;
 
     if(!deepGreenArrow) throw new Error("SKIP:no deep signal");
 
@@ -439,18 +422,11 @@ const _indicators = (() => {
       trailVal:    jax.trailVal,
       high52, low52, pctHi, ema21,
       emaRising:   ema21 > ema21old,
-      isDeepRecovery: true,  // ← blue badge flag
+      isDeepRecovery: true,
       rsiCeiling:  80,
     };
   }
 
-
-  // ── scoreTA — chart-quality composite (0-100) ──────────────────────
-  // ADDITIVE: computes nothing the scan can't already see; just combines
-  // existing inputs into a triage score + visible component breakdown.
-  // mode: "recovery"  → reward oversold-turning-up, distance-off-high is a plus
-  //       "continuation" (JAX/Catalyst) → reward strength, penalize overbought/extended
-  // Returns { taScore, taParts, ...flags }. Never throws on short history.
   function scoreTA(closes, highs, lows, volumes, mode){
     const out = { taScore:0, taParts:{}, taHigherLows:false, taCoiling:false,
                   taVolConfirm:false, taNearTrail:false, taStrongClose:false,
@@ -459,9 +435,9 @@ const _indicators = (() => {
     const n = closes.length;
     const price = closes[n-1], prev = closes[n-2];
     const change = prev ? ((price-prev)/prev)*100 : 0;
-    const cont = mode !== "recovery"; // default to continuation unless told recovery
+    const cont = mode !== "recovery";
 
-    // 1) Trend structure (0-25): higher-lows / higher-highs over last ~20 bars
+    // 1) Trend structure (0-25)
     let trendPts = 0;
     {
       const win = Math.min(20, n-1);
@@ -472,26 +448,24 @@ const _indicators = (() => {
       const higherLows  = lowLate >= lowEarly;
       const higherHighs = hiLate  >= hiEarly;
       out.taHigherLows = higherLows;
-      // chop penalty: how often direction flips bar-to-bar in the window
       let flips = 0; const seg = closes.slice(-win);
       for(let i=2;i<seg.length;i++){ const a=seg[i]-seg[i-1], b=seg[i-1]-seg[i-2]; if((a>0)!==(b>0)) flips++; }
-      const chop = flips/Math.max(seg.length-2,1); // 0 = clean, ~1 = noise
+      const chop = flips/Math.max(seg.length-2,1);
       trendPts = (higherLows?12:0) + (higherHighs?8:0) + Math.round((1-chop)*5);
     }
     out.taParts.trend = trendPts;
 
-    // 2) Volatility compression (0-20): current ATR vs 20-day avg ATR
+    // 2) Volatility compression (0-20)
     let coilPts = 0;
     {
       const atr = calcATR(highs, lows, closes);
       const ratio = atr.avgATR20 > 0 ? atr.currentATR/atr.avgATR20 : 1;
       out.taCoiling = ratio < 0.8;
-      // ratio 0.5 → full marks, 1.2+ → 0
       coilPts = Math.max(0, Math.min(20, Math.round((1.2 - ratio)/0.7 * 20)));
     }
     out.taParts.compression = coilPts;
 
-    // 3) Volume confirmation (0-20): dry-up during base OR spike on the move
+    // 3) Volume confirmation (0-20)
     let volPts = 0;
     {
       const today = volumes[n-1] || 0;
@@ -501,34 +475,34 @@ const _indicators = (() => {
       out.taVolConfirm = spike >= 1.5 || dryUp;
       if(spike >= 2)      volPts = 20;
       else if(spike>=1.5) volPts = 15;
-      else if(dryUp)      volPts = 12;   // quiet base is constructive
+      else if(dryUp)      volPts = 12;
       else if(spike>=1)   volPts = 6;
       else                volPts = 2;
     }
     out.taParts.volume = volPts;
 
-    // 4) Position vs ATR trail (0-15): just-reclaimed = good R/R, far above = extended
+    // 4) Position vs ATR trail (0-15)
     let trailPts = 0;
     {
       const ts = calcATRTrailStop(highs, lows, closes, 10, 3.5);
       const dist = ts.trailVal>0 ? (price - ts.trailVal)/ts.trailVal*100 : 0;
       out.taNearTrail = dist >= 0 && dist <= 6;
       out.taExtended  = dist > 15;
-      if(dist < 0)        trailPts = 4;    // below trail — risky
-      else if(dist <= 6)  trailPts = 15;   // fresh reclaim — best entry
+      if(dist < 0)        trailPts = 4;
+      else if(dist <= 6)  trailPts = 15;
       else if(dist <= 12) trailPts = 9;
       else if(dist <= 20) trailPts = 4;
-      else                trailPts = 1;    // far extended
+      else                trailPts = 1;
     }
     out.taParts.trail = trailPts;
 
-    // 5) Candle quality, last bar (0-10): strong close, small upper wick
+    // 5) Candle quality (0-10)
     let candlePts = 0;
     {
-      const h=highs[n-1], l=lows[n-1], c=closes[n-1], o=closes[n-2]; // o≈prev close (no open in feed)
+      const h=highs[n-1], l=lows[n-1], c=closes[n-1], o=closes[n-2];
       const range = h-l;
       if(range>0){
-        const closePos = (c-l)/range;            // 1 = closed at high
+        const closePos = (c-l)/range;
         const upperWick = (h-Math.max(c,o))/range;
         candlePts = Math.round(closePos*7) + Math.round((1-Math.min(upperWick*2,1))*3);
         out.taStrongClose = closePos >= 0.7 && upperWick <= 0.25;
@@ -536,28 +510,25 @@ const _indicators = (() => {
     }
     out.taParts.candle = candlePts;
 
-    // 6) Momentum (0-10) — MODE-DEPENDENT
+    // 6) Momentum (0-10) — mode-dependent
     let momPts = 0;
     {
       const rsi = calcRSI(closes,14);
       const rsi5ago = calcRSI(closes.slice(0,-5),14);
       if(cont){
-        // continuation: reward rising RSI, penalize overbought (the PLTR-at-67 problem)
         if(rsi>70)        momPts = 2;
         else if(rsi>=50)  momPts = (rsi>rsi5ago?10:7);
         else              momPts = 4;
       } else {
-        // recovery: reward oversold turning up
-        if(rsi<45 && rsi>rsi5ago+3) momPts = 10; // oversold and lifting
+        if(rsi<45 && rsi>rsi5ago+3) momPts = 10;
         else if(rsi<50 && rsi>rsi5ago) momPts = 7;
         else if(rsi<55) momPts = 4;
-        else momPts = 2;                          // already recovered — less juice
+        else momPts = 2;
       }
     }
     out.taParts.momentum = momPts;
 
-    // 7) Ignition bonus (0-15) — today's move + volume, the thing the 6-cond
-    //    Recovery score is blind to. Big green day on volume floats to the top.
+    // 7) Ignition bonus (0-15)
     let igPts = 0;
     {
       const today = volumes[n-1] || 0;
@@ -579,9 +550,24 @@ const _indicators = (() => {
     return out;
   }
 
+  // ── Williams %R ───────────────────────────────────────────────────────────
+  // Returns array same length as closes. Values: -100 (oversold) to 0 (overbought).
+  function calcWilliamsR(highs, lows, closes, period=14){
+    const out = new Array(closes.length).fill(null);
+    for(let i=period-1; i<closes.length; i++){
+      const sliceH = highs.slice(i-period+1, i+1);
+      const sliceL = lows.slice(i-period+1,  i+1);
+      const hh = Math.max(...sliceH);
+      const ll = Math.min(...sliceL);
+      out[i] = hh === ll ? -50 : ((hh - closes[i]) / (hh - ll)) * -100;
+    }
+    return out;
+  }
+
   return {
     calcEMA, calcRSI, calcMACD, calcSuperTrend, calcATRTrailStop,
-    calcJAXPRO, calcATR, scoreRecovery, scoreCatalyst, scoreJAX, scoreJAXDeep,
+    calcJAXPRO, calcATR, calcWilliamsR,
+    scoreRecovery, scoreCatalyst, scoreJAX, scoreJAXDeep,
     scoreTA
   };
 })();
