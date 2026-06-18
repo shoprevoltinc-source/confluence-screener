@@ -2580,8 +2580,9 @@ async function fetchCandlesWithKey(sym, keyIndex, retries=3){
 
 async function runWorker(keyIndex, tickers, minScore, isCatalyst, maxPrice, minVolSpike, onResult, onProgress){
   const DELAY = 8500; // 8.5s between calls = ~7 calls/min per key (safe under 8 limit)
-  // Stagger worker starts: each key waits keyIndex * 1200ms so all 7 don't fire at once
-  if(keyIndex > 0) await sleep(keyIndex * 1200);
+  // Stagger worker starts: spread 7 workers across first 17.5s to avoid burst
+  // Each worker waits keyIndex * 2500ms — max burst now ~3/min at start
+  if(keyIndex > 0) await sleep(keyIndex * 2500);
   for(let i=0; i<tickers.length; i++){
     if(stopReq) break;
     const sym = tickers[i];
@@ -2611,10 +2612,9 @@ async function runWorker(keyIndex, tickers, minScore, isCatalyst, maxPrice, minV
         if(result.score>=3) onResult(result, true);
         else onResult(result, false);
       } else {
-        // Fetch 4H data for enhanced scoring
-        let fourHData = null;
-        try{ fourHData = await fetch4HCandles(sym, keyIndex); }catch(e){}
-        result = scoreRecovery(sym, candles.closes, candles.highs, candles.lows, candles.volumes||[], fourHData);
+        // Recovery scanner: skip 4H to stay under 8 credits/min
+        // 4H adds 1 extra credit per ticker = doubles rate limit exposure
+        result = scoreRecovery(sym, candles.closes, candles.highs, candles.lows, candles.volumes||[], null);
         // Overlay live quote for pre-market price
         const lq = await fetchLiveQuote(sym);
         if(lq&&lq.price>0){ result.price=lq.price; result.change=lq.changePct||result.change; result.liveQuote=lq; result.session=getMarketSession(); }
