@@ -3685,6 +3685,10 @@ async function loadSaved(){
           document.getElementById("c-savedBanner").textContent =
             "☁️ "+(fbC.device||"cloud")+" · "+new Date(fbC.savedAt).toLocaleString()+" — "+cResults.length+" setups";
           document.getElementById("c-filterBar").style.display="flex";
+          // Fix: update stat bar from Firebase load
+          document.getElementById("c-scanned").textContent  = cResults.length;
+          document.getElementById("c-passed").textContent   = cResults.length;
+          document.getElementById("c-ignition").textContent = cResults.filter(r=>r.isIgniting).length;
           renderCatalyst();
         }
 
@@ -3705,6 +3709,10 @@ async function loadSaved(){
             cResults = fbC.data;
             localStorage.setItem("cs_catalyst", JSON.stringify(cResults));
             renderCatalyst();
+            // Fix: update stat bar from Firebase listener
+            document.getElementById("c-scanned").textContent  = cResults.length;
+            document.getElementById("c-passed").textContent   = cResults.length;
+            document.getElementById("c-ignition").textContent = cResults.filter(r=>r.isIgniting).length;
             document.getElementById("c-savedBanner").style.display="block";
             document.getElementById("c-savedBanner").textContent =
               "🔴 LIVE from "+fbC.device+" · "+new Date(fbC.savedAt).toLocaleTimeString();
@@ -4957,10 +4965,15 @@ function mergeJAXResults(){
 function clearJAX(){
   jaxResults=[];
   try{ localStorage.removeItem("cs_jax"); }catch(e){}
-  fbSafeSave("jax_scan", {data:"[]", savedAt:new Date().toISOString(), device:"cleared"});
+  // Fix: save empty array directly, not wrapped object — matches normal JAX save shape
+  fbSafeSave("jax_scan", {data:[], savedAt:new Date().toISOString(), device:"cleared"});
   document.getElementById("jax-savedBanner").style.display="none";
   document.getElementById("jax-filterBar").style.display="none";
   document.getElementById("jax-results").innerHTML='<div class="empty"><span class="empty-icon">🟢</span>Cleared.</div>';
+  // Reset stat bar
+  ["jax-scanned","jax-signals","jax-bull5","jax-deep","jax-utbuy"].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.textContent="0";
+  });
 }
 
 function renderJAX(){
@@ -5079,12 +5092,30 @@ function loadJAX(){
         const fb2 = document.getElementById("jax-filterBar");
         if(el){ el.style.display="block"; el.textContent="☁️ "+(fb.device||"cloud")+" · "+new Date(fb.savedAt).toLocaleString()+" — "+jaxResults.length+" signals"; }
         if(fb2) fb2.style.display="flex";
+        // Fix: update JAX stat bar from Firebase load
+        document.getElementById("jax-scanned").textContent = jaxResults.length;
+        document.getElementById("jax-signals").textContent = jaxResults.length;
+        document.getElementById("jax-bull5").textContent   = jaxResults.filter(r=>r.bullScore===5).length;
+        if(document.getElementById("jax-deep"))  document.getElementById("jax-deep").textContent  = jaxResults.filter(r=>r.isDeepRecovery).length;
+        if(document.getElementById("jax-utbuy")) document.getElementById("jax-utbuy").textContent = jaxResults.filter(r=>r.utBuy).length;
         renderJAX();
       }
       window.fbListen("jax_scan", (fb)=>{
         const jaxD = Array.isArray(fb?.data) ? fb.data :
                      Array.isArray(fb?.data?.data) ? fb.data.data :
                      (typeof fb?.data?.data === "string") ? JSON.parse(fb.data.data) : null;
+        // Fix: handle clear sync — if device="cleared" and empty array, clear this device too
+        if(fb?.device === "cleared" || (Array.isArray(jaxD) && jaxD.length === 0)){
+          jaxResults = [];
+          try{ localStorage.removeItem("cs_jax"); }catch(e){}
+          document.getElementById("jax-savedBanner").style.display="none";
+          document.getElementById("jax-filterBar").style.display="none";
+          document.getElementById("jax-results").innerHTML='<div class="empty"><span class="empty-icon">🟢</span>Cleared.</div>';
+          ["jax-scanned","jax-signals","jax-bull5","jax-deep","jax-utbuy"].forEach(id=>{
+            const el=document.getElementById(id); if(el) el.textContent="0";
+          });
+          return;
+        }
         if(jaxD && jaxD.length > 0){
           jaxResults = jaxD;
           localStorage.setItem("cs_jax", JSON.stringify(jaxResults));
@@ -5092,6 +5123,12 @@ function loadJAX(){
           const fb2 = document.getElementById("jax-filterBar");
           if(el){ el.style.display="block"; el.textContent="🔴 LIVE from "+(fb.device||"cloud")+" · "+new Date(fb.savedAt).toLocaleTimeString()+" — "+jaxResults.length+" signals"; }
           if(fb2) fb2.style.display="flex";
+          // Fix: update JAX stat bar from Firebase listener
+          document.getElementById("jax-scanned").textContent = jaxResults.length;
+          document.getElementById("jax-signals").textContent = jaxResults.length;
+          document.getElementById("jax-bull5").textContent   = jaxResults.filter(r=>r.bullScore===5).length;
+          if(document.getElementById("jax-deep"))  document.getElementById("jax-deep").textContent  = jaxResults.filter(r=>r.isDeepRecovery).length;
+          if(document.getElementById("jax-utbuy")) document.getElementById("jax-utbuy").textContent = jaxResults.filter(r=>r.utBuy).length;
           renderJAX();
         }
       });
