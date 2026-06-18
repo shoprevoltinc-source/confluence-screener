@@ -152,8 +152,8 @@ body::before{
 }
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--green);border-bottom-color:var(--green)}
-.tab-panel{display:none}
-.tab-panel.active{display:block}
+.tab-panel{display:none;overflow-x:hidden}
+.tab-panel.active{display:block;overflow-x:hidden}
 
 /* ═══════════════════════════════════════════════════════════
    WATCHLIST BAR
@@ -713,6 +713,18 @@ pre.dout{
   .controls{padding:8px 12px;gap:5px}
   /* Results — single column on mobile */
   .results{padding:6px 8px;grid-template-columns:1fr}
+  /* Confluence mobile fixes */
+  .conf-header{padding:8px 12px;gap:8px;flex-wrap:wrap}
+  .conf-title{font-size:14px;letter-spacing:1px}
+  .conf-sub{display:none}
+  .conf-stats{flex-wrap:wrap}
+  .conf-stat{flex:1;min-width:60px;padding:6px 8px}
+  .conf-stat-v{font-size:16px}
+  .conf-controls{padding:6px 10px;gap:5px}
+  .conf-filter{padding:5px 10px}
+  .conf-band{padding:8px 10px}
+  .conf-sym{font-size:20px}
+  .conf-price{font-size:13px}
   /* Header stats */
   .hstats{gap:12px}
   .hs-v{font-size:16px}
