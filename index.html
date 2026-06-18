@@ -3106,6 +3106,8 @@ async function startConfluenceScan(){
     // Save to Firebase
     fbSafeSave("confluence", confResults);
     try{ localStorage.setItem("cs_confluence", JSON.stringify(confResults)); }catch(e){}
+    // ← RENDER RESULTS (was missing — caused blank screen on Android)
+    renderConfluence();
   }
   logConf("✅ Complete · "+confResults.length+" hits from "+done+" stocks","ok");
 }
