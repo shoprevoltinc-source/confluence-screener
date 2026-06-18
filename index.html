@@ -3307,7 +3307,7 @@ function loadConfluence(){
     }
   }catch(e){ confResults=[]; }
 
-  document.addEventListener("firebaseReady", async()=>{
+  const _doConfluenceFirebase = async()=>{
     try{
       const fb = await window.fbLoad("confluence");
       if(fb && fb.data && fb.data.length > 0){
@@ -3332,7 +3332,11 @@ function loadConfluence(){
         }
       });
     }catch(e){}
-  });
+  };
+  // Fix: if Firebase already connected (Android Chrome fires event before listener registers)
+  // check window.firebaseReady flag first, fall back to event listener
+  if(window.firebaseReady){ _doConfluenceFirebase(); }
+  else { document.addEventListener("firebaseReady", _doConfluenceFirebase, {once:true}); }
 }
 
 
