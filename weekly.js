@@ -1104,6 +1104,134 @@ function toggleAccordion(bodyId, arrowId){
   if(arrow) arrow.classList.toggle('open', !isOpen);
 }
 
+// ── Tradier: fetch best option strike ─────────────────────────────────────────
+// Rules: first expiry ≥ 30 DTE, best ATM strike (delta ~0.45) + 1-strike OTM (delta ~0.30)
+async function fetchBestStrike(sym, price) {
+  try {
+    const hdrs = { "Authorization": `Bearer ${TR_KEY}`, "Accept": "application/json" };
+
+    // Step 1: get expirations
+    const expRes = await fetch(`${TR_BASE}/markets/options/expirations?symbol=${sym}&includeAllRoots=true&strikes=false`, { headers: hdrs });
+    const expData = await expRes.json();
+    const expirations = expData?.expirations?.date;
+    if (!expirations || !expirations.length) return null;
+
+    // Step 2: find first expiry >= 30 DTE
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    let targetExp = null;
+    for (const exp of expirations) {
+      const expDate = new Date(exp + "T00:00:00");
+      const dte = Math.round((expDate - today) / (1000 * 60 * 60 * 24));
+      if (dte >= 30) { targetExp = { date: exp, dte }; break; }
+    }
+    if (!targetExp) return null;
+
+    // Step 3: get chain for that expiry with greeks
+    const chainRes = await fetch(`${TR_BASE}/markets/options/chains?symbol=${sym}&expiration=${targetExp.date}&greeks=true`, { headers: hdrs });
+    const chainData = await chainRes.json();
+    const options = chainData?.options?.option;
+    if (!options || !options.length) return null;
+
+    // Step 4: filter calls only, find ATM (delta 0.40-0.55) and OTM (delta 0.25-0.40)
+    const calls = options.filter(o => o.option_type === "call" && o.greeks?.delta > 0);
+
+    // ATM: delta closest to 0.47
+    const atm = calls.reduce((best, o) => {
+      const d = Math.abs((o.greeks?.delta || 0) - 0.47);
+      const bd = Math.abs((best?.greeks?.delta || 0) - 0.47);
+      return d < bd ? o : best;
+    }, calls[0]);
+
+    // OTM: delta closest to 0.30
+    const otm = calls.reduce((best, o) => {
+      const d = Math.abs((o.greeks?.delta || 0) - 0.30);
+      const bd = Math.abs((best?.greeks?.delta || 0) - 0.30);
+      return d < bd ? o : best;
+    }, calls[0]);
+
+    return {
+      expiry:  targetExp.date,
+      dte:     targetExp.dte,
+      atm: atm ? {
+        strike:  atm.strike,
+        ask:     atm.ask,
+        bid:     atm.bid,
+        delta:   atm.greeks?.delta?.toFixed(2),
+        iv:      atm.greeks?.smv_vol ? (atm.greeks.smv_vol * 100).toFixed(0) + "%" : "—",
+        theta:   atm.greeks?.theta?.toFixed(2),
+        symbol:  atm.symbol,
+        cost1:   atm.ask ? (atm.ask * 100).toFixed(0) : "—"
+      } : null,
+      otm: otm && otm.strike !== atm?.strike ? {
+        strike:  otm.strike,
+        ask:     otm.ask,
+        bid:     otm.bid,
+        delta:   otm.greeks?.delta?.toFixed(2),
+        iv:      otm.greeks?.smv_vol ? (otm.greeks.smv_vol * 100).toFixed(0) + "%" : "—",
+        theta:   otm.greeks?.theta?.toFixed(2),
+        symbol:  otm.symbol,
+        cost1:   otm.ask ? (otm.ask * 100).toFixed(0) : "—"
+      } : null
+    };
+  } catch(e) {
+    console.warn("Tradier fetch failed:", e.message);
+    return null;
+  }
+}
+
+// Cache so we don't re-fetch on every render
+const wsStrikeCache = {};
+
+async function loadStrikeForCard(sym, price, cardEl) {
+  if (wsStrikeCache[sym]) {
+    renderStrikeRow(sym, wsStrikeCache[sym], cardEl);
+    return;
+  }
+  const strikeEl = cardEl.querySelector(`[data-strike="${sym}"]`);
+  if (strikeEl) strikeEl.innerHTML = `<span style="color:var(--muted2);font-size:9px;font-family:var(--mono)">⏳ Loading options...</span>`;
+  const result = await fetchBestStrike(sym, price);
+  wsStrikeCache[sym] = result;
+  renderStrikeRow(sym, result, cardEl);
+}
+
+function renderStrikeRow(sym, data, cardEl) {
+  const el = cardEl?.querySelector(`[data-strike="${sym}"]`);
+  if (!el) return;
+  if (!data || (!data.atm && !data.otm)) {
+    el.innerHTML = `<span style="color:var(--muted2);font-size:9px;font-family:var(--mono)">Options data unavailable</span>`;
+    return;
+  }
+
+  const fmt = o => !o ? "" : `
+    <div style="background:#0d1a25;border:1px solid rgba(100,181,246,0.2);border-radius:3px;padding:6px 10px;flex:1;min-width:140px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span style="font-size:10px;font-weight:700;color:#64B5F6;font-family:var(--mono)">$${o.strike}C</span>
+        <span style="font-size:9px;color:var(--muted2);font-family:var(--mono)">${data.dte}DTE</span>
+        <span style="font-size:9px;color:var(--muted2);font-family:var(--mono);margin-left:auto">δ ${o.delta}</span>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <span style="font-size:10px;font-family:var(--mono);color:var(--green2)">ask $${o.ask}</span>
+        <span style="font-size:10px;font-family:var(--mono);color:var(--muted2)">IV ${o.iv}</span>
+        <span style="font-size:10px;font-family:var(--mono);color:var(--muted2)">θ ${o.theta}/day</span>
+        <span style="font-size:10px;font-family:var(--mono);color:#FFB300">1 contract = $${o.cost1}</span>
+      </div>
+      <button onclick="event.stopPropagation();logToJournal({sym:'${sym}',price:${cardEl.dataset.price||0},score:'W',source:'weinstein',session:getMarketSession(),greenArrow:false,tradeType:'Weinstein',optionStrike:${o.strike},optionExpiry:'${data.expiry}',optionDTE:${data.dte},optionDelta:${o.delta},premiumPaid:${o.ask},contracts:1})"
+        style="margin-top:6px;width:100%;background:rgba(0,200,83,0.12);border:1px solid var(--green2);color:var(--green2);font-family:var(--mono);font-size:9px;padding:4px;cursor:pointer;border-radius:2px">
+        📓 LOG THIS STRIKE
+      </button>
+    </div>`;
+
+  el.innerHTML = `
+    <div style="font-size:8px;color:var(--muted2);font-family:var(--mono);margin-bottom:4px">
+      OPTIONS — ${data.expiry} (${data.dte} DTE)
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      ${data.atm ? `<div style="flex:1;min-width:140px"><div style="font-size:8px;color:var(--green2);font-family:var(--mono);margin-bottom:3px">ATM δ~0.47</div>${fmt(data.atm)}</div>` : ""}
+      ${data.otm ? `<div style="flex:1;min-width:140px"><div style="font-size:8px;color:#FFB300;font-family:var(--mono);margin-bottom:3px">OTM δ~0.30</div>${fmt(data.otm)}</div>` : ""}
+    </div>`;
+}
+
 // ── Weinstein Tab ─────────────────────────────────────────────────────────────
 let wsResults = [];
 let wsFilter  = "ALL"; // ALL | ENTER | WAIT | AVOID
@@ -1254,7 +1382,9 @@ function renderWeinstein(){
     const chgColor = chg>=0?"var(--green2)":"var(--red)";
 
     return `<div style="background:#0a1525;border:1px solid #1a3a4a;border-left:3px solid ${borderColor};border-radius:4px;padding:12px 14px;margin-bottom:10px;cursor:pointer"
-      onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
+      data-price="${s.price||0}"
+      onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')"
+      id="ws-card-${s.sym}">
 
       <!-- Header row -->
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -1315,13 +1445,19 @@ function renderWeinstein(){
           <div style="font-size:13px;font-weight:700;color:var(--green2);font-family:var(--mono)">$${parseFloat(s.entryZone||0).toFixed(2)}</div>
         </div>
         <div style="background:rgba(255,60,60,0.06);border:1px solid rgba(255,60,60,0.2);border-radius:3px;padding:5px 8px">
-          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">STOP</div>
+          <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">STOP${s.stopSource==="swing-low"?" 📊":""}</div>
           <div style="font-size:13px;font-weight:700;color:var(--red);font-family:var(--mono)">$${parseFloat(s.stop||0).toFixed(2)}</div>
         </div>
         <div style="background:rgba(100,181,246,0.06);border:1px solid rgba(100,181,246,0.2);border-radius:3px;padding:5px 8px">
           <div style="font-size:8px;color:var(--muted2);font-family:var(--mono)">TARGET</div>
           <div style="font-size:13px;font-weight:700;color:#64B5F6;font-family:var(--mono)">$${parseFloat(s.target||0).toFixed(2)}</div>
         </div>
+      </div>
+      <!-- Options chain row — loads async via Tradier -->
+      <div data-strike="${s.sym}"
+        style="background:rgba(100,181,246,0.04);border:1px solid rgba(100,181,246,0.15);border-radius:3px;padding:8px 10px;margin-bottom:8px;min-height:32px"
+        onclick="event.stopPropagation()">
+        <span style="color:var(--muted2);font-size:9px;font-family:var(--mono)">⏳ Loading options...</span>
       </div>` : ""}
 
       ${isWait && s.trigger ? `
@@ -1336,6 +1472,14 @@ function renderWeinstein(){
 
     </div>`;
   }).join("");
+
+  // After render — async load Tradier strikes for all ENTER cards
+  setTimeout(() => {
+    filtered.filter(s => s.action === "ENTER" && s.entryZone).forEach(s => {
+      const cardEl = document.getElementById(`ws-card-${s.sym}`);
+      if (cardEl) loadStrikeForCard(s.sym, s.price || 0, cardEl);
+    });
+  }, 50);
 }
 
 // ── Weinstein ticker search ───────────────────────────────────────────────────
