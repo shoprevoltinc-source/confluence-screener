@@ -141,6 +141,22 @@ function logToJournal(entry){
   if(existing){
     const oldPrice = parseFloat(existing.price).toFixed(2);
     const newPrice = parseFloat(entry.price).toFixed(2);
+    // If coming from LOG THIS STRIKE — update options fields even if ticker already logged
+    if(entry.optionStrike){
+      existing._isOptions    = true;
+      existing.strike        = entry.optionStrike;
+      existing.expiry        = entry.optionExpiry || "";
+      existing.dte           = entry.optionDTE    || null;
+      existing.premiumPaid   = entry.premiumPaid  || "";
+      existing.contracts     = entry.contracts    || 1;
+      existing.optionType    = "call";
+      existing.optionContract= `${entry.sym} $${entry.optionStrike}C ${entry.optionExpiry||""}`;
+      existing.totalCost     = entry.premiumPaid && entry.contracts
+        ? (parseFloat(entry.premiumPaid)*(parseInt(entry.contracts)||1)*100).toFixed(2) : "";
+      saveJournal(); renderJournal();
+      showToast(`📓 ${entry.sym} $${entry.optionStrike}C updated in journal`);
+      return;
+    }
     if(oldPrice !== newPrice){
       existing.price = entry.price;
       existing.score = entry.score;
@@ -153,11 +169,17 @@ function logToJournal(entry){
     return;
   }
 
+  // Build option contract string if strike data provided
+  const hasOption   = !!entry.optionStrike;
+  const optContract = hasOption ? `${entry.sym} $${entry.optionStrike}C ${entry.optionExpiry||""}` : "";
+  const totalCost   = hasOption && entry.premiumPaid && entry.contracts
+    ? (parseFloat(entry.premiumPaid)*(parseInt(entry.contracts)||1)*100).toFixed(2) : "";
+
   const id = Date.now();
   journalEntries.unshift({
     id, date: today,
     sym:          entry.sym,
-    price:        entry.price,        // underlying price at signal
+    price:        entry.price,
     score:        entry.score || "?",
     source:       entry.source || "manual",
     session:      entry.session || getMarketSession(),
@@ -168,26 +190,30 @@ function logToJournal(entry){
     target1:      entry.target1 || "",
     target2:      entry.target2 || "",
     notes:        entry.notes || "",
-    // ── Options fields (filled in journal after logging) ──
-    _isOptions:   false,              // flipped true when option details added
-    optionContract: "",               // e.g. "PENN $19C 7/18"
-    optionType:   "",                 // "call" | "put"
-    strike:       "",                 // strike price
-    expiry:       "",                 // YYYY-MM-DD
-    dte:          null,               // days to expiry at entry
-    premiumPaid:  "",                 // cost per contract e.g. 1.50
-    premiumSold:  "",                 // exit premium e.g. 2.25
-    contracts:    1,                  // number of contracts
-    totalCost:    "",                 // premiumPaid * contracts * 100
-    optionResult: "",                 // % gain/loss on premium
-    // ── Standard fields ──
-    result:       "",
-    status:       "tracking",
-    loggedAt:     new Date().toISOString()
+    // ── Options fields — auto-filled from LOG THIS STRIKE ──
+    _isOptions:     hasOption,
+    optionContract: optContract,
+    optionType:     hasOption ? "call" : "",
+    strike:         entry.optionStrike  || "",
+    expiry:         entry.optionExpiry  || "",
+    dte:            entry.optionDTE     || null,
+    premiumPaid:    entry.premiumPaid   || "",
+    premiumSold:    "",
+    contracts:      entry.contracts     || 1,
+    totalCost:      totalCost,
+    optionResult:   "",
+    result:         "",
+    status:         "tracking",
+    loggedAt:       new Date().toISOString()
   });
   saveJournal(); renderJournal();
-  showToast("📓 "+entry.sym+" logged · tap to add option details");
-  log("📓 Logged "+entry.sym+" · underlying $"+parseFloat(entry.price).toFixed(2)+" · add option details in journal","ok");
+  if(hasOption){
+    showToast(`📓 ${entry.sym} $${entry.optionStrike}C logged · ${entry.optionDTE}DTE · $${totalCost} cost`);
+    log(`📓 Logged ${entry.sym} $${entry.optionStrike}C · ${entry.optionDTE}DTE · cost $${totalCost}`,"ok");
+  } else {
+    showToast("📓 "+entry.sym+" logged · tap to add option details");
+    log("📓 Logged "+entry.sym+" · underlying $"+parseFloat(entry.price).toFixed(2)+" · add option details in journal","ok");
+  }
 }
 
 // ── Add manual entry from journal form ───────────────────────────────────────
