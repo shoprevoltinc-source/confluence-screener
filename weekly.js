@@ -343,7 +343,7 @@ async function startWeeklyMonitor(){
   }, 500);
 
   async function runWMWorker(keyIdx, tickerChunk){
-    const DELAY = 15000; // 15s = 4 stocks/min per key × 3 calls = 12 credits/min — safe under per-key limit
+    const DELAY = 300; // Grow plan — 377 credits/min, no throttle needed
     for(let i=0; i<tickerChunk.length; i++){
       if(wmStopReq) break;
       const sym = tickerChunk[i];
@@ -678,7 +678,7 @@ async function runDailyTrigger(){
   const total    = tickers.length;
   let done       = 0;
   const fired    = []; // stocks where green arrow fired today
-  const DELAY    = 8500;
+  const DELAY    = 300; // Grow plan — 377 credits/min
   const nKeys    = TD_KEYS.length;
   const chunks   = splitInterleaved(tickers, nKeys);
 
