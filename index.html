@@ -731,7 +731,200 @@ pre.dout{
 }
 
 /* ═══════════════════════════════════════════════════════════
-   CONFLUENCE TAB
+   OPTIONS DESK — Floating panel
+═══════════════════════════════════════════════════════════ */
+#options-desk-btn{
+  margin-left:auto;
+  background:linear-gradient(135deg,#1a3a4a,#0d2535);
+  border:1px solid #00b0ff;
+  color:#00b0ff;
+  font-family:var(--mono);
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.1em;
+  padding:5px 12px;
+  cursor:pointer;
+  border-radius:3px;
+  white-space:nowrap;
+  transition:background .15s;
+}
+#options-desk-btn:hover{ background:rgba(0,176,255,0.15); }
+
+#options-desk-overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.5);
+  z-index:999;
+}
+#options-desk-panel{
+  position:fixed;
+  top:0;
+  right:0;
+  width:360px;
+  max-width:100vw;
+  height:100vh;
+  background:var(--bg2);
+  border-left:1px solid #1a2d45;
+  z-index:1000;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  transform:translateX(100%);
+  transition:transform .25s ease;
+}
+#options-desk-panel.open{ transform:translateX(0); }
+
+#od-header{
+  padding:14px 16px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background:var(--bg3);
+}
+#od-title{
+  font-family:var(--mono);
+  font-size:12px;
+  font-weight:700;
+  color:#00b0ff;
+  letter-spacing:.12em;
+  flex:1;
+}
+#od-close{
+  background:none;
+  border:none;
+  color:var(--muted2);
+  font-size:18px;
+  cursor:pointer;
+  padding:0 4px;
+  line-height:1;
+}
+#od-close:hover{ color:var(--text); }
+
+#od-search-row{
+  padding:12px 16px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  gap:8px;
+}
+#od-input{
+  flex:1;
+  background:var(--bg3);
+  border:1px solid var(--border2);
+  color:var(--text);
+  font-family:var(--mono);
+  font-size:13px;
+  padding:8px 12px;
+  border-radius:3px;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  outline:none;
+}
+#od-input:focus{ border-color:#00b0ff; }
+#od-search-btn{
+  background:#00b0ff;
+  border:none;
+  color:#000;
+  font-family:var(--mono);
+  font-size:10px;
+  font-weight:700;
+  padding:8px 14px;
+  cursor:pointer;
+  border-radius:3px;
+  letter-spacing:.05em;
+}
+#od-search-btn:hover{ background:#33bfff; }
+
+#od-body{
+  flex:1;
+  overflow-y:auto;
+  padding:14px 16px;
+}
+.od-price-row{
+  display:flex;
+  align-items:baseline;
+  gap:8px;
+  margin-bottom:12px;
+}
+.od-sym{ font-size:20px;font-weight:700;color:var(--text);font-family:var(--mono); }
+.od-price{ font-size:18px;font-weight:700;color:var(--green2);font-family:var(--mono); }
+.od-chg{ font-size:12px;font-family:var(--mono); }
+.od-levels{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:6px;
+  margin-bottom:14px;
+}
+.od-level{
+  border-radius:3px;
+  padding:7px 10px;
+  text-align:center;
+}
+.od-level-lbl{ font-size:8px;color:var(--muted2);font-family:var(--mono);margin-bottom:3px;letter-spacing:.08em; }
+.od-level-val{ font-size:13px;font-weight:700;font-family:var(--mono); }
+.od-divider{
+  border:none;
+  border-top:1px solid var(--border);
+  margin:12px 0;
+}
+.od-exp-label{
+  font-size:9px;
+  color:var(--muted2);
+  font-family:var(--mono);
+  letter-spacing:.1em;
+  margin-bottom:10px;
+}
+.od-strike-card{
+  background:var(--bg3);
+  border:1px solid var(--border2);
+  border-radius:4px;
+  padding:10px 12px;
+  margin-bottom:8px;
+}
+.od-strike-type{
+  font-size:8px;
+  letter-spacing:.1em;
+  font-family:var(--mono);
+  font-weight:700;
+  margin-bottom:6px;
+}
+.od-strike-main{
+  display:flex;
+  align-items:baseline;
+  gap:8px;
+  margin-bottom:6px;
+}
+.od-strike-sym{ font-size:16px;font-weight:700;color:#00b0ff;font-family:var(--mono); }
+.od-strike-dte{ font-size:10px;color:var(--muted2);font-family:var(--mono); }
+.od-strike-delta{ font-size:10px;color:var(--text2);font-family:var(--mono);margin-left:auto; }
+.od-strike-stats{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:8px;
+}
+.od-stat{ font-size:10px;font-family:var(--mono); }
+.od-cost{ color:#FFB300;font-weight:700; }
+.od-log-btn{
+  width:100%;
+  background:rgba(0,200,83,0.1);
+  border:1px solid var(--green2);
+  color:var(--green2);
+  font-family:var(--mono);
+  font-size:9px;
+  font-weight:700;
+  padding:6px;
+  cursor:pointer;
+  border-radius:2px;
+  letter-spacing:.05em;
+}
+.od-log-btn:hover{ background:rgba(0,200,83,0.2); }
+#od-loading{ text-align:center;color:var(--muted2);font-family:var(--mono);font-size:11px;padding:30px 0; }
+#od-error{ color:var(--red);font-family:var(--mono);font-size:11px;padding:20px 0;text-align:center; }
+@media(max-width:768px){
+  #options-desk-panel{ width:100vw; }
+}
 ═══════════════════════════════════════════════════════════ */
 .conf-header{
   display:flex;align-items:center;gap:12px;
@@ -1328,6 +1521,27 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <div class="tab" id="tab-backtest" onclick="switchTab('backtest')">🔬 Backtest</div>
   <div class="tab" id="tab-agent" onclick="switchTab('agent')" style="color:var(--green2);font-weight:700">🤖 Agent</div>
   <div class="tab" id="tab-weinstein" onclick="switchTab('weinstein')" style="color:#FFB300;font-weight:700">📊 Weinstein</div>
+  <button id="options-desk-btn" onclick="openOptionsDesk()">🎯 OPTIONS DESK</button>
+</div>
+
+<!-- ═══ OPTIONS DESK — Floating Panel ═══ -->
+<div id="options-desk-overlay" onclick="closeOptionsDesk()"></div>
+<div id="options-desk-panel">
+  <div id="od-header">
+    <span id="od-title">🎯 OPTIONS DESK</span>
+    <button id="od-close" onclick="closeOptionsDesk()">✕</button>
+  </div>
+  <div id="od-search-row">
+    <input id="od-input" type="text" placeholder="Enter ticker... WOLF" maxlength="6"
+      onkeydown="if(event.key==='Enter') odSearch()"
+      oninput="this.value=this.value.toUpperCase()">
+    <button id="od-search-btn" onclick="odSearch()">SEARCH</button>
+  </div>
+  <div id="od-body">
+    <div id="od-loading" style="display:none">⏳ Loading options chain...</div>
+    <div id="od-error" style="display:none"></div>
+    <div id="od-results"></div>
+  </div>
 </div>
 
 <!-- ═══ WATCHLIST BAR ═══ -->
@@ -5409,6 +5623,156 @@ window.addEventListener("load", function(){
   if(typeof _initApp === "function") _initApp();
   else console.error("_initApp still not defined after load — check script errors");
 });
-</script>
+
+// ── OPTIONS DESK ──────────────────────────────────────────────────────────────
+function openOptionsDesk(){
+  document.getElementById("options-desk-overlay").style.display = "block";
+  document.getElementById("options-desk-panel").classList.add("open");
+  setTimeout(()=>document.getElementById("od-input").focus(), 300);
+}
+
+function closeOptionsDesk(){
+  document.getElementById("options-desk-overlay").style.display = "none";
+  document.getElementById("options-desk-panel").classList.remove("open");
+}
+
+// Close on Escape key
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeOptionsDesk(); });
+
+async function odSearch(){
+  const sym = document.getElementById("od-input").value.trim().toUpperCase();
+  if(!sym) return;
+
+  const loading = document.getElementById("od-loading");
+  const error   = document.getElementById("od-error");
+  const results = document.getElementById("od-results");
+
+  loading.style.display = "block";
+  error.style.display   = "none";
+  results.innerHTML     = "";
+
+  try{
+    // Step 1: get live quote from TwelveData
+    const qRes  = await fetch(`https://api.twelvedata.com/quote?symbol=${sym}&apikey=${TD_KEYS[0]}`);
+    const qData = await qRes.json();
+    const price = parseFloat(qData.close || qData.price || 0);
+    const chg   = parseFloat(qData.percent_change || 0);
+    if(!price){ throw new Error(`${sym} not found`); }
+
+    // Step 2: get options chain from Tradier
+    const hdrs = { "Authorization":`Bearer ${TR_KEY}`, "Accept":"application/json" };
+
+    // Get expirations
+    const expRes  = await fetch(`${TR_BASE}/markets/options/expirations?symbol=${sym}&includeAllRoots=true&strikes=false`, {headers:hdrs});
+    const expData = await expRes.json();
+    const expirations = expData?.expirations?.date;
+    if(!expirations?.length){ throw new Error(`No options found for ${sym}`); }
+
+    // Find first expiry >= 30 DTE
+    const today = new Date(); today.setHours(0,0,0,0);
+    let targetExp = null;
+    for(const exp of expirations){
+      const expDate = new Date(exp+"T00:00:00");
+      const dte = Math.round((expDate-today)/(1000*60*60*24));
+      if(dte >= 30){ targetExp={date:exp,dte}; break; }
+    }
+    if(!targetExp){ throw new Error("No expiry ≥ 30 DTE found"); }
+
+    // Get chain with greeks
+    const chainRes  = await fetch(`${TR_BASE}/markets/options/chains?symbol=${sym}&expiration=${targetExp.date}&greeks=true`, {headers:hdrs});
+    const chainData = await chainRes.json();
+    const options   = chainData?.options?.option;
+    if(!options?.length){ throw new Error("Empty options chain"); }
+
+    // Filter calls
+    const calls = options.filter(o=>o.option_type==="call" && o.greeks?.delta > 0);
+
+    // ATM: delta ~0.47
+    const atm = calls.reduce((best,o)=>{
+      return Math.abs((o.greeks?.delta||0)-0.47) < Math.abs((best?.greeks?.delta||0)-0.47) ? o : best;
+    }, calls[0]);
+
+    // OTM: delta ~0.30
+    const otm = calls.reduce((best,o)=>{
+      return Math.abs((o.greeks?.delta||0)-0.30) < Math.abs((best?.greeks?.delta||0)-0.30) ? o : best;
+    }, calls[0]);
+
+    // Stop: 10-day swing low capped at 8%
+    const stop   = parseFloat((price * 0.92).toFixed(2)); // 8% cap default
+    const target = parseFloat((price * 1.15).toFixed(2));
+    const chgClr = chg >= 0 ? "var(--green2)" : "var(--red)";
+    const chgStr = (chg >= 0 ? "+" : "") + chg.toFixed(2) + "%";
+
+    const oiClr = oi => oi >= 1000 ? "var(--green2)" : oi >= 500 ? "#FFB300" : "var(--red)";
+    const oiLbl = oi => oi >= 1000 ? "✅ liquid" : oi >= 500 ? "⚠️ moderate" : "🔴 thin";
+    const atmOI = atm?.open_interest || 0;
+    const liqBanner = atmOI < 500
+      ? `<div style="background:rgba(255,23,68,0.08);border:1px solid rgba(255,23,68,0.3);border-radius:3px;padding:8px 10px;margin-bottom:12px;font-family:var(--mono);font-size:10px;color:var(--red)">⚠️ LOW LIQUIDITY — ATM OI ${atmOI.toLocaleString()}<br>Wide spreads likely · Consider stock entry or different expiry</div>`
+      : atmOI < 1000
+      ? `<div style="background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);border-radius:3px;padding:8px 10px;margin-bottom:12px;font-family:var(--mono);font-size:10px;color:#FFD600">⚠️ MODERATE LIQUIDITY — ATM OI ${atmOI.toLocaleString()}<br>Verify fill before entering</div>`
+      : `<div style="background:rgba(0,200,83,0.06);border:1px solid rgba(0,200,83,0.2);border-radius:3px;padding:8px 10px;margin-bottom:12px;font-family:var(--mono);font-size:10px;color:var(--green2)">✅ GOOD LIQUIDITY — ATM OI ${atmOI.toLocaleString()}</div>`;
+
+    const fmtStrike = o => !o ? "" : `
+      ${(o.open_interest||0) < 500 ? `
+      <div style="background:rgba(255,109,0,0.1);border:1px solid var(--orange);border-radius:3px;padding:6px 10px;margin-bottom:6px;font-family:var(--mono);font-size:9px;color:var(--orange)">
+        ⚠️ LOW LIQUIDITY — OI ${(o.open_interest||0).toLocaleString()} · Wide spreads likely · Consider stock entry or different expiry
+      </div>` : ""}
+      <div class="od-strike-card">
+        <div class="od-strike-type" style="color:${o===atm?"var(--green2)":"#FFB300"}">
+          ${o===atm?"ATM — δ ~0.47":"OTM — δ ~0.30"}
+        </div>
+        <div class="od-strike-main">
+          <span class="od-strike-sym">$${o.strike}C</span>
+          <span class="od-strike-dte">${targetExp.dte} DTE</span>
+          <span class="od-strike-delta">δ ${(o.greeks?.delta||0).toFixed(2)}</span>
+        </div>
+        <div class="od-strike-stats">
+          <span class="od-stat" style="color:var(--green2)">ask $${o.ask}</span>
+          <span class="od-stat" style="color:var(--muted2)">IV ${o.greeks?.smv_vol?(o.greeks.smv_vol*100).toFixed(0)+"%":"—"}</span>
+          <span class="od-stat" style="color:var(--muted2)">θ ${(o.greeks?.theta||0).toFixed(2)}/day</span>
+          <span class="od-stat" style="color:${oiClr(o.open_interest||0)}">OI ${(o.open_interest||0).toLocaleString()} — ${oiLbl(o.open_interest||0)}</span>
+          <span class="od-stat od-cost">1 contract = $${o.ask?(o.ask*100).toFixed(0):"—"}</span>
+        </div>
+        <button class="od-log-btn" onclick="logToJournal({
+          sym:'${sym}',price:${price},score:'OD',source:'options-desk',
+          session:getMarketSession(),greenArrow:false,tradeType:'Options Desk',
+          optionStrike:${o.strike},optionExpiry:'${targetExp.date}',
+          optionDTE:${targetExp.dte},optionDelta:${(o.greeks?.delta||0).toFixed(2)},
+          premiumPaid:${o.ask||0},contracts:1
+        })">📓 LOG THIS STRIKE — $${o.strike}C</button>
+      </div>`;
+
+    loading.style.display = "none";
+    results.innerHTML = `
+      <div class="od-price-row">
+        <span class="od-sym">${sym}</span>
+        <span class="od-price">$${price.toFixed(2)}</span>
+        <span class="od-chg" style="color:${chgClr}">${chgStr}</span>
+      </div>
+      <div class="od-levels">
+        <div class="od-level" style="background:rgba(0,200,83,0.06);border:1px solid rgba(0,200,83,0.2)">
+          <div class="od-level-lbl">ENTRY</div>
+          <div class="od-level-val" style="color:var(--green2)">$${price.toFixed(2)}</div>
+        </div>
+        <div class="od-level" style="background:rgba(255,23,68,0.06);border:1px solid rgba(255,23,68,0.2)">
+          <div class="od-level-lbl">STOP 8%</div>
+          <div class="od-level-val" style="color:var(--red)">$${stop}</div>
+        </div>
+        <div class="od-level" style="background:rgba(0,176,255,0.06);border:1px solid rgba(0,176,255,0.2)">
+          <div class="od-level-lbl">TARGET 15%</div>
+          <div class="od-level-val" style="color:#00b0ff">$${target}</div>
+        </div>
+      </div>
+      <div class="od-exp-label">OPTIONS CHAIN — ${targetExp.date} (${targetExp.dte} DTE)</div>
+      ${fmtStrike(atm)}
+      ${otm && otm.strike !== atm?.strike ? fmtStrike(otm) : ""}
+    `;
+
+  }catch(e){
+    loading.style.display = "none";
+    error.style.display   = "block";
+    error.textContent     = "❌ " + e.message;
+  }
+}</script>
 </body>
 </html>
