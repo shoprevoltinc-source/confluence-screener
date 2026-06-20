@@ -1161,7 +1161,8 @@ async function fetchBestStrike(sym, price) {
         iv:      atm.greeks?.smv_vol ? (atm.greeks.smv_vol * 100).toFixed(0) + "%" : "—",
         theta:   atm.greeks?.theta?.toFixed(2),
         symbol:  atm.symbol,
-        cost1:   atm.ask ? (atm.ask * 100).toFixed(0) : "—"
+        cost1:   atm.ask ? (atm.ask * 100).toFixed(0) : "—",
+        oi:      atm.open_interest || 0
       } : null,
       otm: otm && otm.strike !== atm?.strike ? {
         strike:  otm.strike,
@@ -1171,7 +1172,8 @@ async function fetchBestStrike(sym, price) {
         iv:      otm.greeks?.smv_vol ? (otm.greeks.smv_vol * 100).toFixed(0) + "%" : "—",
         theta:   otm.greeks?.theta?.toFixed(2),
         symbol:  otm.symbol,
-        cost1:   otm.ask ? (otm.ask * 100).toFixed(0) : "—"
+        cost1:   otm.ask ? (otm.ask * 100).toFixed(0) : "—",
+        oi:      otm.open_interest || 0
       } : null
     };
   } catch(e) {
@@ -1203,6 +1205,19 @@ function renderStrikeRow(sym, data, cardEl) {
     return;
   }
 
+  const oiClr = oi => oi >= 1000 ? "var(--green2)" : oi >= 500 ? "#FFB300" : "var(--red)";
+  const oiLbl = oi => oi >= 1000 ? "✅" : oi >= 500 ? "⚠️" : "🔴";
+
+  // Low liquidity warning banner
+  const atmOI = data.atm?.oi || 0;
+  const liquidityWarning = atmOI < 500 ? `
+    <div style="background:rgba(255,23,68,0.08);border:1px solid rgba(255,23,68,0.3);border-radius:3px;padding:6px 10px;margin-bottom:8px;font-family:var(--mono);font-size:9px;color:var(--red)">
+      ⚠️ LOW LIQUIDITY — ATM OI ${atmOI.toLocaleString()} · Wide spreads likely · Consider stock entry or different expiry
+    </div>` : atmOI < 1000 ? `
+    <div style="background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);border-radius:3px;padding:6px 10px;margin-bottom:8px;font-family:var(--mono);font-size:9px;color:#FFD600">
+      ⚠️ MODERATE LIQUIDITY — ATM OI ${atmOI.toLocaleString()} · Verify fill before entering
+    </div>` : "";
+
   const fmt = o => !o ? "" : `
     <div style="background:#0d1a25;border:1px solid rgba(100,181,246,0.2);border-radius:3px;padding:6px 10px;flex:1;min-width:140px">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
@@ -1210,19 +1225,23 @@ function renderStrikeRow(sym, data, cardEl) {
         <span style="font-size:9px;color:var(--muted2);font-family:var(--mono)">${data.dte}DTE</span>
         <span style="font-size:9px;color:var(--muted2);font-family:var(--mono);margin-left:auto">δ ${o.delta}</span>
       </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">
         <span style="font-size:10px;font-family:var(--mono);color:var(--green2)">ask $${o.ask}</span>
         <span style="font-size:10px;font-family:var(--mono);color:var(--muted2)">IV ${o.iv}</span>
         <span style="font-size:10px;font-family:var(--mono);color:var(--muted2)">θ ${o.theta}/day</span>
         <span style="font-size:10px;font-family:var(--mono);color:#FFB300">1 contract = $${o.cost1}</span>
       </div>
+      <div style="font-size:9px;font-family:var(--mono);color:${oiClr(o.oi)};margin-bottom:6px">
+        ${oiLbl(o.oi)} OI ${(o.oi||0).toLocaleString()}${o.oi >= 1000 ? " — liquid" : o.oi >= 500 ? " — moderate" : " — thin"}
+      </div>
       <button onclick="event.stopPropagation();logToJournal({sym:'${sym}',price:${cardEl.dataset.price||0},score:'W',source:'weinstein',session:getMarketSession(),greenArrow:false,tradeType:'Weinstein',optionStrike:${o.strike},optionExpiry:'${data.expiry}',optionDTE:${data.dte},optionDelta:${o.delta},premiumPaid:${o.ask},contracts:1})"
-        style="margin-top:6px;width:100%;background:rgba(0,200,83,0.12);border:1px solid var(--green2);color:var(--green2);font-family:var(--mono);font-size:9px;padding:4px;cursor:pointer;border-radius:2px">
+        style="width:100%;background:rgba(0,200,83,0.12);border:1px solid var(--green2);color:var(--green2);font-family:var(--mono);font-size:9px;padding:4px;cursor:pointer;border-radius:2px">
         📓 LOG THIS STRIKE
       </button>
     </div>`;
 
   el.innerHTML = `
+    ${liquidityWarning}
     <div style="font-size:8px;color:var(--muted2);font-family:var(--mono);margin-bottom:4px">
       OPTIONS — ${data.expiry} (${data.dte} DTE)
     </div>
