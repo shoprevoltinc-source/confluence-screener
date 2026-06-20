@@ -65,7 +65,7 @@ function fbWrite(path, body) { return fbRequest("PUT",  path, body); }
 // ── TwelveData: fetch last 10 daily candles → return swing low ────────────────
 // Only called for ENTER tickers — 1 credit per ticker
 function fetchSwingLow(sym) {
-  const key = process.env.TD_KEYS ? process.env.TD_KEYS.split(",")[0].trim() : "";
+  const key = process.env.TD_KEYS ? process.env.TD_KEYS.split(",")[0].trim() : "c05d8242562f496e8709d5c9e0ce4109";
   if (!key) return Promise.resolve(null);
   return new Promise((resolve) => {
     const path = `/v1/time_series?symbol=${sym}&interval=1day&outputsize=15&apikey=${key}`;
