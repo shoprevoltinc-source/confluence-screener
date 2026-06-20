@@ -2897,7 +2897,7 @@ async function startConfluenceScan(){
   }, 500);
 
   async function runConfWorker(keyIdx, tickerChunk){
-    const DELAY = 8500;
+    const DELAY = 300; // Grow plan — 377 credits/min
     for(let i=0; i<tickerChunk.length; i++){
       if(confStopReq) break;
       const sym = tickerChunk[i];
@@ -3384,7 +3384,7 @@ async function runBacktest(){
   let done     = 0;
 
   async function runBTWorker(keyIdx, tickerChunk){
-    const DELAY = 8500;
+    const DELAY = 300; // Grow plan — 377 credits/min
     for(let i=0; i<tickerChunk.length; i++){
       if(btStopReq) break;
       const sym = tickerChunk[i];
@@ -4786,7 +4786,7 @@ async function startJAXScan(){
 
   // Custom worker for JAX — no earnings fetch needed, just candles + JAX
   async function runJAXWorker(keyIdx, tickers){
-    const DELAY = 8500;
+    const DELAY = 300; // Grow plan — 377 credits/min
     for(let i=0; i<tickers.length; i++){
       if(stopReq) break;
       const sym = tickers[i];
@@ -4905,7 +4905,7 @@ async function startJAXDeepScan(tickers, minBull){
   let done     = 0;
 
   async function runDeepWorker(keyIdx, tickers){
-    const DELAY = 8500;
+    const DELAY = 300; // Grow plan — 377 credits/min
     for(let i=0; i<tickers.length; i++){
       if(stopReq) break;
       const sym = tickers[i];
