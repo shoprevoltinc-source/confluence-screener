@@ -11,13 +11,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script>
 const TD_KEYS = [
-  "fceed7ef4b7847d38e1ecd0bddcad5eb",
-  "c05d8242562f496e8709d5c9e0ce4109",
-  "9802166cf9694f42a64738bd776c22b9",
-  "5a13fcf43f1347c6b2b4459a0076ba51",
-  "257f261bbb394e8bad0c871eb5d9218d",
-  "2a6a1433dd864417a504d1913c2bfc5d",
-  "250893f6cebe4fddb505c2c50e99b8a7"
+  "c05d8242562f496e8709d5c9e0ce4109"  // TwelveData Grow plan — 377 credits/min, no daily limit
 ].filter(Boolean);
 const FH_KEY    = "d819lthr01qler4hgk4gd819lthr01qler4hgk50";
 const TR_KEY    = "vPPiI8FgAYWgSEI2X1jKWtA8oSrT"; // Tradier live
@@ -2591,10 +2585,7 @@ async function fetchCandlesWithKey(sym, keyIndex, retries=3){
 }
 
 async function runWorker(keyIndex, tickers, minScore, isCatalyst, maxPrice, minVolSpike, onResult, onProgress){
-  const DELAY = 8500; // 8.5s between calls = ~7 calls/min per key (safe under 8 limit)
-  // Stagger worker starts: spread 7 workers across first 17.5s to avoid burst
-  // Each worker waits keyIndex * 2500ms — max burst now ~3/min at start
-  if(keyIndex > 0) await sleep(keyIndex * 2500);
+  const DELAY = 300; // 300ms between calls — well under 377 credits/min limit
   for(let i=0; i<tickers.length; i++){
     if(stopReq) break;
     const sym = tickers[i];
