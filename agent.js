@@ -661,309 +661,85 @@ ${jnlCtx}${calibrationCtx}`;
   btn.disabled = false;
 }
 
-// ══════════════════════════════════════════════════════════
-// JOB 2: ENTRY CONFIRMATION
-// ══════════════════════════════════════════════════════════
-async function confirmEntry(){
-  const sym   = (document.getElementById("agent-entry-sym")?.value||"").trim().toUpperCase();
-  const price = parseFloat(document.getElementById("agent-entry-price")?.value)||0;
-  const body  = document.getElementById("agent-entry-body");
 
-  if(!sym){ body.innerHTML='<div class="agent-output" style="color:var(--red)">Enter a ticker symbol</div>'; return; }
-
-  body.innerHTML = '<div class="agent-output loading">⏳ Analyzing '+sym+'...</div>';
+// ══════════════════════════════════════════════════════════
+// MARKET MOVERS — Pre-market gainers/losers via TwelveData
+// ══════════════════════════════════════════════════════════
+async function runMarketMovers(){
+  const btn  = document.getElementById("agent-movers-btn");
+  const body = document.getElementById("agent-movers-body");
+  if(btn) btn.disabled = true;
+  if(body) body.innerHTML = '<div class="agent-output loading">⏳ Fetching market movers...</div>';
 
   try{
-    const data    = await gatherAllData();
-    const account = parseFloat(document.getElementById("agent-account").value)||10000;
-    const risk    = parseFloat(document.getElementById("agent-risk").value)||1;
-    const riskAmt = account * (risk/100);
+    // Fetch top gainers and losers from TwelveData
+    const key = TD_KEYS[0];
+    const [gainRes, loseRes] = await Promise.all([
+      fetch(`https://api.twelvedata.com/market_movers/stocks?direction=gainers&outputsize=10&apikey=${key}`),
+      fetch(`https://api.twelvedata.com/market_movers/stocks?direction=losers&outputsize=10&apikey=${key}`)
+    ]);
 
-    // Find sym in all scanners
-    const inWeekly    = (data.weekly_monitor||[]).find(r=>r.sym===sym);
-    const inJAX       = (data.jax_scan||[]).find(r=>r.sym===sym&&r.greenArrow);
-    const inConf      = (data.confluence||[]).find(r=>r.sym===sym);
-    const inPulse     = (data.pulse||[]).find(r=>r.sym===sym);
-    const inRecovery  = (data.recovery||[]).find(r=>r.sym===sym);
-    const inCatalyst  = (data.catalyst||[]).find(r=>r.sym===sym);
+    const gainData = await gainRes.json();
+    const loseData = await loseRes.json();
 
-    // Journal history for this symbol
-    const journal     = Array.isArray(data.journal)?data.journal:[];
-    const symHistory  = journal.filter(e=>e.sym===sym);
-    const openPos     = journal.find(e=>e.sym===sym&&e.status==="open");
-    const srcStats    = {};
-    journal.forEach(e=>{
-      const s=e.source||"manual";
-      if(!srcStats[s]) srcStats[s]={w:0,l:0};
-      if(e.status==="win") srcStats[s].w++;
-      if(e.status==="loss") srcStats[s].l++;
-    });
+    const gainers = gainData.values || [];
+    const losers  = loseData.values || [];
 
-    // Find sym in cron alerts too
-    const cronData   = data.jax_cron_alerts;
-    const inCron     = cronData && cronData.data ? cronData.data.find(r=>r.sym===sym) : null;
-
-    // Calculate conviction score using same system as Morning Brief
-    let score = 0;
-    const scoreBreakdown = [];
-    if(inWeekly){
-      score += 3; scoreBreakdown.push("+3 weekly watchlist");
-      if(inWeekly.weeklyJAXRecent){ score += 2; scoreBreakdown.push("+2 weekly JAX fired"); }
-      if(inWeekly.daily200Reclaim){ score += 1; scoreBreakdown.push("+1 200EMA reclaim"); }
-      if(inWeekly.h4FlipRecent)   { score += 1; scoreBreakdown.push("+1 4H just flipped"); }
+    if(!gainers.length && !losers.length){
+      throw new Error("No movers data available");
     }
-    if(inCron){ score += 2; scoreBreakdown.push("+2 green arrow today (auto-scan)"); }
-    else if(inJAX){ score += 1; scoreBreakdown.push("+1 green arrow (JAX)"); }
-    if(inJAX && inJAX.bullScore >= 4){ score += 2; scoreBreakdown.push("+2 bull "+inJAX.bullScore+"/5"); }
-    else if(inJAX && inJAX.bullScore === 3){ score += 1; scoreBreakdown.push("+1 bull 3/5"); }
-    if(inConf && inConf.confScore === 4){ score += 1; scoreBreakdown.push("+1 confluence 4/4"); }
-    if(inCatalyst && inCatalyst.atrCoiling){ score += 1; scoreBreakdown.push("+1 catalyst coil"); }
-    if(!inWeekly){ score -= 2; scoreBreakdown.push("-2 not on weekly watchlist"); }
-    const rsi = inWeekly?.rsi || inJAX?.rsi14 || 0;
-    if(rsi > 70){ score -= 2; scoreBreakdown.push("-2 RSI "+rsi.toFixed(0)+" overbought"); }
-    else if(rsi > 65){ score -= 1; scoreBreakdown.push("-1 RSI "+rsi.toFixed(0)+" elevated"); }
 
-    const scoreGrade = score >= 8 ? "A++ 🔥" : score >= 6 ? "A+" : score >= 4 ? "A" : score >= 2 ? "WATCH" : "SKIP";
+    const fmtRow = (m, isGainer) => {
+      const chg    = parseFloat(m.percent_change || 0);
+      const price  = parseFloat(m.close || m.price || 0);
+      const vol    = parseFloat(m.volume || 0);
+      const volStr = vol > 1e6 ? (vol/1e6).toFixed(1)+"M" : vol > 1e3 ? (vol/1e3).toFixed(0)+"K" : vol.toString();
+      const clr    = isGainer ? "var(--green2)" : "var(--red)";
+      const arr    = isGainer ? "▲" : "▼";
+      return `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer"
+        onclick="document.getElementById('od-input').value='${m.symbol}';openOptionsDesk();odSearch()">
+        <span style="font-family:var(--sans);font-size:13px;font-weight:700;color:#fff;min-width:55px">${m.symbol}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text2);flex:1">${(m.name||"").slice(0,20)}</span>
+        <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${clr}">${arr}${Math.abs(chg).toFixed(2)}%</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">$${price.toFixed(2)}</span>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--muted2)">${volStr}</span>
+        <span style="font-size:8px;color:var(--blue);font-family:var(--mono)">→ OPTIONS DESK</span>
+      </div>`;
+    };
 
-    const symCtx = [
-      `CONVICTION SCORE: ${score}/10 — ${scoreGrade}`,
-      `Score breakdown: ${scoreBreakdown.join(", ")}`,
-      "",
-      inWeekly  ? `✅ Weekly Monitor: TIER${inWeekly.tier1?"1 ⭐":inWeekly.tier2?"2 🟢":"3"} | flip ${inWeekly.weeksAgo}wk ago at $${inWeekly.weeklyFlipPrice?.toFixed(2)} | 4H ${inWeekly.h4Bullish?"bullish ✅":"bearish ❌"} | W-RSI ${inWeekly.weeklyRsi?.toFixed(0)} | D-RSI ${inWeekly.rsi?.toFixed(0)}` : "❌ Weekly Monitor: NOT on watchlist",
-      inCron    ? `✅ AUTO-SCAN: Green arrow fired TODAY | bull ${inCron.bullScore}/5 | RSI ${inCron.rsi?.toFixed(0)}` : "",
-      inJAX     ? `✅ JAX: Green arrow | bull score ${inJAX.bullScore}/5 | trail $${inJAX.trailVal?.toFixed(2)}` : "❌ JAX: no green arrow",
-      inConf    ? `✅ Confluence: ${inConf.confScore}/4 | pillars: ${Object.entries(inConf.pillars||{}).filter(([,v])=>v).map(([k])=>k.toUpperCase()).join("+")}` : "❌ Confluence: not in scan",
-      inCatalyst? `✅ Catalyst: ATR coiling ${inCatalyst.atrCoiling?"YES":"NO"}` : "",
-      inPulse   ? `📊 Pulse: ${inPulse.changePct>=0?"▲":"▼"}${Math.abs(inPulse.changePct||0).toFixed(1)}% today` : "",
-      openPos   ? `⚠️ ALREADY OPEN: entered $${parseFloat(openPos.price).toFixed(2)}` : "No open position",
-      symHistory.length ? `History: ${symHistory.filter(e=>e.status==="win").length}W/${symHistory.filter(e=>e.status==="loss").length}L on ${sym}` : "No history on this stock",
-    ].filter(Boolean).join("\n");
+    const sess    = getMarketSession();
+    const sessLbl = {"premarket":"🌅 Pre-Market","open":"🟢 Market Open","afterhours":"🌙 After Hours","closed":"⚪ Closed","weekend":"⚪ Weekend"}[sess]||"";
+    const time    = new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});
 
-    const winRateCtx = Object.entries(srcStats).map(([s,v])=>`${s}: ${v.w+v.l>0?Math.round(v.w/(v.w+v.l)*100)+"%":"—"} (${v.w+v.l} trades)`).join(", ");
-
-    const system = `You are a professional trading advisor using a proven conviction scoring system.
-Score: ${score}/10 — ${scoreGrade}
-Rules:
-- Score 8-10 = YES, full 1% risk
-- Score 6-7 = YES, 0.75% risk  
-- Score 4-5 = YES, 0.5% risk
-- Score 2-3 = WAIT for better entry
-- Score 0-1 = NO
-Be direct. Under 200 words. Lead with YES/NO/WAIT.`;
-
-    const user = `Should I enter ${sym} at ${price>0?"$"+price.toFixed(2):"current price"}?
-
-${symCtx}
-
-MY WIN RATES: ${winRateCtx}
-Account: $${account} | Max risk: $${riskAmt.toFixed(0)}
-
-Give: decision, one-line reason, stop level on underlying, option guidance (strike, expiry, est premium, contracts), confidence.`;
-
-    const response = await callClaude(system, user, 400);
-    const isYes    = response.toLowerCase().startsWith("yes");
-    const isNo     = response.toLowerCase().startsWith("no");
-    const isWait   = response.toLowerCase().startsWith("wait");
-    const clr      = isYes?"var(--green2)":isNo?"var(--red)":"var(--yellow)";
-    const scoreClr = score>=8?"#00E676":score>=6?"var(--green2)":score>=4?"var(--yellow)":"var(--red)";
-
-    body.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <div style="font-family:var(--mono);font-size:15px;font-weight:700;color:${clr}">${response.split("\n")[0]}</div>
-        <div style="font-family:var(--mono);font-size:11px;font-weight:700;color:${scoreClr};padding:2px 8px;background:rgba(0,0,0,0.3);border-radius:3px">${score}/10 ${scoreGrade}</div>
+    if(body) body.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-family:var(--mono);font-size:9px;color:var(--muted2)">${sessLbl} · ${time}</span>
+        <button class="agent-btn" onclick="runMarketMovers()" style="font-size:8px;padding:4px 10px">🔄 REFRESH</button>
       </div>
-      <div style="font-family:var(--mono);font-size:10px;color:var(--muted2);margin-bottom:8px">${scoreBreakdown.join(" · ")}</div>
-      <div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(response.split("\n").slice(1).join("\n"))}</div>`;
-
-  }catch(e){
-    body.innerHTML = `<div class="agent-output" style="color:var(--red)">Error: ${e.message}</div>`;
-  }
-}
-
-// ══════════════════════════════════════════════════════════
-// JOB 3: EXIT MONITOR
-// ══════════════════════════════════════════════════════════
-async function runExitMonitor(){
-  const body = document.getElementById("agent-exit-body");
-  body.innerHTML = '<div class="agent-output loading">⏳ Checking open positions...</div>';
-
-  try{
-    const data    = await gatherAllData();
-    const journal = Array.isArray(data.journal)?data.journal:[];
-    const open    = journal.filter(e=>e.status==="open"&&e.price&&parseFloat(e.price)>0);
-
-    if(!open.length){
-      body.innerHTML = '<div class="agent-output" style="color:var(--muted2)">No open positions in journal.</div>';
-      return;
-    }
-
-    // Check each open position against current JAX and weekly data
-    const exitSignals = [];
-    const holds       = [];
-
-    for(const pos of open){
-      const sym      = pos.sym;
-      const entry    = parseFloat(pos.price);
-      const stop     = parseFloat(pos.stopLoss)||0;
-      const target   = parseFloat(pos.target1)||0;
-
-      // Check JAX status
-      const jaxData  = (data.jax_scan||[]).find(r=>r.sym===sym);
-      const wkData   = (data.weekly_monitor||[]).find(r=>r.sym===sym);
-      const pulseData= (data.pulse||[]).find(r=>r.sym===sym);
-
-      const currentPrice = pulseData?.price || entry;
-      const unrealPct    = ((currentPrice-entry)/entry*100).toFixed(1);
-      const jaxBearish   = jaxData && !jaxData.greenArrow && jaxData.bullScore <= 2;
-      const wkBearish    = wkData && !wkData.weeklyBullish;
-
-      if(jaxBearish || wkBearish){
-        exitSignals.push({sym, entry, currentPrice, unrealPct, reason: jaxBearish?"JAX turned bearish":"Weekly trail flipped"});
-      } else {
-        holds.push({sym, entry, currentPrice, unrealPct, target, stop});
-      }
-    }
-
-    let html = "";
-
-    if(exitSignals.length){
-      html += `<div style="color:var(--red);font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1px;margin-bottom:8px">🚨 EXIT SIGNALS</div>`;
-      exitSignals.forEach(s=>{
-        const pnlClr = parseFloat(s.unrealPct)>=0?"var(--green2)":"var(--red)";
-        html += `<div class="agent-trade" style="border-color:rgba(255,23,68,0.4);background:rgba(255,23,68,0.04);margin-bottom:6px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="agent-trade-sym" style="display:flex;align-items:center;gap:5px">${tickerLogo(s.sym,18)}${s.sym}</span>
-            <span style="font-family:var(--mono);font-size:8px;color:var(--red);font-weight:700">🚨 CONSIDER EXIT</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--green2);letter-spacing:1px;margin-bottom:6px;padding:0 10px">🟢 TOP GAINERS</div>
+          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:3px;overflow:hidden">
+            ${gainers.map(m=>fmtRow(m,true)).join("")}
           </div>
-          <div class="agent-trade-detail">Entry $${s.entry.toFixed(2)} → Now $${s.currentPrice.toFixed(2)} · <span style="color:${pnlClr}">${parseFloat(s.unrealPct)>=0?"+":""}${s.unrealPct}%</span><br>Reason: ${s.reason}</div>
-        </div>`;
-      });
-    }
-
-    if(holds.length){
-      html += `<div style="color:var(--green2);font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:1px;margin:8px 0">✅ HOLD</div>`;
-      holds.forEach(s=>{
-        const pnlClr = parseFloat(s.unrealPct)>=0?"var(--green2)":"var(--red)";
-        const toTarget = s.target>0?((s.target-s.currentPrice)/s.currentPrice*100).toFixed(1):null;
-        html += `<div class="agent-trade" style="margin-bottom:6px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="agent-trade-sym" style="display:flex;align-items:center;gap:5px">${tickerLogo(s.sym,18)}${s.sym}</span>
-            <span style="font-family:var(--mono);font-size:8px;color:var(--green2)">HOLD</span>
+        </div>
+        <div>
+          <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--red);letter-spacing:1px;margin-bottom:6px;padding:0 10px">🔴 TOP LOSERS</div>
+          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:3px;overflow:hidden">
+            ${losers.map(m=>fmtRow(m,false)).join("")}
           </div>
-          <div class="agent-trade-detail">Entry $${s.entry.toFixed(2)} → Now $${s.currentPrice.toFixed(2)} · <span style="color:${pnlClr}">${parseFloat(s.unrealPct)>=0?"+":""}${s.unrealPct}%</span>${toTarget?` · ${toTarget}% to target`:""}${s.stop?" · Stop $"+s.stop.toFixed(2):""}</div>
-        </div>`;
-      });
-    }
-
-    body.innerHTML = html || '<div class="agent-output" style="color:var(--muted2)">No signals detected on open positions.</div>';
-
-  }catch(e){
-    body.innerHTML = `<div class="agent-output" style="color:var(--red)">Error: ${e.message}</div>`;
-  }
-}
-
-// ══════════════════════════════════════════════════════════
-// JOB 4: PATTERN ANALYSIS
-// ══════════════════════════════════════════════════════════
-async function runPatternAnalysis(){
-  const btn  = document.getElementById("agent-patterns-btn");
-  const body = document.getElementById("agent-patterns-body");
-  btn.disabled = true;
-  body.innerHTML = '<div class="agent-output loading">⏳ Analyzing your trading patterns...</div>';
-
-  try{
-    const data    = await gatherAllData();
-    const journal = Array.isArray(data.journal)?data.journal:[];
-
-    if(journal.length < 5){
-      body.innerHTML = '<div class="agent-output" style="color:var(--muted2)">Need at least 5 journal entries for pattern analysis.</div>';
-      btn.disabled = false;
-      return;
-    }
-
-    // Build detailed journal data for Claude
-    const closed = journal.filter(e=>e.status==="win"||e.status==="loss");
-    const jnlData = closed.slice(0,50).map(e=>({
-      sym:    e.sym,
-      source: e.source||"manual",
-      result: parseFloat(e.result||0),
-      status: e.status,
-      rsi:    e.rsi||null,
-      score:  e.score,
-      greenArrow: e.greenArrow||false,
-      session: e.session||"unknown",
-      tradeType: e.tradeType||"",
-      date:   e.date||""
-    }));
-
-    const system = `You are a quantitative trading analyst. Analyze this trader's journal data and identify specific, actionable patterns. Be data-driven. Focus on what ACTUALLY improves their win rate based on the data. Under 300 words. Use bullet points.`;
-
-    const user = `Analyze my trading journal and tell me:
-1. Which signal sources produce my best results
-2. Any time/session patterns (morning vs afternoon)
-3. What my worst trades have in common
-4. My single biggest improvement opportunity
-5. What I should do MORE of based on the data
-
-My journal (${closed.length} closed trades):
-${JSON.stringify(jnlData, null, 1)}
-
-Be specific with numbers. If a pattern isn't clear in the data, say so.`;
-
-    const response = await callClaude(system, user, 600);
-    body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(response)}</div>`;
+        </div>
+      </div>
+      <div style="font-family:var(--mono);font-size:8px;color:var(--muted2);margin-top:8px;padding:0 2px">
+        💡 Click any ticker to open OPTIONS DESK instantly
+      </div>`;
 
   }catch(e){
-    body.innerHTML = `<div class="agent-output" style="color:var(--red)">Error: ${e.message}</div>`;
+    if(body) body.innerHTML = `<div class="agent-output" style="color:var(--red)">❌ ${e.message}</div>`;
   }
-  btn.disabled = false;
+  if(btn) btn.disabled = false;
 }
 
-// ══════════════════════════════════════════════════════════
-// JOB 5: WEEKLY REVIEW
-// ══════════════════════════════════════════════════════════
-async function runWeeklyReview(){
-  const btn  = document.getElementById("agent-review-btn");
-  const body = document.getElementById("agent-review-body");
-  btn.disabled = true;
-  body.innerHTML = '<div class="agent-output loading">⏳ Running weekly review...</div>';
-
-  try{
-    const data    = await gatherAllData();
-    const journal = Array.isArray(data.journal)?data.journal:[];
-
-    // Get last 7 days
-    const weekAgo  = new Date(Date.now() - 7*24*60*60*1000);
-    const thisWeek = journal.filter(e=>{
-      try{ return new Date(e.loggedAt||e.date) >= weekAgo; }catch(ex){ return false; }
-    });
-
-    const system = `You are a professional trading coach doing a weekly performance review. Be honest, direct, and constructive. Focus on process not just results. Under 400 words.`;
-
-    const user = `Review my trading week and give me:
-1. Performance summary (numbers)
-2. What worked well this week
-3. What to improve next week
-4. Specific rule to follow next week based on my patterns
-5. Confidence level going into next week
-
-This week's trades (${thisWeek.length} entries):
-${JSON.stringify(thisWeek.slice(0,20), null, 1)}
-
-Overall journal context:
-${buildJournalContext(journal)}
-
-Current scanner signals summary:
-${buildScannerContext(data)}`;
-
-    const response = await callClaude(system, user, 600);
-    body.innerHTML = `<div style="font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--text)">${renderMD(response)}</div>`;
-
-  }catch(e){
-    body.innerHTML = `<div class="agent-output" style="color:var(--red)">Error: ${e.message}</div>`;
-  }
-  btn.disabled = false;
-}
 
 // ── Load saved agent brief on startup ─────────────────────
 // ── Load saved agent brief on startup / tab switch ────────
