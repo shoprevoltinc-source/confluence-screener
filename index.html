@@ -5659,7 +5659,30 @@ async function odSearch(){
     const chg   = parseFloat(qData.percent_change || 0);
     if(!price){ throw new Error(`${sym} not found`); }
 
-    // Step 2: get options chain from Tradier
+    // Step 2: fetch 4H candles from TwelveData for real ATR trail stop
+    let stop = parseFloat((price * 0.92).toFixed(2)); // fallback: 8% cap
+    try {
+      const h4Res  = await fetch(`https://api.twelvedata.com/time_series?symbol=${sym}&interval=4h&outputsize=100&apikey=${TD_KEYS[0]}&cache=no-store`);
+      const h4Data = await h4Res.json();
+      if(h4Data.values && h4Data.values.length >= 20){
+        const closes = h4Data.values.map(v=>parseFloat(v.close)).reverse();
+        const highs  = h4Data.values.map(v=>parseFloat(v.high)).reverse();
+        const lows   = h4Data.values.map(v=>parseFloat(v.low)).reverse();
+        // ATR (14 period)
+        let atrSum = 0, atrCount = 0;
+        for(let i=1; i<Math.min(15,closes.length); i++){
+          const tr = Math.max(highs[i]-lows[i], Math.abs(highs[i]-closes[i-1]), Math.abs(lows[i]-closes[i-1]));
+          atrSum += tr; atrCount++;
+        }
+        const atr = atrCount ? atrSum/atrCount : 0;
+        // ATR trail (factor 1.5)
+        let trail = closes[0] - (atr * 1.5);
+        trail = Math.max(trail, price * 0.92); // never wider than 8%
+        stop  = parseFloat(trail.toFixed(2));
+      }
+    } catch(e){ /* fallback to 8% already set */ }
+
+    // Step 3: get options chain from Tradier
     const hdrs = { "Authorization":`Bearer ${TR_KEY}`, "Accept":"application/json" };
 
     // Get expirations
@@ -5698,7 +5721,6 @@ async function odSearch(){
     }, calls[0]);
 
     // Stop: 10-day swing low capped at 8%
-    const stop   = parseFloat((price * 0.92).toFixed(2)); // 8% cap default
     const target = parseFloat((price * 1.15).toFixed(2));
     const chgClr = chg >= 0 ? "var(--green2)" : "var(--red)";
     const chgStr = (chg >= 0 ? "+" : "") + chg.toFixed(2) + "%";
@@ -5755,7 +5777,7 @@ async function odSearch(){
           <div class="od-level-val" style="color:var(--green2)">$${price.toFixed(2)}</div>
         </div>
         <div class="od-level" style="background:rgba(255,23,68,0.06);border:1px solid rgba(255,23,68,0.2)">
-          <div class="od-level-lbl">STOP 8%</div>
+          <div class="od-level-lbl">STOP 4H</div>
           <div class="od-level-val" style="color:var(--red)">$${stop}</div>
         </div>
         <div class="od-level" style="background:rgba(0,176,255,0.06);border:1px solid rgba(0,176,255,0.2)">
