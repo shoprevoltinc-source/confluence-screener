@@ -2505,8 +2505,7 @@ function switchTab(tab){ _doSwitchTab(tab); }
   </label>
   <div style="margin-left:auto;display:flex;gap:6px">
     <button class="agent-btn" id="agent-brief-btn" onclick="runMorningBrief()">☀️ MORNING BRIEF</button>
-    <button class="agent-btn blue" id="agent-review-btn" onclick="runWeeklyReview()">📊 WEEKLY REVIEW</button>
-    <button class="agent-btn purple" id="agent-patterns-btn" onclick="runPatternAnalysis()">🧠 MY PATTERNS</button>
+    <button class="agent-btn blue" id="agent-movers-btn" onclick="runMarketMovers()">📊 MARKET MOVERS</button>
   </div>
 </div>
 
@@ -2536,56 +2535,17 @@ function switchTab(tab){ _doSwitchTab(tab); }
     </div>
   </div>
 
-  <!-- Entry Confirmation -->
+  <!-- Market Movers -->
   <div class="agent-card">
-    <div class="agent-card-header">
-      <span class="agent-card-icon">✅</span>
-      <span class="agent-card-title">Entry Confirmation</span>
-    </div>
-    <div class="agent-card-body">
-      <div style="display:flex;gap:6px;margin-bottom:10px">
-        <input type="text" id="agent-entry-sym" placeholder="TICKER" 
-          style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:5px 8px;font-family:var(--mono);font-size:10px;border-radius:2px;width:90px;text-transform:uppercase"
-          onkeydown="if(event.key==='Enter') confirmEntry()">
-        <input type="number" id="agent-entry-price" placeholder="Price $"
-          style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:5px 8px;font-family:var(--mono);font-size:10px;border-radius:2px;width:80px">
-        <button class="agent-btn" onclick="confirmEntry()" style="font-size:8px;padding:5px 10px">ASK</button>
-      </div>
-      <div class="agent-output" id="agent-entry-body" style="color:var(--muted2)">Enter a ticker and price to get entry confirmation...</div>
-    </div>
-  </div>
-
-  <!-- Exit Monitor -->
-  <div class="agent-card">
-    <div class="agent-card-header">
-      <span class="agent-card-icon">🚨</span>
-      <span class="agent-card-title">Exit Monitor</span>
-      <button class="agent-btn" onclick="runExitMonitor()" style="margin-left:auto;font-size:8px;padding:4px 10px">CHECK NOW</button>
-    </div>
-    <div class="agent-card-body" id="agent-exit-body">
-      <div class="agent-output" style="color:var(--muted2)">Monitors your open positions for exit signals...</div>
-    </div>
-  </div>
-
-  <!-- Pattern Learning -->
-  <div class="agent-card">
-    <div class="agent-card-header">
-      <span class="agent-card-icon">🧠</span>
-      <span class="agent-card-title">My Patterns</span>
-    </div>
-    <div class="agent-card-body" id="agent-patterns-body">
-      <div class="agent-output" style="color:var(--muted2)">Tap MY PATTERNS to discover what makes you win...</div>
-    </div>
-  </div>
-
-  <!-- Weekly Review — full width -->
-  <div class="agent-card" style="grid-column:1/-1">
     <div class="agent-card-header">
       <span class="agent-card-icon">📊</span>
-      <span class="agent-card-title">Weekly Review</span>
+      <span class="agent-card-title">Market Movers</span>
+      <span style="margin-left:auto;font-family:var(--mono);font-size:8px;color:var(--muted2)" id="agent-movers-time"></span>
     </div>
-    <div class="agent-card-body" id="agent-review-body">
-      <div class="agent-output" style="color:var(--muted2)">Tap WEEKLY REVIEW for a full analysis of your trading week...</div>
+    <div class="agent-card-body" id="agent-movers-body">
+      <div class="agent-output" style="color:var(--muted2)">Tap MARKET MOVERS to see today's top gainers and losers...<br><br>
+        <span style="font-size:9px">Click any ticker to open OPTIONS DESK instantly</span>
+      </div>
     </div>
   </div>
 
