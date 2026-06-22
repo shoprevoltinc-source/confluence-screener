@@ -19,7 +19,7 @@ const TD_KEYS = (process.env.TD_KEYS || "")
 
 const FIREBASE_DB_URL = (process.env.FIREBASE_DB_URL || "").replace(/\/$/, "");
 
-const SCAN_DELAY_MS   = 10000; // 10s between calls per key — matches daily scanner, safe under per-key limit
+const SCAN_DELAY_MS   = 300;  // 300ms between calls — Grow plan 377 credits/min, no throttle needed
 const FLIP_AGE_MAX    = 3;     // weeks — only recent flips
 const WEEKLY_RSI_MAX  = 70;
 const OVERSOLD_THRESH = 40;    // RSI was below this recently = recovery from oversold
@@ -368,7 +368,7 @@ async function run() {
 
   async function runWorker(keyIdx, chunk) {
     // Stagger worker starts: key 0 starts immediately, key 1 waits 1.5s, key 2 waits 3s, etc.
-    if (keyIdx > 0) await sleep(keyIdx * 1500);
+    if (keyIdx > 0) await sleep(300); // minimal stagger with Grow plan
     for (let i = 0; i < chunk.length; i++) {
       const sym = chunk[i];
       let retries = 2;
