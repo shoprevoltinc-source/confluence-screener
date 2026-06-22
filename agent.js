@@ -756,8 +756,8 @@ async function runMarketMovers(){
         <span style="font-family:var(--mono);font-size:9px;color:var(--muted2)">${sessLbl} · ${time} · ${valid.length} stocks</span>
         <button class="agent-btn" onclick="runMarketMovers()" style="font-size:8px;padding:4px 10px">🔄 REFRESH</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px">
+        <div style="min-width:0">
           <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--green2);letter-spacing:1px;margin-bottom:5px;padding:0 4px">🟢 TOP GAINERS</div>
           <div style="background:var(--bg3);border:1px solid var(--border);border-radius:3px;overflow:hidden">
             ${gainers.map(m=>fmtRow(m,true)).join("")}
@@ -765,7 +765,7 @@ async function runMarketMovers(){
         </div>
         <div>
           <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--red);letter-spacing:1px;margin-bottom:5px;padding:0 4px">🔴 TOP LOSERS</div>
-          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:3px;overflow:hidden">
+          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:3px;overflow:hidden;min-width:0">
             ${losers.map(m=>fmtRow(m,false)).join("")}
           </div>
         </div>
