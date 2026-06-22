@@ -663,75 +663,115 @@ ${jnlCtx}${calibrationCtx}`;
 
 
 // ══════════════════════════════════════════════════════════
-// MARKET MOVERS — Pre-market gainers/losers via TwelveData
+// MARKET MOVERS — Real-time gainers/losers via Tradier
+// Fetches quotes for SP500 + watchlist, ranks by % change
 // ══════════════════════════════════════════════════════════
 async function runMarketMovers(){
   const btn  = document.getElementById("agent-movers-btn");
   const body = document.getElementById("agent-movers-body");
+  const timeEl = document.getElementById("agent-movers-time");
   if(btn) btn.disabled = true;
-  if(body) body.innerHTML = '<div class="agent-output loading">⏳ Fetching market movers...</div>';
+  if(body) body.innerHTML = '<div class="agent-output loading">⏳ Fetching quotes from Tradier...</div>';
 
   try{
-    // Fetch top gainers and losers from TwelveData
-    const key = TD_KEYS[0];
-    const [gainRes, loseRes] = await Promise.all([
-      fetch(`https://api.twelvedata.com/market_movers/stocks?direction=gainers&outputsize=10&apikey=${key}`),
-      fetch(`https://api.twelvedata.com/market_movers/stocks?direction=losers&outputsize=10&apikey=${key}`)
-    ]);
+    // Build universe — watchlist + key SP500 names (Tradier handles large batches)
+    const universe = [...new Set([
+      ...(typeof WATCHLIST !== "undefined" ? WATCHLIST : []),
+      // Top liquid SP500 names for movers
+      "AAPL","MSFT","NVDA","AMZN","META","GOOGL","TSLA","AMD","PLTR","CRM",
+      "JPM","BAC","GS","MS","V","MA","PYPL","COIN",
+      "SPY","QQQ","IWM","XLF","XLK","XLE","XLV","XLRE",
+      "SOFI","HOOD","AFRM","UPST","MARA","RIOT","IREN",
+      "VST","CEG","GEV","PWR","ETN","NEE","FSLR",
+      "NKE","COST","WMT","TGT","MCD","SBUX",
+      "AMGN","LLY","PFE","MRNA","ABBV",
+      "PANW","CRWD","ZS","FTNT","NET"
+    ])];
 
-    const gainData = await gainRes.json();
-    const loseData = await loseRes.json();
+    const hdrs = { "Authorization": `Bearer ${TR_KEY}`, "Accept": "application/json" };
 
-    const gainers = gainData.values || [];
-    const losers  = loseData.values || [];
-
-    if(!gainers.length && !losers.length){
-      throw new Error("No movers data available");
+    // Tradier allows up to 200 symbols per request — batch in chunks of 200
+    const BATCH = 200;
+    const batches = [];
+    for(let i = 0; i < universe.length; i += BATCH){
+      batches.push(universe.slice(i, i + BATCH));
     }
 
+    let allQuotes = [];
+    for(const batch of batches){
+      const syms = batch.join(",");
+      const res  = await fetch(`${TR_BASE}/markets/quotes?symbols=${syms}&greeks=false`, {headers:hdrs});
+      const data = await res.json();
+      const quotes = data?.quotes?.quote;
+      if(!quotes) continue;
+      const arr = Array.isArray(quotes) ? quotes : [quotes];
+      allQuotes.push(...arr);
+    }
+
+    if(!allQuotes.length) throw new Error("No quotes returned from Tradier");
+
+    // Filter valid quotes with % change
+    const valid = allQuotes
+      .filter(q => q.symbol && q.last > 0 && q.change_percentage !== null)
+      .map(q => ({
+        symbol:  q.symbol,
+        name:    q.description || "",
+        price:   parseFloat(q.last || 0),
+        change:  parseFloat(q.change_percentage || 0),
+        volume:  parseFloat(q.volume || 0),
+        prevClose: parseFloat(q.prevclose || 0)
+      }))
+      .filter(q => q.price >= 3); // filter penny stocks
+
+    // Sort for gainers and losers
+    const sorted  = [...valid].sort((a,b) => b.change - a.change);
+    const gainers = sorted.filter(q => q.change > 0).slice(0, 10);
+    const losers  = [...valid].sort((a,b) => a.change - b.change).filter(q => q.change < 0).slice(0, 10);
+
+    if(!gainers.length && !losers.length) throw new Error("No movers found — market may be closed");
+
     const fmtRow = (m, isGainer) => {
-      const chg    = parseFloat(m.percent_change || 0);
-      const price  = parseFloat(m.close || m.price || 0);
-      const vol    = parseFloat(m.volume || 0);
-      const volStr = vol > 1e6 ? (vol/1e6).toFixed(1)+"M" : vol > 1e3 ? (vol/1e3).toFixed(0)+"K" : vol.toString();
       const clr    = isGainer ? "var(--green2)" : "var(--red)";
       const arr    = isGainer ? "▲" : "▼";
-      return `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer"
-        onclick="document.getElementById('od-input').value='${m.symbol}';openOptionsDesk();odSearch()">
-        <span style="font-family:var(--sans);font-size:13px;font-weight:700;color:#fff;min-width:55px">${m.symbol}</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text2);flex:1">${(m.name||"").slice(0,20)}</span>
-        <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${clr}">${arr}${Math.abs(chg).toFixed(2)}%</span>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">$${price.toFixed(2)}</span>
-        <span style="font-family:var(--mono);font-size:9px;color:var(--muted2)">${volStr}</span>
-        <span style="font-size:8px;color:var(--blue);font-family:var(--mono)">→ OPTIONS DESK</span>
+      const vol    = m.volume;
+      const volStr = vol > 1e6 ? (vol/1e6).toFixed(1)+"M" : vol > 1e3 ? (vol/1e3).toFixed(0)+"K" : vol.toString();
+      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s"
+        onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''"
+        onclick="document.getElementById('od-input').value='${m.symbol}';openOptionsDesk();setTimeout(odSearch,300)">
+        <span style="font-family:var(--sans);font-size:13px;font-weight:700;color:#fff;min-width:52px">${m.symbol}</span>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--text2);flex:1;overflow:hidden;white-space:nowrap">${m.name.slice(0,18)}</span>
+        <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${clr}">${arr}${Math.abs(m.change).toFixed(2)}%</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">$${m.price.toFixed(2)}</span>
+        <span style="font-family:var(--mono);font-size:8px;color:var(--muted2)">${volStr}</span>
       </div>`;
     };
 
     const sess    = getMarketSession();
     const sessLbl = {"premarket":"🌅 Pre-Market","open":"🟢 Market Open","afterhours":"🌙 After Hours","closed":"⚪ Closed","weekend":"⚪ Weekend"}[sess]||"";
     const time    = new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});
+    if(timeEl) timeEl.textContent = time;
 
     if(body) body.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <span style="font-family:var(--mono);font-size:9px;color:var(--muted2)">${sessLbl} · ${time}</span>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-family:var(--mono);font-size:9px;color:var(--muted2)">${sessLbl} · ${time} · ${valid.length} stocks</span>
         <button class="agent-btn" onclick="runMarketMovers()" style="font-size:8px;padding:4px 10px">🔄 REFRESH</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div>
-          <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--green2);letter-spacing:1px;margin-bottom:6px;padding:0 10px">🟢 TOP GAINERS</div>
+          <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--green2);letter-spacing:1px;margin-bottom:5px;padding:0 4px">🟢 TOP GAINERS</div>
           <div style="background:var(--bg3);border:1px solid var(--border);border-radius:3px;overflow:hidden">
             ${gainers.map(m=>fmtRow(m,true)).join("")}
           </div>
         </div>
         <div>
-          <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--red);letter-spacing:1px;margin-bottom:6px;padding:0 10px">🔴 TOP LOSERS</div>
+          <div style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--red);letter-spacing:1px;margin-bottom:5px;padding:0 4px">🔴 TOP LOSERS</div>
           <div style="background:var(--bg3);border:1px solid var(--border);border-radius:3px;overflow:hidden">
             ${losers.map(m=>fmtRow(m,false)).join("")}
           </div>
         </div>
       </div>
       <div style="font-family:var(--mono);font-size:8px;color:var(--muted2);margin-top:8px;padding:0 2px">
-        💡 Click any ticker to open OPTIONS DESK instantly
+        💡 Click any ticker → OPTIONS DESK opens with live chain
       </div>`;
 
   }catch(e){
