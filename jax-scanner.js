@@ -301,7 +301,7 @@ async function main(){
 
   const fired   = [];
   const errors  = [];
-  const DELAY   = 10000;
+  const DELAY   = 300; // Grow plan — 377 credits/min, no throttle needed
   const nKeys   = TD_KEYS.length;
 
   const chunks = Array.from({length: nKeys}, ()=>[]);
