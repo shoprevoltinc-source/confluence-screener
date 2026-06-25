@@ -633,12 +633,10 @@ function renderJournal(){
           border:1px solid ${e.entryMode==="trade"?"rgba(0,200,83,0.3)":"rgba(100,100,100,0.2)"}">
           ${e.entryMode==="trade"?"💰":"📊"}
         </span>
-        <select onchange="updateField(${e.id},'entryMode',this.value);renderJournal()"
-          style="font-size:7px;background:transparent;border:none;color:var(--muted);cursor:pointer">
-          <option value="">▾</option>
-          <option value="tracking">📊 Track</option>
-          <option value="trade">💰 Real Trade</option>
-        </select>
+        <button onclick="openEditModal(${e.id})"
+          style="margin-left:4px;font-size:7px;padding:1px 5px;border-radius:2px;
+          background:rgba(0,176,255,0.1);border:1px solid rgba(0,176,255,0.3);
+          color:var(--blue);cursor:pointer;font-family:var(--mono)">✏️ EDIT</button>
       </td>
 
       <!-- Options contract cell -->
@@ -789,3 +787,181 @@ function startCloseAutoTimer(){
 }
 
 startCloseAutoTimer();
+
+// ── Edit Modal — mobile-friendly full screen panel ────────────────────────────
+function openEditModal(id){
+  const entry = journalEntries.find(e=>e.id===id);
+  if(!entry) return;
+
+  // Remove existing modal if any
+  const existing = document.getElementById("jnl-edit-modal");
+  if(existing) existing.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "jnl-edit-modal";
+  modal.style.cssText = `
+    position:fixed;inset:0;z-index:2000;
+    background:rgba(0,0,0,0.85);
+    display:flex;align-items:flex-end;
+    font-family:'JetBrains Mono',monospace;
+  `;
+
+  modal.innerHTML = `
+    <div style="width:100%;max-height:90vh;overflow-y:auto;
+      background:#080d16;border-top:2px solid rgba(0,200,83,0.4);
+      border-radius:12px 12px 0 0;padding:20px 16px 40px">
+
+      <!-- Header -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div>
+          <div style="font-size:20px;font-weight:700;color:#fff">${entry.sym}</div>
+          <div style="font-size:9px;color:var(--muted2);margin-top:2px">${entry.date} · ${entry.source||"manual"}</div>
+        </div>
+        <button onclick="document.getElementById('jnl-edit-modal').remove()"
+          style="background:rgba(255,255,255,0.08);border:none;color:#fff;font-size:18px;
+          width:36px;height:36px;border-radius:50%;cursor:pointer">✕</button>
+      </div>
+
+      <!-- Options Contract -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;margin-bottom:6px">OPTIONS CONTRACT</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <div style="font-size:8px;color:var(--muted2);margin-bottom:4px">TYPE</div>
+            <select id="em-type" style="width:100%;background:#0d1520;border:1px solid #1a3a4a;color:#fff;padding:10px 8px;border-radius:6px;font-family:inherit;font-size:12px">
+              <option value="call" ${entry.optionType==="call"?"selected":""}>📈 Call</option>
+              <option value="put"  ${entry.optionType==="put"?"selected":""}>📉 Put</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:8px;color:var(--muted2);margin-bottom:4px">STRIKE PRICE</div>
+            <input id="em-strike" type="number" step="0.5" placeholder="e.g. 15" value="${entry.strike||''}"
+              style="width:100%;background:#0d1520;border:1px solid #1a3a4a;color:var(--green2);
+              padding:10px 8px;border-radius:6px;font-family:inherit;font-size:14px;font-weight:700">
+          </div>
+        </div>
+        <div>
+          <div style="font-size:8px;color:var(--muted2);margin-bottom:4px">EXPIRATION DATE</div>
+          <input id="em-expiry" type="date" value="${entry.expiry||''}"
+            style="width:100%;background:#0d1520;border:1px solid #1a3a4a;color:#fff;
+            padding:10px 8px;border-radius:6px;font-family:inherit;font-size:14px">
+        </div>
+      </div>
+
+      <!-- Premium -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;margin-bottom:6px">PREMIUM & CONTRACTS</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <div>
+            <div style="font-size:8px;color:var(--muted2);margin-bottom:4px">PREMIUM PAID</div>
+            <input id="em-premium" type="number" step="0.01" placeholder="e.g. 1.25" value="${entry.premiumPaid||''}"
+              style="width:100%;background:#0d1520;border:1px solid #1a3a4a;color:var(--green2);
+              padding:10px 8px;border-radius:6px;font-family:inherit;font-size:14px;font-weight:700">
+          </div>
+          <div>
+            <div style="font-size:8px;color:var(--muted2);margin-bottom:4px">CONTRACTS</div>
+            <input id="em-contracts" type="number" min="1" placeholder="1" value="${entry.contracts||1}"
+              style="width:100%;background:#0d1520;border:1px solid #1a3a4a;color:#fff;
+              padding:10px 8px;border-radius:6px;font-family:inherit;font-size:14px">
+          </div>
+          <div>
+            <div style="font-size:8px;color:var(--muted2);margin-bottom:4px">PREMIUM SOLD</div>
+            <input id="em-sold" type="number" step="0.01" placeholder="exit $" value="${entry.premiumSold||''}"
+              style="width:100%;background:#0d1520;border:1px solid rgba(255,23,68,0.3);color:var(--red);
+              padding:10px 8px;border-radius:6px;font-family:inherit;font-size:14px;font-weight:700">
+          </div>
+        </div>
+      </div>
+
+      <!-- Stop & Target -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;margin-bottom:6px">TRADE LEVELS</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <div style="font-size:8px;color:var(--red);margin-bottom:4px">STOP LOSS $</div>
+            <input id="em-stop" type="number" step="0.01" placeholder="stop price" value="${entry.stopLoss||''}"
+              style="width:100%;background:#0d1520;border:1px solid rgba(255,23,68,0.3);color:var(--red);
+              padding:10px 8px;border-radius:6px;font-family:inherit;font-size:14px">
+          </div>
+          <div>
+            <div style="font-size:8px;color:var(--green2);margin-bottom:4px">TARGET $</div>
+            <input id="em-target" type="number" step="0.01" placeholder="target price" value="${entry.target1||''}"
+              style="width:100%;background:#0d1520;border:1px solid rgba(0,200,83,0.2);color:var(--green2);
+              padding:10px 8px;border-radius:6px;font-family:inherit;font-size:14px">
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div style="margin-bottom:20px">
+        <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;margin-bottom:6px">NOTES</div>
+        <textarea id="em-notes" placeholder="Setup notes, why you took this trade..."
+          style="width:100%;background:#0d1520;border:1px solid #1a3a4a;color:#fff;
+          padding:10px 8px;border-radius:6px;font-family:inherit;font-size:12px;
+          min-height:70px;resize:none">${entry.notes||''}</textarea>
+      </div>
+
+      <!-- Save button -->
+      <button onclick="saveEditModal(${id})"
+        style="width:100%;background:linear-gradient(135deg,#00C853,#00E676);
+        color:#000;border:none;padding:16px;border-radius:8px;
+        font-family:inherit;font-size:14px;font-weight:700;
+        letter-spacing:1px;cursor:pointer">
+        💾 SAVE CHANGES
+      </button>
+    </div>
+  `;
+
+  modal.addEventListener("click", e=>{ if(e.target===modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+function saveEditModal(id){
+  const entry = journalEntries.find(e=>e.id===id);
+  if(!entry) return;
+
+  const type      = document.getElementById("em-type")?.value||"";
+  const strike    = document.getElementById("em-strike")?.value||"";
+  const expiry    = document.getElementById("em-expiry")?.value||"";
+  const premium   = document.getElementById("em-premium")?.value||"";
+  const contracts = document.getElementById("em-contracts")?.value||"1";
+  const sold      = document.getElementById("em-sold")?.value||"";
+  const stop      = document.getElementById("em-stop")?.value||"";
+  const target    = document.getElementById("em-target")?.value||"";
+  const notes     = document.getElementById("em-notes")?.value||"";
+
+  entry.optionType  = type;
+  entry.strike      = strike;
+  entry.expiry      = expiry;
+  entry.dte         = expiry ? calcDTE(expiry) : null;
+  entry.premiumPaid = premium;
+  entry.contracts   = parseInt(contracts)||1;
+  entry.premiumSold = sold;
+  entry.stopLoss    = stop;
+  entry.target1     = target;
+  entry.notes       = notes;
+  entry._isOptions  = !!(type && strike && expiry);
+
+  // Auto-build contract string
+  if(type && strike && expiry){
+    entry.optionContract = `${entry.sym} $${strike}${type==="call"?"C":"P"} ${expiry.slice(5).replace("-","/")}`;
+  }
+
+  // Auto-calculate total cost
+  const p = parseFloat(premium)||0;
+  const c = parseInt(contracts)||1;
+  entry.totalCost = p && c ? (p*c*100).toFixed(2) : "";
+
+  // Auto-calculate P&L if sold price entered
+  if(p > 0 && parseFloat(sold) > 0){
+    const pct = ((parseFloat(sold) - p) / p * 100);
+    entry.optionResult = pct.toFixed(2);
+    entry.result       = pct.toFixed(2);
+    entry.status       = pct >= 0 ? "win" : "loss";
+  }
+
+  saveJournal();
+  renderJournal();
+  document.getElementById("jnl-edit-modal")?.remove();
+  showToast(`✅ ${entry.sym} updated`);
+}
