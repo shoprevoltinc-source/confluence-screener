@@ -1842,6 +1842,7 @@ function switchTab(tab){ _doSwitchTab(tab); }
     <option value="Mid-Cap Energy">⚡ Mid Energy</option>
     <option value="Comm Services">📡 Comm Svc</option>
     <option value="Fiber/Optical">🔆 Fiber/Optical</option>
+    <option value="Nuclear Energy">⚛️ Nuclear Energy</option>
   </select>
   <span class="ctrl-label">MAX $</span>
   <input type="number" class="ctrl-input" id="catMaxPrice" value="250" min="1" max="500" style="width:60px">
@@ -2891,7 +2892,8 @@ const SECTORS = {
   "Mid-Cap Defense":["KTOS","AVAV","CDRE","BWXT","CACI","DRS","LDOS","SAIC","HWM","TDG","AXON","ACHR","JOBY","RDW","ASTS","SPIR","LUNR","RCAT","BBAI","MRCY"],
   "Mid-Cap Energy": ["CWEN","BE","ARRY","SHLS","STEM","FLNC","GPRE","AMRC","CLNE","GEVO","EVGO","BLNK","CHPT"],
   "Comm Services":  ["LUMN","VSAT","IRDM","GSAT","SHEN","IDT","SPOK","OOMA","LMND","GOGO","TMUS","SATS","AVNW","CLFD"],
-  "Fiber/Optical":  ["LITE","AAOI","VIAV","CIEN","CRDO","POET","ANGO","COHU","FORM","ADTN","CALX","NTGR","COMM"]
+  "Fiber/Optical":  ["LITE","AAOI","VIAV","CIEN","CRDO","POET","ANGO","COHU","FORM","ADTN","CALX","NTGR","COMM"],
+  "Nuclear Energy": ["CCJ","NNE","SMR","OKLO","LEU","UEC","UUUU","DNN","URG","BWXT","VST","CEG","ETN","PWR","GEV"]
 };
 
 // Full catalyst + mid-cap universe — $2-$250
@@ -2910,7 +2912,9 @@ const SMALLCAP = ["MRAM", "KTOS", "AVAV", "RCAT", "ACHR", "JOBY", "ASTS", "LUNR"
   "SATS", "SPOK", "LPSN", "CEVA", "DRS", "CACI", "SAIC", "BWXT", "HWM", "TDG", "TALK", "ALHC", "CERT", "XERS", "INVA", "LUNG", "LDOS", "PANW", "SNOW", 
   "MDB", "NET", "TEAM", "HUBS", "INSP", "IRTC", "OMCL", "NTRA", "RGEN", "PAYC", "PAYO", 
   "SMCI", "AEHR", "ACLS", "EME", "TTMI", "UCTT", "KLIC", "KRYS", "VKTX", "ARWR", "RKLB", "DOMO", "TSSI", 
-  "MAXN", "SPWR", "LC", "CACC", "ENVA", "QFIN", "WKHS", "MVST"
+  "MAXN", "SPWR", "LC", "CACC", "ENVA", "QFIN", "WKHS", "MVST",
+  // Nuclear energy — AI power demand thesis
+  "CCJ", "NNE", "SMR", "OKLO", "LEU", "UEC", "UUUU", "DNN", "URG"
 ];
 
 // ── State ───────────────────────────────────────────────────
