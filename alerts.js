@@ -211,6 +211,13 @@ const REDDIT_CACHE_KEY = "cs_reddit_cache";
 const SUBREDDITS = ["wallstreetbets","stocks","options","investing"];
 
 async function fetchRedditMentions(sym){
+  // DISABLED — Reddit's public JSON endpoint blocks browser requests via CORS
+  // (no Access-Control-Allow-Origin header), so every call failed and spammed the
+  // console. Returning null; all consumers already handle a null reddit result.
+  // To re-enable, route these through a CORS proxy / serverless function instead
+  // of calling reddit.com directly, then restore the body below.
+  return null;
+  /* original implementation preserved for future re-enable:
   try{
     const cached = JSON.parse(localStorage.getItem(REDDIT_CACHE_KEY)||"{}");
     const now    = Date.now();
@@ -246,6 +253,7 @@ async function fetchRedditMentions(sym){
     try{ localStorage.setItem(REDDIT_CACHE_KEY, JSON.stringify(cached)); }catch(e){}
     return result;
   }catch(e){ return null; }
+  */
 }
 
 // ── Main run function ─────────────────────────────────────────────────────────
