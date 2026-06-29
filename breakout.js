@@ -236,8 +236,8 @@ function renderBreakout(){
       <div class="bo-row2">
         <span class="bo-sc"><b>${s.setupScore||0}</b> setup</span>
         <span class="bo-sc"><b>${s.triggerScore||'—'}</b> trig</span>
-        <div class="bo-stack">${pips}</div>
       </div>
+      <div class="bo-stack" style="margin-left:0;margin-top:10px;width:100%;justify-content:space-between;flex-wrap:wrap;gap:6px 4px">${pips}</div>
       <div class="bo-bars">
         ${bar('Base',p.base,30,'var(--green2)')}
         ${bar('Vol',p.vol,25,'#00bcd4')}
