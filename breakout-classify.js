@@ -77,7 +77,7 @@ const fbWrite = (p, b) => fbRequest("PUT", p, b);
 
 // ── TwelveData: one daily series per ticker (oldest→newest) ───────────────────
 // outputsize 160 covers: ATR-then (~60 bars ago), 6-month RS, base window, 20/50 SMA.
-function fetchDailySeries(sym) {
+function fetchDailySeries(sym, debug=false) {
   return new Promise(resolve => {
     const path = `/v1/time_series?symbol=${encodeURIComponent(sym)}&interval=1day&outputsize=160&apikey=${TD_KEY}`;
     const req = https.request({ hostname: "api.twelvedata.com", path, method: "GET",
@@ -86,7 +86,10 @@ function fetchDailySeries(sym) {
       res.on("end", () => {
         try {
           const d = JSON.parse(raw);
-          if (d.status === "error" || !d.values || !d.values.length) return resolve(null);
+          if (d.status === "error" || !d.values || !d.values.length) {
+            if (debug) console.log(`   ⓘ ${sym} TD says: ${d.message || d.status || "no values"}`);
+            return resolve(null);
+          }
           // TD returns newest-first → reverse to oldest-first
           const bars = d.values.slice().reverse().map(v => ({
             open:+v.open, high:+v.high, low:+v.low, close:+v.close, volume:+v.volume
@@ -273,16 +276,20 @@ async function main() {
   if (!universe.length) { console.error("❌ No tickers from Firebase."); process.exit(1); }
   console.log(`\n📊 Universe: ${universe.length} tickers`);
 
-  // 2 — SPY once for relative strength (retry — the very first TD call can blip)
+  // 2 — SPY once for relative strength (try fallbacks; the first TD call can also blip)
   console.log(`📡 Fetching SPY for relative strength...`);
   let spyBars = null;
-  for(let attempt=1; attempt<=4 && !spyBars; attempt++){
-    spyBars = await fetchDailySeries("SPY");
-    if(!spyBars){ console.log(`   ↻ SPY attempt ${attempt} failed — retrying...`); await new Promise(r=>setTimeout(r, 1500)); }
+  const spyCandidates = ["SPY", "SPY:NYSE", "SPY:ARCA", "VOO"];
+  for(const symTry of spyCandidates){
+    for(let attempt=1; attempt<=2 && !spyBars; attempt++){
+      spyBars = await fetchDailySeries(symTry, true); // debug=true → logs TD's message
+      if(spyBars){ console.log(`   ✅ RS benchmark: ${symTry} (${spyBars.length} bars)`); break; }
+      await new Promise(r=>setTimeout(r, 1200));
+    }
+    if(spyBars) break;
   }
   const spyCloses = spyBars ? spyBars.map(b=>b.close) : [];
-  if(!spyCloses.length) console.warn("   ⚠️  SPY fetch failed after retries — RS scores will be 0");
-  else console.log(`   ✅ SPY ${spyCloses.length} bars`);
+  if(!spyCloses.length) console.warn("   ⚠️  SPY/benchmark fetch failed — RS scores will be 0 (run continues)");
 
   // 3 — score each ticker from one candle fetch
   const setups = {};      // keyed by sym — shape the breakout tab reads directly
