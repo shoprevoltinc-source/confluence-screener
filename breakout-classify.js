@@ -29,7 +29,10 @@ const getArg = (flag, def) => { const i = args.indexOf(flag); return i >= 0 && a
 const hasArg = (flag)      => args.includes(flag);
 
 const SOURCE  = getArg("--source", "all");
-const TOP_N   = parseInt(getArg("--top", "9999"), 10); // default: whole universe
+const TOP_RAW = (getArg("--top", "all") || "all").trim();
+// 'all' or any non-numeric (e.g. NaN from a stray space) → whole universe
+const TOP_N   = (TOP_RAW.toLowerCase() === "all" || isNaN(parseInt(TOP_RAW, 10)))
+                  ? 9999 : parseInt(TOP_RAW, 10);
 const DRY_RUN = hasArg("--dry-run");
 const DELAY   = 300; // ms between candle fetches — your standard Grow-plan delay
 
