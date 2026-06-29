@@ -269,7 +269,14 @@ function sendTelegram(text){
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
   console.log(`\n🚀 Breakout Classifier (Layer 1 — daily setup)`);
-  console.log(`   Source: ${SOURCE} · Top: ${TOP_N===9999?"all":TOP_N} · Dry: ${DRY_RUN}\n`);
+  console.log(`   Source: ${SOURCE} · Top: ${TOP_N===9999?"all":TOP_N} · Dry: ${DRY_RUN}`);
+  // ── env sanity check (masked — does not leak secrets) ──────────────────────
+  const tdRaw = process.env.TD_KEYS || "";
+  const keyLen = TD_KEY ? TD_KEY.length : 0;
+  console.log(`   TD_KEYS present: ${tdRaw ? "yes" : "NO ❌"} · using key length ${keyLen}`
+    + (TD_KEY ? ` (…${TD_KEY.slice(-4)})` : ""));
+  console.log(`   FIREBASE_URL: ${process.env.FIREBASE_URL ? "set" : "NO ❌"} · FIREBASE_TOKEN: ${process.env.FIREBASE_TOKEN ? "set" : "absent"}\n`);
+  if(!tdRaw) console.warn("   ⚠️  TD_KEYS env var is empty — every candle fetch will fail. Check the workflow env block + secret name.\n");
 
   // 1 — universe + your pre-computed fields
   const universe = (await readSources(SOURCE)).filter(s=>s.sym).slice(0, TOP_N);
