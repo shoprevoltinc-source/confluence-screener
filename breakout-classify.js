@@ -273,11 +273,16 @@ async function main() {
   if (!universe.length) { console.error("❌ No tickers from Firebase."); process.exit(1); }
   console.log(`\n📊 Universe: ${universe.length} tickers`);
 
-  // 2 — SPY once for relative strength
+  // 2 — SPY once for relative strength (retry — the very first TD call can blip)
   console.log(`📡 Fetching SPY for relative strength...`);
-  const spyBars = await fetchDailySeries("SPY");
+  let spyBars = null;
+  for(let attempt=1; attempt<=4 && !spyBars; attempt++){
+    spyBars = await fetchDailySeries("SPY");
+    if(!spyBars){ console.log(`   ↻ SPY attempt ${attempt} failed — retrying...`); await new Promise(r=>setTimeout(r, 1500)); }
+  }
   const spyCloses = spyBars ? spyBars.map(b=>b.close) : [];
-  if (!spyCloses.length) console.warn("   ⚠️  SPY fetch failed — RS scores will be 0");
+  if(!spyCloses.length) console.warn("   ⚠️  SPY fetch failed after retries — RS scores will be 0");
+  else console.log(`   ✅ SPY ${spyCloses.length} bars`);
 
   // 3 — score each ticker from one candle fetch
   const setups = {};      // keyed by sym — shape the breakout tab reads directly
