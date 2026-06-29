@@ -1,0 +1,58 @@
+name: Breakout Classify (Layer 1)
+
+# ── Triggers ──────────────────────────────────────────────────────────────────
+on:
+  # Manual run — from the Actions tab, or from the app's "RUN SCANNER" button
+  # (which POSTs a workflow_dispatch and passes these inputs).
+  workflow_dispatch:
+    inputs:
+      top:
+        description: "Universe cap — a number (e.g. 50) or 'all'"
+        required: false
+        default: "all"
+      source:
+        description: "Source: all | jax | weekly | recovery | catalyst"
+        required: false
+        default: "all"
+
+  # Scheduled — 9:15am ET Mon–Fri, a few minutes after weinstein-classify (9:10)
+  # so screener/* fields are fresh. GitHub cron is UTC and does NOT auto-adjust
+  # for DST: 13:15 UTC = 9:15 EDT (summer). In winter (EST) this fires at 8:15 ET
+  # — if you want exactly 9:15 year-round, switch to "15 14 * * 1-5" during EST,
+  # or keep both lines and accept one harmless early/late run.
+  schedule:
+    - cron: "15 13 * * 1-5"
+
+# Least privilege — this job only reads the repo (it writes to Firebase, not GitHub)
+permissions:
+  contents: read
+
+# Don't pile up overlapping runs if a manual dispatch lands on a scheduled one
+concurrency:
+  group: breakout-classify
+  cancel-in-progress: false
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run breakout classifier (Layer 1)
+        env:
+          FIREBASE_URL:       ${{ secrets.FIREBASE_URL }}
+          FIREBASE_TOKEN:     ${{ secrets.FIREBASE_TOKEN }}
+          TD_KEYS:            ${{ secrets.TD_KEYS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          node breakout-classify.js \
+            --top "${{ github.event.inputs.top || 'all' }}" \
+            --source "${{ github.event.inputs.source || 'all' }}"
