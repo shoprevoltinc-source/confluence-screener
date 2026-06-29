@@ -270,13 +270,32 @@ function sendTelegram(text){
 async function main() {
   console.log(`\n🚀 Breakout Classifier (Layer 1 — daily setup)`);
   console.log(`   Source: ${SOURCE} · Top: ${TOP_N===9999?"all":TOP_N} · Dry: ${DRY_RUN}`);
-  // ── env sanity check (masked — does not leak secrets) ──────────────────────
+
+  // ════════════════════════════════════════════════════════════════════════
+  // SELF-TEST — prints the exact cause before doing any real work.
+  // ════════════════════════════════════════════════════════════════════════
   const tdRaw = process.env.TD_KEYS || "";
-  const keyLen = TD_KEY ? TD_KEY.length : 0;
-  console.log(`   TD_KEYS present: ${tdRaw ? "yes" : "NO ❌"} · using key length ${keyLen}`
-    + (TD_KEY ? ` (…${TD_KEY.slice(-4)})` : ""));
-  console.log(`   FIREBASE_URL: ${process.env.FIREBASE_URL ? "set" : "NO ❌"} · FIREBASE_TOKEN: ${process.env.FIREBASE_TOKEN ? "set" : "absent"}\n`);
-  if(!tdRaw) console.warn("   ⚠️  TD_KEYS env var is empty — every candle fetch will fail. Check the workflow env block + secret name.\n");
+  console.log(`\n──────── SELF-TEST ────────`);
+  console.log(` TD_KEYS env present : ${tdRaw ? "YES" : "NO ❌ (secret not reaching script)"}`);
+  console.log(` key length / suffix : ${TD_KEY ? TD_KEY.length + "  …" + TD_KEY.slice(-4) : "—"}`);
+  console.log(` FIREBASE_URL        : ${process.env.FIREBASE_URL ? "set" : "NO ❌"}`);
+  console.log(` FIREBASE_TOKEN      : ${process.env.FIREBASE_TOKEN ? "set" : "absent"}`);
+  // raw probe to TwelveData — prints the literal answer (key error / network / OK)
+  const probe = await new Promise(resolve => {
+    const path = `/v1/time_series?symbol=AAPL&interval=1day&outputsize=2&apikey=${TD_KEY}`;
+    const r = https.request({ hostname:"api.twelvedata.com", path, method:"GET" }, res=>{
+      let raw=""; res.on("data",c=>raw+=c);
+      res.on("end",()=>resolve(`HTTP ${res.statusCode} · ${raw.slice(0,160)}`));
+    });
+    r.on("error", e=>resolve(`NETWORK FAIL · ${e.message}`));
+    r.setTimeout(10000, ()=>{ r.destroy(); resolve("TIMEOUT after 10s (egress likely blocked)"); });
+    r.end();
+  });
+  console.log(` TwelveData probe    : ${probe}`);
+  console.log(`───────────────────────────\n`);
+  // hard stop if the key clearly isn't getting through — no point scoring 0
+  if(!tdRaw){ console.error("❌ TD_KEYS is empty in the Action. Fix the secret/workflow env. Exiting."); process.exit(1); }
+
 
   // 1 — universe + your pre-computed fields
   const universe = (await readSources(SOURCE)).filter(s=>s.sym).slice(0, TOP_N);
