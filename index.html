@@ -1521,6 +1521,7 @@ function switchTab(tab){ _doSwitchTab(tab); }
   <div class="tab" id="tab-backtest" onclick="switchTab('backtest')">🔬 Backtest</div>
   <div class="tab" id="tab-agent" onclick="switchTab('agent')" style="color:var(--green2);font-weight:700">🤖 Agent</div>
   <div class="tab" id="tab-weinstein" onclick="switchTab('weinstein')" style="color:#FFB300;font-weight:700">📊 Weinstein</div>
+  <div class="tab" id="tab-breakout" onclick="switchTab('breakout')" style="color:#00b0ff;font-weight:700">🚀 Breakout</div>
   <button id="options-desk-btn" onclick="openOptionsDesk()">🎯 OPTIONS DESK</button>
 </div>
 
@@ -2703,6 +2704,84 @@ function switchTab(tab){ _doSwitchTab(tab); }
 
 </div><!-- end weinstein -->
 
+<!-- ═══ BREAKOUT TAB ═══ -->
+<div class="tab-panel" id="panel-breakout">
+<style>
+#panel-breakout .bo-card{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--muted);border-radius:3px;padding:13px 14px;cursor:pointer;transition:border-color .15s,transform .1s;position:relative}
+#panel-breakout .bo-card:hover{transform:translateY(-2px);border-color:var(--border2)}
+#panel-breakout .bo-card.bo-tA{border-left-color:var(--green2);box-shadow:0 4px 20px rgba(0,200,83,.06)}
+#panel-breakout .bo-card.bo-tE{border-left-color:var(--orange)}
+#panel-breakout .bo-card.bo-tW{border-left-color:var(--blue)}
+#panel-breakout .bo-row1{display:flex;align-items:center;gap:9px}
+#panel-breakout .bo-tkr{font-family:var(--sans);font-size:18px;font-weight:800;color:#fff;letter-spacing:1px;display:flex;align-items:center;gap:6px}
+#panel-breakout .bo-px{font-family:var(--mono);font-size:13px;color:var(--muted2)}
+#panel-breakout .bo-stars{color:#e8c14a;font-size:12px;letter-spacing:1px}
+#panel-breakout .bo-tier{margin-left:auto;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.08em;padding:3px 9px;border:1px solid;border-radius:4px}
+#panel-breakout .bo-row2{display:flex;align-items:center;gap:14px;margin-top:10px}
+#panel-breakout .bo-sc{font-family:var(--mono);font-size:10px;color:var(--muted2)}
+#panel-breakout .bo-sc b{font-size:15px;color:var(--text);font-weight:700}
+#panel-breakout .bo-stack{display:flex;gap:5px;margin-left:auto}
+#panel-breakout .bo-pip{display:flex;flex-direction:column;align-items:center;gap:3px;width:30px}
+#panel-breakout .bo-pip i{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--border2);background:transparent;transition:.15s}
+#panel-breakout .bo-pip.on i{background:var(--green2);border-color:var(--green2);box-shadow:0 0 6px rgba(0,200,83,.4)}
+#panel-breakout .bo-pip b{font-family:var(--mono);font-size:8px;font-weight:500;color:var(--muted);letter-spacing:.02em}
+#panel-breakout .bo-bars{margin-top:10px;display:grid;gap:5px}
+#panel-breakout .bo-bar{display:flex;align-items:center;gap:8px}
+#panel-breakout .bo-bl{font-family:var(--mono);font-size:9px;color:var(--muted2);width:42px}
+#panel-breakout .bo-bt{flex:1;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}
+#panel-breakout .bo-bf{display:block;height:100%;border-radius:2px}
+#panel-breakout .bo-bv{font-family:var(--mono);font-size:9px;color:var(--muted2);width:42px;text-align:right}
+#panel-breakout .bo-detail{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px}
+#panel-breakout .bo-tag{font-family:var(--mono);font-size:8px;padding:2px 7px;border-radius:1px;border:1px solid rgba(0,200,83,.3);background:rgba(0,200,83,.06);color:var(--green2);letter-spacing:.5px}
+#panel-breakout .bo-tag.warn{border-color:rgba(255,23,68,.3);background:rgba(255,23,68,.06);color:var(--red)}
+#panel-breakout .bo-footer{display:flex;align-items:center;gap:8px;padding-top:8px;margin-top:9px;border-top:1px solid var(--border)}
+#panel-breakout .bo-chip.on{border-color:rgba(0,176,255,.4);background:rgba(0,176,255,.08);color:var(--blue)}
+</style>
+
+<div class="conf-header">
+  <div>
+    <div class="conf-title">🚀 BREAKOUT</div>
+    <div class="conf-sub" id="bo-sub">DAILY SETUP SCORER → 4H TRIGGER → DAILY CONFIRM</div>
+  </div>
+  <div style="margin-left:auto;font-family:var(--mono);font-size:8px;color:var(--muted2)" id="bo-lastrun"></div>
+</div>
+
+<div class="wm-stats">
+  <div class="wm-stat"><div class="wm-stat-v" id="bo-aplus" style="color:var(--green)">0</div><div class="wm-stat-l">A+ Breakout</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="bo-early" style="color:var(--orange)">0</div><div class="wm-stat-l">Early</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="bo-watch" style="color:var(--blue)">0</div><div class="wm-stat-l">Watch</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="bo-avg" style="color:var(--yellow)">—</div><div class="wm-stat-l">Avg Setup</div></div>
+  <div class="wm-stat"><div class="wm-stat-v" id="bo-gated" style="color:var(--muted2)">0</div><div class="wm-stat-l">Gated Out</div></div>
+</div>
+
+<div class="conf-controls">
+  <button class="btn-scan" onclick="triggerBreakoutRun()" style="background:linear-gradient(135deg,#1565C0,#00b0ff);box-shadow:0 0 16px rgba(0,176,255,0.3)">🚀 RUN SCANNER</button>
+  <span id="bo-run-status" style="font-size:8px;color:var(--muted2);font-family:var(--mono)"></span>
+  <span class="ctrl-label">TIER</span>
+  <button class="chip bo-chip on" onclick="setBOFilter('ALL',this)">ALL</button>
+  <button class="chip bo-chip" onclick="setBOFilter('A+',this)">A+</button>
+  <button class="chip bo-chip" onclick="setBOFilter('EARLY',this)">EARLY</button>
+  <button class="chip bo-chip" onclick="setBOFilter('WATCH',this)">WATCH</button>
+  <select class="sort-select" id="bo-sort" onchange="renderBreakout()">
+    <option value="setup">Setup Score</option>
+    <option value="trigger">Trigger Score</option>
+    <option value="ticker">Ticker</option>
+  </select>
+  <input type="text" class="search-input" id="bo-search" placeholder="🔍 ticker..." oninput="renderBreakout()" style="margin-left:4px">
+  <span class="res-count" id="bo-resCount" style="margin-left:auto"></span>
+</div>
+
+<div class="results" id="bo-results">
+  <div class="conf-empty">
+    <span class="conf-empty-icon">🚀</span>
+    BREAKOUT SCANNER<br>
+    <span style="font-size:9px;color:var(--muted2)">Run breakout-classify (GitHub Action) to populate setups</span><br>
+    <span style="font-size:8px;color:var(--muted)">Daily setup scorer → 4H trigger → daily confirm · writes breakout/* in Firebase</span>
+  </div>
+</div>
+
+</div><!-- end breakout -->
+
 <script>
 
 
@@ -2972,6 +3051,9 @@ function _doSwitchTab(tab){
     document.getElementById("mainSubtitle").textContent="📊 WEINSTEIN STAGE ANALYSIS · DESKTOP AGENT · DUAL TIMEFRAME";
     loadWeinstein();
     loadAgent();
+  } else if(tab==="breakout"){
+    document.getElementById("mainSubtitle").textContent="🚀 BREAKOUT · DAILY SETUP → 4H TRIGGER → DAILY CONFIRM";
+    renderBreakout();
   } else if(tab==="backtest"){
     document.getElementById("mainSubtitle").textContent="🔬 BACKTEST · WEEKLY TRAIL FLIP SIGNAL VALIDATOR · 5 YEARS";
   }
@@ -5556,6 +5638,7 @@ function _initApp(){
   try{ loadPulseAlerts(); }catch(e){}
   try{ loadAlertsTab(); }catch(e){ console.warn('loadAlertsTab:',e); }
   try{ loadAgent(); }catch(e){ console.warn("loadAgent:",e); }
+  try{ loadBreakout(); }catch(e){ console.warn("loadBreakout:",e); }
   setTimeout(()=>{ try{ loadCalendar(); }catch(e){} }, 2000);
 }
 
@@ -5580,6 +5663,7 @@ try{
 <script src="regime.js"></script>
 <script src="alerts.js"></script>
 <script src="agent.js"></script>
+<script src="breakout.js"></script>
 <script>
 // Wait for all external scripts to finish loading before init
 // Guards against Service Worker cache serving scripts out of order
