@@ -108,11 +108,42 @@ function renderBreakout(){
   }).join('');
 }
 
-// Manual run hook — wire to your RUN CLASSIFIER PAT (build-queue #7) to enable,
-// mirroring triggerWeinsteinRun(). Until then the scanner runs on schedule.
-function triggerBreakoutRun(){
-  const st = document.getElementById('bo-run-status');
-  if(st) st.textContent = 'Runs via GitHub Action (breakout-classify) — scheduled after daily scan';
+// ── Manual run: triggers the breakout-classify GitHub Action via workflow_dispatch ──
+// Needs a token with "Actions: write" on this repo. DO NOT hardcode it here and commit
+// it — this repo is public. Store it once, per-device, in the browser instead:
+//     localStorage.setItem('gh_pat','github_pat_xxx')
+// (a fine-grained PAT scoped to Actions:write on confluence-screener only).
+// If your Weinstein RUN CLASSIFIER button already works, it uses the same idea — point
+// this at whatever it uses (e.g. set window.GH_PAT in firebase.js) and it'll match.
+const BREAKOUT_REPO     = "shoprevoltinc-source/confluence-screener";
+const BREAKOUT_WORKFLOW = "breakout-classify.yml";
+const BREAKOUT_REF      = "main"; // change to "master" if that's your default branch
+
+async function triggerBreakoutRun(){
+  const st  = document.getElementById('bo-run-status');
+  const pat = window.GH_PAT || (function(){ try{ return localStorage.getItem('gh_pat')||""; }catch(e){ return ""; } })();
+  if(!pat){
+    if(st) st.textContent = 'No token — run once in console: localStorage.setItem("gh_pat","github_pat_…") (Actions:write)';
+    return;
+  }
+  if(st) st.textContent = '⏳ Dispatching scan…';
+  try{
+    const res = await fetch(`https://api.github.com/repos/${BREAKOUT_REPO}/actions/workflows/${BREAKOUT_WORKFLOW}/dispatches`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${pat}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+      },
+      body: JSON.stringify({ ref: BREAKOUT_REF, inputs: { top: 'all', source: 'all' } })
+    });
+    if(res.status === 204){
+      if(st) st.textContent = '✅ Scan dispatched — ~3 min · this tab updates live when it writes';
+    } else {
+      const t = await res.text();
+      if(st) st.textContent = '✗ '+res.status+' '+t.slice(0,90);
+    }
+  }catch(e){ if(st) st.textContent = '✗ '+e.message; }
 }
 
 // Load once from _initApp — registers listeners a single time.
