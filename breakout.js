@@ -353,7 +353,7 @@ function renderBreakout(){
   }
 
   grid.innerHTML = f.map(function(s){
-    const pips  = (s.stack||[]).map(p=>`<div class="bo-pip ${p.on?'on':''}"><i></i><b>${p.k}</b></div>`).join('');
+    const pips  = (s.stack||[]).map(p=>`<div class="bo-pip ${p.on?'on':''}" style="flex:1 1 0;min-width:0;width:auto"><i></i><b style="font-size:7px;letter-spacing:0;white-space:nowrap">${p.k}</b></div>`).join('');
     const tags  = (s.tags||[]).map(t=>`<span class="bo-tag">${(''+t).replace(/_/g,' ')}</span>`).join('');
     const warns = (s.warnings||[]).map(w=>`<span class="bo-tag warn">${w}</span>`).join('');
     const p     = s.parts || {};
@@ -372,7 +372,7 @@ function renderBreakout(){
         <span class="bo-sc"><b>${s.setupScore||0}</b> setup</span>
         <span class="bo-sc"><b>${s.triggerScore||'—'}</b> trig</span>
       </div>
-      <div class="bo-stack" style="margin-left:0;margin-top:10px;width:100%;justify-content:space-between;flex-wrap:nowrap;gap:2px">${pips}</div>
+      <div class="bo-stack" style="margin-left:0;margin-top:10px;width:100%;display:flex;flex-wrap:nowrap;gap:2px">${pips}</div>
       <div class="bo-bars">
         ${bar('Base',p.base,30,'var(--green2)')}
         ${bar('Vol',p.vol,25,'#00bcd4')}
@@ -441,4 +441,4 @@ function loadBreakout(){
 
 // Version stamp — check the console after refresh to confirm the new file loaded.
 // If you DON'T see this line in the console, your Service Worker served a cached copy.
-console.log('%c🚀 breakout.js v5 loaded — Layer 2 (4H trigger) + universe dropdown', 'color:#00b0ff;font-weight:700');
+console.log('%c🚀 breakout.js v6 loaded — responsive pips + Layer 2', 'color:#00b0ff;font-weight:700');
