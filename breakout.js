@@ -272,6 +272,11 @@ function boTriggerEval(c4, dm){
            rvol:+rvol.toFixed(2), breakPct:+breakPct.toFixed(2), closeLoc:+closeLoc.toFixed(2), rangeHigh:+rangeHigh.toFixed(2) };
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// RUN SCANNER — client-side scan (this is what the button calls)
+// ════════════════════════════════════════════════════════════════════════════
+async function triggerBreakoutRun(){ return runBreakoutScan(); }
+
 async function runBreakoutScan(){
   const st = document.getElementById('bo-run-status');
   if(boScanning){ boStopReq = true; if(st) st.textContent='⏹ stopping…'; return; }
@@ -511,7 +516,7 @@ function loadBreakout(){
   }catch(e){}
 
   const subEl = document.getElementById('bo-sub');
-  if(subEl) subEl.textContent = 'DAILY SETUP → 4H TRIGGER → DAILY CONFIRM · v10';
+  if(subEl) subEl.textContent = 'DAILY SETUP → 4H TRIGGER → DAILY CONFIRM · v11';
 
   try{
     const cached = localStorage.getItem('cs_breakout');
@@ -538,4 +543,4 @@ function loadBreakout(){
 
 // Version stamp — check the console after refresh to confirm the new file loaded.
 // If you DON'T see this line in the console, your Service Worker served a cached copy.
-console.log('%c🚀 breakout.js v10 loaded — JAX arrow (daily+4H) additive', 'color:#00b0ff;font-weight:700');
+console.log('%c🚀 breakout.js v11 loaded — JAX arrow + button fix', 'color:#00b0ff;font-weight:700');
