@@ -266,6 +266,7 @@ async function runBreakoutScan(){
 
   // ── LAYER 2 — 4H trigger on the qualified setups only ──────────────────────
   const setupSyms = Object.keys(setups);
+  let trig4hOk=0;
   if(setupSyms.length && !boStopReq){
     let ti=0;
     for(const sym of setupSyms){
@@ -276,6 +277,7 @@ async function runBreakoutScan(){
       try{
         const c4 = await bo4HFetch(sym, 0);
         if(c4){
+          trig4hOk++;
           const tg = boTriggerEval(c4, { atrDaily:s.atr });
           if(tg){
             s.triggerScore = tg.triggerScore;
@@ -313,7 +315,15 @@ async function runBreakoutScan(){
 
   boScanning = false; boStopReq = false;
   boSetups = setups; renderBreakout();
-  if(st) st.textContent = '✅ '+scored+' setups · '+gated+' gated · saved '+new Date().toLocaleTimeString();
+  if(st){
+    const aplus = Object.values(setups).filter(x=>x.tier==='A+').length;
+    const early = Object.values(setups).filter(x=>x.tier==='EARLY').length;
+    if(setupSyms.length && trig4hOk===0){
+      st.textContent = '⚠️ '+scored+' setups · Layer 2 could NOT fetch 4H data (0/'+setupSyms.length+') — names stay WATCH. Tell Claude.';
+    } else {
+      st.textContent = '✅ '+scored+' setups · 4H '+trig4hOk+'/'+setupSyms.length+' · '+aplus+' A+ · '+early+' EARLY · '+new Date().toLocaleTimeString();
+    }
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -362,11 +372,11 @@ function renderBreakout(){
       +`<span class="bo-bv">${(v||0).toFixed(0)}/${m}</span></div>`;
     const tClr = boTierClr(s.tier);
     return `<div class="bo-card ${boTierCls(s.tier)}" onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
-      <div class="bo-row1">
-        <span class="bo-tkr">${tickerLogo(s.sym,20)}${s.sym}</span>
-        <span class="bo-px">$${(s.close||0).toFixed(2)}</span>
-        <span class="bo-stars">${boStars(s.stars||1)}</span>
-        <span class="bo-tier" style="color:${tClr};border-color:${tClr}">${s.tier}</span>
+      <div class="bo-row1" style="flex-wrap:nowrap;min-width:0">
+        <span class="bo-tkr" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:1">${tickerLogo(s.sym,20)}${s.sym}</span>
+        <span class="bo-px" style="flex-shrink:0">$${(s.close||0).toFixed(2)}</span>
+        <span class="bo-stars" style="flex-shrink:0">${boStars(s.stars||1)}</span>
+        <span class="bo-tier" style="color:${tClr};border-color:${tClr};flex-shrink:0;white-space:nowrap;margin-left:auto">${s.tier}</span>
       </div>
       <div class="bo-row2">
         <span class="bo-sc"><b>${s.setupScore||0}</b> setup</span>
@@ -416,6 +426,9 @@ function loadBreakout(){
     }
   }catch(e){}
 
+  const subEl = document.getElementById('bo-sub');
+  if(subEl) subEl.textContent = 'DAILY SETUP → 4H TRIGGER → DAILY CONFIRM · v8';
+
   try{
     const cached = localStorage.getItem('cs_breakout');
     if(cached){ const o=JSON.parse(cached); boSetups=o.setups||{}; boMeta=o.meta||null; renderBreakout(); }
@@ -441,4 +454,4 @@ function loadBreakout(){
 
 // Version stamp — check the console after refresh to confirm the new file loaded.
 // If you DON'T see this line in the console, your Service Worker served a cached copy.
-console.log('%c🚀 breakout.js v6 loaded — responsive pips + Layer 2', 'color:#00b0ff;font-weight:700');
+console.log('%c🚀 breakout.js v8 loaded — header badge fix', 'color:#00b0ff;font-weight:700');
