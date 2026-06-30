@@ -144,6 +144,60 @@ async function boGetUniverse(mode){
   return syms.length >= 20 ? syms : dedup(SC);  // fallback if screener empty
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// LAYER 2 — 4H TRIGGER (consolidation break · RVOL · close-loc · wick · fresh)
+// Runs only on Layer-1 setups, so it's cheap. Promotes WATCH → EARLY / A+.
+// ════════════════════════════════════════════════════════════════════════════
+const BO_T = { BREAK_PCT:2.0, RVOL_MIN:1.5, CLOSE_LOC_MIN:0.70, WICK_MAX:0.40,
+  FRESH_ATR_MAX:2.5, EARLY_RVOL:1.2, EARLY_LOC:0.60, LOOKBACK:10 };
+
+async function bo4HFetch(sym, ki){
+  const key = (typeof TD_KEYS!=='undefined' && TD_KEYS.length) ? TD_KEYS[ki % TD_KEYS.length] : null;
+  if(!key) return null;
+  try{
+    const url = 'https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(sym)
+      +'&interval=4h&outputsize=120&apikey='+key;
+    const r = await fetch(url);
+    if(!r.ok) return null;
+    const d = await r.json();
+    if(!d || d.status==='error' || !d.values || !d.values.length) return null;
+    const v = d.values.slice().reverse(); // TD returns newest-first → oldest-first
+    return { closes:v.map(x=>+x.close), highs:v.map(x=>+x.high), lows:v.map(x=>+x.low), volumes:v.map(x=>+(x.volume||0)) };
+  }catch(e){ return null; }
+}
+
+// Evaluate the 4H trigger. dm = daily metrics (for ATR + extension). Returns trigger detail.
+function boTriggerEval(c4, dm){
+  const n=c4.closes.length; if(n<BO_T.LOOKBACK+2) return null;
+  const close=c4.closes[n-1], high=c4.highs[n-1], low=c4.lows[n-1];
+  const rangeHigh=Math.max.apply(null, c4.highs.slice(n-1-BO_T.LOOKBACK, n-1));
+  const breakPct=rangeHigh>0?(close-rangeHigh)/rangeHigh*100:0;
+  const avgVol=c4.volumes.slice(n-1-20<0?0:n-1-20, n-1).reduce((a,b)=>a+b,0)/Math.min(20,n-1);
+  const rvol=avgVol>0?c4.volumes[n-1]/avgVol:0;
+  const barRange=high-low;
+  const closeLoc=barRange>0?(close-low)/barRange:0;
+  const wickFrac=barRange>0?(high-close)/barRange:0;
+  const atr=dm.atrDaily||barRange||1;
+  const extAtr=atr>0?(close-rangeHigh)/atr:0;
+
+  const closeOver=breakPct>=BO_T.BREAK_PCT, volOk=rvol>=BO_T.RVOL_MIN,
+        locOk=closeLoc>=BO_T.CLOSE_LOC_MIN, wickOk=wickFrac<=BO_T.WICK_MAX,
+        fresh=extAtr<=BO_T.FRESH_ATR_MAX && extAtr>=-0.75;
+
+  let score=0;
+  score += closeOver?35:boClamp(breakPct/BO_T.BREAK_PCT)*35;
+  score += volOk?25:boClamp(rvol/BO_T.RVOL_MIN)*25;
+  score += locOk?20:boClamp(closeLoc/BO_T.CLOSE_LOC_MIN)*20;
+  score += wickOk?10:0;
+  score += fresh?10:0;
+  score = Math.round(Math.min(100, score));
+
+  const fullTrigger = closeOver && volOk && locOk && wickOk && fresh;
+  const earlyTrigger = !fullTrigger && fresh && breakPct>=-1 && rvol>=BO_T.EARLY_RVOL && closeLoc>=BO_T.EARLY_LOC;
+  return { triggerScore:score, closeOver, volOk, locOk, wickOk, fresh, fullTrigger, earlyTrigger,
+           rvol:+rvol.toFixed(2), breakPct:+breakPct.toFixed(2), closeLoc:+closeLoc.toFixed(2), rangeHigh:+rangeHigh.toFixed(2) };
+}
+
 async function runBreakoutScan(){
   const st = document.getElementById('bo-run-status');
   if(boScanning){ boStopReq = true; if(st) st.textContent='⏹ stopping…'; return; }
@@ -209,6 +263,42 @@ async function runBreakoutScan(){
   }
 
   await Promise.all(chunks.map((c,ki)=>worker(ki, c)));
+
+  // ── LAYER 2 — 4H trigger on the qualified setups only ──────────────────────
+  const setupSyms = Object.keys(setups);
+  if(setupSyms.length && !boStopReq){
+    let ti=0;
+    for(const sym of setupSyms){
+      if(boStopReq) break;
+      ti++;
+      if(st) st.textContent = '⏳ Layer 2 (4H trigger): '+ti+'/'+setupSyms.length+' · '+sym;
+      const s = setups[sym];
+      try{
+        const c4 = await bo4HFetch(sym, 0);
+        if(c4){
+          const tg = boTriggerEval(c4, { atrDaily:s.atr });
+          if(tg){
+            s.triggerScore = tg.triggerScore;
+            const dailyConfirm = !s.extended && s.distPct <= 2;   // daily at new-high & fresh
+            s.stack = s.stack.map(p=>{
+              if(p.k==='CLOSE') return { k:'CLOSE', on: tg.closeOver && tg.locOk };
+              if(p.k==='DAILY') return { k:'DAILY', on: dailyConfirm };
+              return p;
+            });
+            if(!s.extended){
+              if(tg.fullTrigger && dailyConfirm) s.tier='A+';
+              else if(tg.fullTrigger || tg.earlyTrigger) s.tier='EARLY';
+              else s.tier='WATCH';
+            } else { s.tier='WATCH'; }
+            if(tg.fullTrigger && s.tags.indexOf('TRIGGER')<0) s.tags.unshift('TRIGGER');
+            s.trig = { rvol:tg.rvol, breakPct:tg.breakPct, closeLoc:tg.closeLoc };
+          }
+        }
+      }catch(e){}
+      boSetups = Object.assign({}, setups); renderBreakout();
+      await new Promise(r=>setTimeout(r, 200));
+    }
+  }
 
   // write under screener/breakout — a path your rules already permit (no token needed)
   const ranked = Object.values(setups).sort((a,b)=>b.setupScore-a.setupScore);
@@ -351,4 +441,4 @@ function loadBreakout(){
 
 // Version stamp — check the console after refresh to confirm the new file loaded.
 // If you DON'T see this line in the console, your Service Worker served a cached copy.
-console.log('%c🚀 breakout.js v4 loaded — universe dropdown + aligned cards', 'color:#00b0ff;font-weight:700');
+console.log('%c🚀 breakout.js v5 loaded — Layer 2 (4H trigger) + universe dropdown', 'color:#00b0ff;font-weight:700');
