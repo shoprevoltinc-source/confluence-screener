@@ -10,6 +10,7 @@ let boSetups   = {};   // keyed by sym
 let boTriggers = {};   // keyed by sym (Layer 2, not built yet)
 let boMeta     = null;
 let boFilter   = "ALL";
+let boUniverse = "flagged";   // flagged | smallcap | sp500 | all | watchlist
 let boScanning = false, boStopReq = false;
 
 function boText(id, v){ const e = document.getElementById(id); if(e) e.textContent = v; }
@@ -100,6 +101,49 @@ function boGate(m, stage){
 // ════════════════════════════════════════════════════════════════════════════
 async function triggerBreakoutRun(){ return runBreakoutScan(); }
 
+// Build the scan universe. "flagged" = union of tickers your other scanners already
+// surfaced (screener/recovery|catalyst|jax_scan|weekly_monitor) — pre-vetted & smaller,
+// so the scan is much faster and higher signal. Falls back to small-caps if empty.
+async function boGetUniverse(mode){
+  mode = mode || boUniverse || 'flagged';
+  const dedup = arr => [...new Set((arr||[]).filter(Boolean).map(s=>(''+s).toUpperCase().trim()))];
+  const SC = (typeof SMALLCAP!=='undefined') ? SMALLCAP : [];
+  const SP = (typeof SP500!=='undefined') ? SP500 : [];
+
+  if(mode==='smallcap') return dedup(SC);
+  if(mode==='sp500')    return dedup(SP);
+  if(mode==='all')      return dedup([...SC, ...SP]);
+  if(mode==='watchlist'){
+    if(typeof WATCHLIST!=='undefined' && WATCHLIST.length) return dedup(WATCHLIST);
+    try{ const w=JSON.parse(localStorage.getItem('cs_watchlist')||'[]'); if(w.length) return dedup(w); }catch(e){}
+    return dedup(SC);
+  }
+
+  // 'flagged' — read the screener nodes your other scanners write
+  let syms = [];
+  try{
+    if(typeof firebase!=='undefined' && firebase.database){
+      const nodes = ['recovery','catalyst','jax_scan','weekly_monitor'];
+      for(const n of nodes){
+        try{
+          const snap = await firebase.database().ref('screener/'+n).once('value');
+          const v = snap.val(); if(!v) continue;
+          let arr = [];
+          if(Array.isArray(v)) arr = v;
+          else if(Array.isArray(v.data)) arr = v.data;
+          else if(typeof v==='object') arr = Object.values(v).filter(x=>x && typeof x==='object');
+          arr.forEach(it=>{
+            if(typeof it==='string') syms.push(it);
+            else if(it) { const s = it.sym||it.ticker||it.symbol; if(s) syms.push(s); }
+          });
+        }catch(e){}
+      }
+    }
+  }catch(e){}
+  syms = dedup(syms);
+  return syms.length >= 20 ? syms : dedup(SC);  // fallback if screener empty
+}
+
 async function runBreakoutScan(){
   const st = document.getElementById('bo-run-status');
   if(boScanning){ boStopReq = true; if(st) st.textContent='⏹ stopping…'; return; }
@@ -108,11 +152,12 @@ async function runBreakoutScan(){
   }
   boScanning = true; boStopReq = false;
 
-  // universe — catalyst small-caps + S&P 500, deduped (your "both" set)
-  let tickers = (typeof SMALLCAP !== 'undefined') ? [...SMALLCAP] : [];
-  if(typeof SP500 !== 'undefined') tickers = [...new Set([...tickers, ...SP500])];
+  // universe — see boGetUniverse(); default "flagged" = pre-vetted union from your scanners
+  const tickers = await boGetUniverse(boUniverse);
   const total = tickers.length;
-  if(st) st.textContent = '⏳ scanning '+total+' tickers in-browser…';
+  if(!total){ if(st) st.textContent='✗ universe empty — run your other scanners first, or switch to Small-caps'; boScanning=false; return; }
+  const uniLabel = {flagged:'flagged',smallcap:'small-caps',sp500:'S&P 500',all:'all',watchlist:'watchlist'}[boUniverse]||boUniverse;
+  if(st) st.textContent = '⏳ scanning '+total+' '+uniLabel+' tickers in-browser…';
 
   // SPY once for relative strength
   let spy=null; try{ spy = await fetchCandlesWithKey('SPY', 0); }catch(e){}
@@ -159,7 +204,7 @@ async function runBreakoutScan(){
           }
         }
       }catch(e){ /* skip bad ticker */ }
-      await new Promise(r=>setTimeout(r, 300)); // your standard Grow-plan delay
+      await new Promise(r=>setTimeout(r, 200)); // ~5 req/s — under the Grow 377/min cap
     }
   }
 
@@ -237,7 +282,7 @@ function renderBreakout(){
         <span class="bo-sc"><b>${s.setupScore||0}</b> setup</span>
         <span class="bo-sc"><b>${s.triggerScore||'—'}</b> trig</span>
       </div>
-      <div class="bo-stack" style="margin-left:0;margin-top:10px;width:100%;justify-content:space-between;flex-wrap:wrap;gap:6px 4px">${pips}</div>
+      <div class="bo-stack" style="margin-left:0;margin-top:10px;width:100%;justify-content:space-between;flex-wrap:nowrap;gap:2px">${pips}</div>
       <div class="bo-bars">
         ${bar('Base',p.base,30,'var(--green2)')}
         ${bar('Vol',p.vol,25,'#00bcd4')}
@@ -261,6 +306,26 @@ function renderBreakout(){
 // LOAD — read screener/breakout (written by the browser scan above)
 // ════════════════════════════════════════════════════════════════════════════
 function loadBreakout(){
+  // inject a universe selector into the controls (additive; no index.html change)
+  try{
+    const ctrls = document.querySelector('#panel-breakout .conf-controls');
+    if(ctrls && !document.getElementById('bo-universe')){
+      const sel = document.createElement('select');
+      sel.className = 'sort-select'; sel.id = 'bo-universe';
+      sel.title = 'Scan universe';
+      sel.innerHTML = '<option value="flagged">⚡ Flagged (~fast)</option>'
+        + '<option value="smallcap">Small-caps</option>'
+        + '<option value="sp500">S&amp;P 500</option>'
+        + '<option value="all">All (~slow)</option>'
+        + '<option value="watchlist">Watchlist</option>';
+      sel.value = boUniverse;
+      sel.onchange = function(){ boUniverse = sel.value; };
+      const sortSel = document.getElementById('bo-sort');
+      if(sortSel && sortSel.parentNode) sortSel.parentNode.insertBefore(sel, sortSel);
+      else ctrls.appendChild(sel);
+    }
+  }catch(e){}
+
   try{
     const cached = localStorage.getItem('cs_breakout');
     if(cached){ const o=JSON.parse(cached); boSetups=o.setups||{}; boMeta=o.meta||null; renderBreakout(); }
@@ -283,3 +348,7 @@ function loadBreakout(){
   if(window.firebaseReady){ _fb(); }
   else { document.addEventListener('firebaseReady', _fb, {once:true}); }
 }
+
+// Version stamp — check the console after refresh to confirm the new file loaded.
+// If you DON'T see this line in the console, your Service Worker served a cached copy.
+console.log('%c🚀 breakout.js v4 loaded — universe dropdown + aligned cards', 'color:#00b0ff;font-weight:700');
