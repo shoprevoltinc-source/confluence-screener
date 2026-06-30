@@ -97,9 +97,83 @@ function boGate(m, stage){
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// RUN SCANNER — client-side scan (this is what the button calls)
+// JAX PRO arrow — faithful JS port of longCond from JAX_PRO_Strategy_v5 (Pine v6).
+// longCond = (utBuy OR stFlip) AND bull_score>=entry_min AND rsi14<70
+// Used ADDITIVELY: computed on daily AND 4H; a badge lights when both agree.
 // ════════════════════════════════════════════════════════════════════════════
-async function triggerBreakoutRun(){ return runBreakoutScan(); }
+const JAX = { ATR_P:10, ATR_MULT:3.5, ST_FACTOR:1.5, ST_ATR:10, ENTRY_MIN:1 };
+
+function jaxATRSeries(highs,lows,closes,n){
+  const len=closes.length, tr=new Array(len).fill(NaN), atr=new Array(len).fill(NaN);
+  for(let i=1;i<len;i++){ const h=highs[i],l=lows[i],pc=closes[i-1]; tr[i]=Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)); }
+  if(len<=n) return atr;
+  let sum=0; for(let i=1;i<=n;i++) sum+=tr[i]; atr[n]=sum/n;
+  for(let i=n+1;i<len;i++) atr[i]=(atr[i-1]*(n-1)+tr[i])/n;
+  return atr;
+}
+function jaxEMAval(c,n){ const k=2/(n+1); let e=c[0]; for(let i=1;i<c.length;i++) e=c[i]*k+e*(1-k); return e; }
+function jaxEMASeries(v,n){ const k=2/(n+1), out=[v[0]]; for(let i=1;i<v.length;i++) out.push(v[i]*k+out[i-1]*(1-k)); return out; }
+function jaxRSI(c,n){
+  let g=0,l=0; for(let i=1;i<=n;i++){ const ch=c[i]-c[i-1]; if(ch>=0) g+=ch; else l-=ch; }
+  let ag=g/n, al=l/n;
+  for(let i=n+1;i<c.length;i++){ const ch=c[i]-c[i-1]; ag=(ag*(n-1)+(ch>0?ch:0))/n; al=(al*(n-1)+(ch<0?-ch:0))/n; }
+  if(al===0) return 100; return 100-100/(1+ag/al);
+}
+function jaxMACDhist(c){
+  const e12=jaxEMASeries(c,12), e26=jaxEMASeries(c,26), macd=c.map((_,i)=>e12[i]-e26[i]), sig=jaxEMASeries(macd,9);
+  const i=c.length-1; return macd[i]-sig[i];
+}
+function jaxWPR(highs,lows,closes,n){
+  const i=closes.length-1, hh=Math.max.apply(null,highs.slice(i-n+1,i+1)), ll=Math.min.apply(null,lows.slice(i-n+1,i+1));
+  return hh===ll?0:(hh-closes[i])/(hh-ll)*-100;
+}
+// UT Bot ATR trailing stop → direction series
+function jaxTrailDir(closes, atr, mult){
+  const n=closes.length, trail=new Array(n).fill(NaN), tdir=new Array(n).fill(0);
+  for(let i=0;i<n;i++){
+    const a=isNaN(atr[i])?0:atr[i], nLoss=mult*a, trailUp=closes[i]-nLoss, trailDown=closes[i]+nLoss;
+    if(i===0||isNaN(trail[i-1])) trail[i]=closes[i];
+    else { const pt=trail[i-1];
+      if(closes[i]>pt && closes[i-1]>pt) trail[i]=Math.max(pt,trailUp);
+      else if(closes[i]<pt && closes[i-1]<pt) trail[i]=Math.min(pt,trailDown);
+      else trail[i]= closes[i]>pt ? trailUp : trailDown; }
+    tdir[i] = i===0 ? 0 : (trail[i]>trail[i-1]?1:trail[i]<trail[i-1]?-1:tdir[i-1]);
+  }
+  return tdir;
+}
+// Supertrend direction series (-1 = bullish, +1 = bearish — matches Pine ta.supertrend)
+function jaxSupertrendDir(highs,lows,closes,factor,atrP){
+  const n=closes.length, atr=jaxATRSeries(highs,lows,closes,atrP);
+  const dir=new Array(n).fill(1), st=new Array(n).fill(NaN), fU=new Array(n).fill(NaN), fL=new Array(n).fill(NaN);
+  for(let i=0;i<n;i++){
+    const hl2=(highs[i]+lows[i])/2, a=isNaN(atr[i])?0:atr[i], bu=hl2+factor*a, bl=hl2-factor*a;
+    if(i===0||isNaN(atr[i-1])){ fU[i]=bu; fL[i]=bl; dir[i]=1; st[i]=bu; continue; }
+    fU[i]=(bu<fU[i-1]||closes[i-1]>fU[i-1])?bu:fU[i-1];
+    fL[i]=(bl>fL[i-1]||closes[i-1]<fL[i-1])?bl:fL[i-1];
+    if(st[i-1]===fU[i-1]) dir[i]= closes[i]>fU[i] ? -1 : 1;
+    else                  dir[i]= closes[i]<fL[i] ?  1 : -1;
+    st[i]= dir[i]===-1 ? fL[i] : fU[i];
+  }
+  return dir;
+}
+// Returns the full JAX evaluation for one candle set (daily or 4H).
+function jaxSignal(cd){
+  const c=cd.closes, h=cd.highs, l=cd.lows, n=c.length;
+  if(n<70) return null;
+  const atr=jaxATRSeries(h,l,c,JAX.ATR_P);
+  const tdir=jaxTrailDir(c,atr,JAX.ATR_MULT);
+  const utBuy = tdir[n-1]===1 && tdir[n-2]===-1;
+  const sdir=jaxSupertrendDir(h,l,c,JAX.ST_FACTOR,JAX.ST_ATR);
+  const stBull = sdir[n-1]<0, stFlip = stBull && !(sdir[n-2]<0);
+  const e20=jaxEMAval(c,20), e40=jaxEMAval(c,40), e60=jaxEMAval(c,60), close=c[n-1];
+  const emaStack = e20>e40 && e40>e60 && close>e20;
+  const macdBull = jaxMACDhist(c)>0;
+  const rsi=jaxRSI(c,14), rsiBull=rsi>50;
+  const wrBull = jaxWPR(h,l,c,14) > -50;
+  const bullScore=(emaStack?1:0)+(macdBull?1:0)+(rsiBull?1:0)+(wrBull?1:0)+(stBull?1:0);
+  const longCond = (utBuy||stFlip) && bullScore>=JAX.ENTRY_MIN && rsi<70;
+  return { longCond, bullScore, utBuy, stFlip, stBull, emaStack, macdBull, rsiBull, wrBull, rsi:+rsi.toFixed(1) };
+}
 
 // Build the scan universe. "flagged" = union of tickers your other scanners already
 // surfaced (screener/recovery|catalyst|jax_scan|weekly_monitor) — pre-vetted & smaller,
@@ -237,6 +311,7 @@ async function runBreakoutScan(){
             if(sc.total >= BO_K.MIN_SCORE){
               const stars = boStarCount(sc.total);
               const extended = m.close > m.sma20*1.20 || m.close > m.sma50*1.25;
+              const jd = jaxSignal(cd);  // JAX arrow on the DAILY timeframe
               const tags=[]; if(m.distPct<=1) tags.push('52W_HIGH'); tags.push('RANGE_BREAK'); if(stage===2 && m.distPct<=3) tags.push('STAGE_2');
               const warnings=[]; if(extended) warnings.push('EXTENDED');
               const stack=[
@@ -251,7 +326,9 @@ async function runBreakoutScan(){
               setups[sym] = { sym, close:+m.close.toFixed(2), tier:'WATCH', stars,
                 setupScore:Math.round(sc.total),
                 parts:{ base:+sc.base.toFixed(1), vol:+sc.vol.toFixed(1), trend:+sc.trend.toFixed(1), rs:+sc.rs.toFixed(1), prox:+sc.prox.toFixed(1) },
-                tags, warnings, stack, distPct:+m.distPct.toFixed(1), atr:+m.atrDaily.toFixed(2), extended, stage:'S'+stage };
+                tags, warnings, stack, distPct:+m.distPct.toFixed(1), atr:+m.atrDaily.toFixed(2), extended, stage:'S'+stage,
+                jaxArrowD: jd?jd.longCond:false, jaxScoreD: jd?jd.bullScore:0, jaxRsiD: jd?jd.rsi:null,
+                jaxArrow4:false, jaxScore4:0, jaxBoth:false };
               scored++;
               boSetups = Object.assign({}, setups); renderBreakout(); // live paint
             }
@@ -278,6 +355,9 @@ async function runBreakoutScan(){
         const c4 = await bo4HFetch(sym, 0);
         if(c4){
           trig4hOk++;
+          const j4 = jaxSignal(c4);  // JAX arrow on the 4H timeframe
+          if(j4){ s.jaxArrow4 = j4.longCond; s.jaxScore4 = j4.bullScore; }
+          s.jaxBoth = !!(s.jaxArrowD && s.jaxArrow4);
           const tg = boTriggerEval(c4, { atrDaily:s.atr });
           if(tg){
             s.triggerScore = tg.triggerScore;
@@ -366,6 +446,10 @@ function renderBreakout(){
     const pips  = (s.stack||[]).map(p=>`<div class="bo-pip ${p.on?'on':''}" style="flex:1 1 0;min-width:0;width:auto"><i></i><b style="font-size:7px;letter-spacing:0;white-space:nowrap">${p.k}</b></div>`).join('');
     const tags  = (s.tags||[]).map(t=>`<span class="bo-tag">${(''+t).replace(/_/g,' ')}</span>`).join('');
     const warns = (s.warnings||[]).map(w=>`<span class="bo-tag warn">${w}</span>`).join('');
+    const jax = s.jaxBoth
+      ? `<span class="bo-tag" style="border-color:#00e676;background:rgba(0,230,118,.12);color:#00e676;font-weight:700">⚡ JAX D+4H · ${s.jaxScoreD||0}/5</span>`
+      : (s.jaxArrowD ? `<span class="bo-tag" style="border-color:rgba(0,176,255,.35);background:rgba(0,176,255,.06);color:#7fd4ff">JAX Daily · ${s.jaxScoreD||0}/5</span>`
+      : (s.jaxArrow4 ? `<span class="bo-tag" style="border-color:rgba(255,179,0,.35);background:rgba(255,179,0,.06);color:#ffce6b">JAX 4H · ${s.jaxScore4||0}/5</span>` : ''));
     const p     = s.parts || {};
     const bar = (lbl,v,m,clr)=>`<div class="bo-bar"><span class="bo-bl">${lbl}</span>`
       +`<span class="bo-bt"><span class="bo-bf" style="width:${Math.round(((v||0)/m)*100)}%;background:${clr}"></span></span>`
@@ -373,10 +457,9 @@ function renderBreakout(){
     const tClr = boTierClr(s.tier);
     return `<div class="bo-card ${boTierCls(s.tier)}" onclick="window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent('${s.sym}'),'_blank')">
       <div class="bo-row1" style="flex-wrap:nowrap;min-width:0">
-        <span class="bo-tkr" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:1">${tickerLogo(s.sym,20)}${s.sym}</span>
+        <span class="bo-tkr" style="white-space:nowrap;flex-shrink:0">${tickerLogo(s.sym,20)}${s.sym}</span>
         <span class="bo-px" style="flex-shrink:0">$${(s.close||0).toFixed(2)}</span>
-        <span class="bo-stars" style="flex-shrink:0">${boStars(s.stars||1)}</span>
-        <span class="bo-tier" style="color:${tClr};border-color:${tClr};flex-shrink:0;white-space:nowrap;margin-left:auto">${s.tier}</span>
+        <span class="bo-stars" style="flex-shrink:0;margin-left:auto">${boStars(s.stars||1)}</span>
       </div>
       <div class="bo-row2">
         <span class="bo-sc"><b>${s.setupScore||0}</b> setup</span>
@@ -390,10 +473,11 @@ function renderBreakout(){
         ${bar('RS',p.rs,15,'#CE93D8')}
         ${bar('Prox',p.prox,10,'var(--yellow)')}
       </div>
-      ${(tags||warns)?`<div class="bo-detail">${tags}${warns}</div>`:''}
+      ${(tags||warns||jax)?`<div class="bo-detail">${jax}${tags}${warns}</div>`:''}
       <div class="bo-footer">
         <span style="font-size:8px;color:var(--muted2);font-family:var(--mono)">${s.stage||''}${s.extended?' · EXTENDED':''}</span>
-        <div style="margin-left:auto;display:flex;gap:6px">
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+          <span class="bo-tier" style="color:${tClr};border-color:${tClr};white-space:nowrap">${s.tier}</span>
           <button class="log-btn" onclick="event.stopPropagation();logToJournal({sym:'${s.sym}',price:${s.close||0},score:${s.setupScore||0},source:'breakout',session:getMarketSession(),greenArrow:${s.tier==='A+'},tradeType:'Breakout',entryMode:'tracking'})">📓 LOG</button>
           <span style="font-size:8px;color:var(--muted2);font-family:var(--mono)">📈 TV →</span>
         </div>
@@ -427,7 +511,7 @@ function loadBreakout(){
   }catch(e){}
 
   const subEl = document.getElementById('bo-sub');
-  if(subEl) subEl.textContent = 'DAILY SETUP → 4H TRIGGER → DAILY CONFIRM · v8';
+  if(subEl) subEl.textContent = 'DAILY SETUP → 4H TRIGGER → DAILY CONFIRM · v10';
 
   try{
     const cached = localStorage.getItem('cs_breakout');
@@ -454,4 +538,4 @@ function loadBreakout(){
 
 // Version stamp — check the console after refresh to confirm the new file loaded.
 // If you DON'T see this line in the console, your Service Worker served a cached copy.
-console.log('%c🚀 breakout.js v8 loaded — header badge fix', 'color:#00b0ff;font-weight:700');
+console.log('%c🚀 breakout.js v10 loaded — JAX arrow (daily+4H) additive', 'color:#00b0ff;font-weight:700');
