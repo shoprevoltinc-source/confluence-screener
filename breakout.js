@@ -30,7 +30,8 @@ function boTierClr(t){ return t==='A+'?'var(--green)':t==='EARLY'?'var(--orange)
 // ════════════════════════════════════════════════════════════════════════════
 const BO_K = { PRICE_FLOOR:10, FRESH_MAX_ATR:2.5, CONTRACTION_STRONG:0.60,
   BASE_DEPTH_TIGHT:0.15, MIN_BASE_WEEKS:5, DOLLARVOL_MIN:5e6, VOL_MIN:500000,
-  MIN_SCORE:60, CAP:40 };
+  MIN_SCORE:60, CAP:40,
+  RS_LEADER:true };  // gate out market laggards — a breakout must lead (rs3>0 OR rs6>0)
 const boClamp = x => Math.max(0, Math.min(1, x));
 const boSMA = (a,n)=>{ const s=a.slice(-n); return s.reduce((x,y)=>x+y,0)/Math.min(n, s.length||1); };
 const boEMA = (c,n)=>{ const k=2/(n+1); let e=c[0]; for(let i=1;i<c.length;i++) e=c[i]*k+e*(1-k); return e; };
@@ -76,24 +77,51 @@ function boStage(m, closes){
   if(m.close<ema200 && !rising) return 4;
   return m.close<ema200 ? 3 : 1;
 }
-function boScore(m, stage){
+function boScore(m, stage, mc){
+  // BASE (30) — tight, contracting VCP-style base (position in range doesn't matter)
   const dp=boClamp((0.35-m.depth)/(0.35-BO_K.BASE_DEPTH_TIGHT))*10;
   const du=boClamp((m.baseWeeks-BO_K.MIN_BASE_WEEKS)/(20-BO_K.MIN_BASE_WEEKS))*4;
   const cp=boClamp((1-m.atrRatio)/(1-BO_K.CONTRACTION_STRONG))*11;
   const tp=boClamp((m.atrFirstThird-m.atrRecentThird)/(m.atrFirstThird||1)/0.30)*5;
   const base=dp+du+cp+tp;
-  const dry=boClamp((1-m.dryRatio)/(1-0.6))*13, acc=boClamp((m.accumRatio-1)/(2-1))*12, vol=dry+acc;
-  const sp=stage===2?10:stage===1?5:0;
-  let ep=(m.close>m.sma20&&m.close>m.sma50)?6:(m.close>m.sma50?3:0); ep+=(m.sma50>m.ema200)?2:0;
-  const trend=Math.min(20, sp+ep+2);
+  // CURL (25) — RSI + Williams %R momentum clearly turning up (your entry signal)
+  const curl=(mc?mc.score:0)*25;
+  // VOL (15) — dry-up + accumulation
+  const dry=boClamp((1-m.dryRatio)/(1-0.6))*9, acc=boClamp((m.accumRatio-1)/(2-1))*6, vol=dry+acc;
+  // TREND (15) — stage + EMA structure
+  const sp=stage===2?7:stage===1?4:0;
+  let ep=(m.close>m.sma20&&m.close>m.sma50)?5:(m.close>m.sma50?3:0); ep+=(m.sma50>m.ema200)?3:0;
+  const trend=Math.min(15, sp+ep);
+  // RS (15) — market leadership
   const rs=(m.rs1>0?3:0)+(m.rs3>0?4:0)+(m.rs6>0?4:0)+(m.rsLineHigh?4:0);
-  const prox=m.distPct<=0?10:boClamp((10-m.distPct)/10)*10;
-  return { total:base+vol+trend+rs+prox, base, vol, trend, rs, prox };
+  return { total:base+curl+vol+trend+rs, base, curl, vol, trend, rs };
+}
+
+// Momentum curl from YOUR indicators (Wilder RSI + Williams %R, exactly as jaxSignal).
+// "Clearly turning" = RSI rising 2+ days in the 50-70 zone (strong but not late, <70),
+// AND Williams %R hooked up out of the lower zone. Both must agree. Graded 0..1 for rank.
+function boMomentumCurl(cd){
+  const c=cd.closes, h=cd.highs, l=cd.lows, n=c.length;
+  if(n<20) return { rsi:null, wpr:null, curl:false, score:0 };
+  const rsiAt = k => jaxRSI(c.slice(0, n-k), 14);
+  const wprAt = k => jaxWPR(h.slice(0, n-k), l.slice(0, n-k), c.slice(0, n-k), 14);
+  const r0=rsiAt(0), r1=rsiAt(1), r2=rsiAt(2);
+  const w0=wprAt(0), w2=wprAt(2);
+  const rsiRising = (r0>r1 && r1>=r2) && r0>=50 && r0<70;   // 2-day rise, in the sweet spot
+  const wprHook   = (w0 > w2 + 5) && (w0 > -50) && (w0 < -2); // rising ≥5pts into bullish zone, not pinned
+  const curl = rsiRising && wprHook;
+  let score=0;
+  if(r0>=50 && r0<70) score+=0.25;
+  if(r0>r1 && r1>=r2) score+=0.25;
+  if(w0>-50 && w0<-2) score+=0.25;
+  if(w0>w2+5)         score+=0.25;
+  return { rsi:+r0.toFixed(1), wpr:+w0.toFixed(1), rsiRising, wprHook, curl, score };
 }
 const boStarCount = s => s>=90?5:s>=75?4:s>=60?3:s>=45?2:1;
 function boGate(m, stage){
   const dv=m.avg20Vol*m.close;
-  return m.close<BO_K.PRICE_FLOOR || dv<BO_K.DOLLARVOL_MIN || m.avg20Vol<BO_K.VOL_MIN || m.close<=m.ema200 || stage===4;
+  const noLeadership = BO_K.RS_LEADER && !(m.rs3>0 || m.rs6>0); // laggards aren't breakout leaders
+  return m.close<BO_K.PRICE_FLOOR || dv<BO_K.DOLLARVOL_MIN || m.avg20Vol<BO_K.VOL_MIN || m.close<=m.ema200 || stage===4 || noLeadership;
 }
 
 // Extension model — separates a FRESH breakout from a late-stage extended run.
@@ -324,27 +352,29 @@ async function runBreakoutScan(){
           const stage = boStage(m, cd.closes);
           if(boGate(m, stage)){ gated++; }
           else {
-            const sc = boScore(m, stage);
+            const mc = boMomentumCurl(cd);
+            const sc = boScore(m, stage, mc);
             if(sc.total >= BO_K.MIN_SCORE){
               const stars = boStarCount(sc.total);
               const ex = boExtension(m);
               const extended = ex.extended;
               const jd = jaxSignal(cd);  // JAX arrow on the DAILY timeframe
-              const tags=[]; if(m.distPct<=1) tags.push('52W_HIGH'); tags.push('RANGE_BREAK'); if(stage===2 && m.distPct<=3) tags.push('STAGE_2');
+              const tags=[]; if(mc.curl) tags.push('MOM_CURL'); tags.push('RANGE_BREAK'); if(stage===2) tags.push('STAGE_2');
               const warnings=[]; if(extended){ warnings.push(ex.veryExtended?'VERY_EXTENDED':'EXTENDED'); warnings.push('WAIT_PULLBACK'); }
               const stack=[
                 {k:'COIL',  on:m.atrRatio<=0.80},
                 {k:'VOL',   on:m.dryRatio<1.0 && m.accumRatio>1.2},
                 {k:'RS',    on:m.rs3>0},
-                {k:'FRESH', on:!extended && m.distPct<=2},
+                {k:'CURL',  on:mc.curl},
                 {k:'CLOSE', on:false},
                 {k:'TREND', on:stage===2 && m.close>m.ema200},
                 {k:'DAILY', on:false}
               ];
               setups[sym] = { sym, close:+m.close.toFixed(2), tier: extended?'EXTENDED':'WATCH', stars,
                 setupScore:Math.round(sc.total),
-                parts:{ base:+sc.base.toFixed(1), vol:+sc.vol.toFixed(1), trend:+sc.trend.toFixed(1), rs:+sc.rs.toFixed(1), prox:+sc.prox.toFixed(1) },
+                parts:{ base:+sc.base.toFixed(1), curl:+sc.curl.toFixed(1), vol:+sc.vol.toFixed(1), trend:+sc.trend.toFixed(1), rs:+sc.rs.toFixed(1) },
                 tags, warnings, extension:ex, stack, distPct:+m.distPct.toFixed(1), atr:+m.atrDaily.toFixed(2), extended, stage:'S'+stage,
+                rsi:mc.rsi, wpr:mc.wpr, momCurl:mc.curl,
                 jaxArrowD: jd?jd.longCond:false, jaxScoreD: jd?jd.bullScore:0, jaxRsiD: jd?jd.rsi:null,
                 jaxArrow4:false, jaxScore4:0, jaxBoth:false };
               scored++;
@@ -492,10 +522,10 @@ function renderBreakout(){
       <div class="bo-stack" style="margin-left:0;margin-top:10px;width:100%;display:flex;flex-wrap:nowrap;gap:2px">${pips}</div>
       <div class="bo-bars">
         ${bar('Base',p.base,30,'var(--green2)')}
-        ${bar('Vol',p.vol,25,'#00bcd4')}
-        ${bar('Trend',p.trend,20,'var(--blue)')}
+        ${bar('Curl',p.curl,25,'#ff9d3c')}
+        ${bar('Vol',p.vol,15,'#00bcd4')}
+        ${bar('Trend',p.trend,15,'var(--blue)')}
         ${bar('RS',p.rs,15,'#CE93D8')}
-        ${bar('Prox',p.prox,10,'var(--yellow)')}
       </div>
       ${(tags||warns||jax)?`<div class="bo-detail">${jax}${tags}${warns}</div>`:''}
       <div class="bo-footer">
@@ -573,4 +603,4 @@ function loadBreakout(){
 
 // Version stamp — check the console after refresh to confirm the new file loaded.
 // If you DON'T see this line in the console, your Service Worker served a cached copy.
-console.log('%c🚀 breakout.js v12 loaded — extension filter (fresh vs extended)', 'color:#00b0ff;font-weight:700');
+console.log('%c🚀 breakout.js v14 loaded — momentum curl (RSI+%R) ranking, proximity dropped', 'color:#00b0ff;font-weight:700');
