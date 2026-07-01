@@ -276,7 +276,7 @@ async function bo4HFetch(sym, ki){
     const d = await r.json();
     if(!d || d.status==='error' || !d.values || !d.values.length) return null;
     const v = d.values.slice().reverse(); // TD returns newest-first → oldest-first
-    return { closes:v.map(x=>+x.close), highs:v.map(x=>+x.high), lows:v.map(x=>+x.low), volumes:v.map(x=>+(x.volume||0)) };
+    return { opens:v.map(x=>+x.open), closes:v.map(x=>+x.close), highs:v.map(x=>+x.high), lows:v.map(x=>+x.low), volumes:v.map(x=>+(x.volume||0)) };
   }catch(e){ return null; }
 }
 
@@ -284,32 +284,40 @@ async function bo4HFetch(sym, ki){
 function boTriggerEval(c4, dm){
   const n=c4.closes.length; if(n<BO_T.LOOKBACK+2) return null;
   const close=c4.closes[n-1], high=c4.highs[n-1], low=c4.lows[n-1];
-  const rangeHigh=Math.max.apply(null, c4.highs.slice(n-1-BO_T.LOOKBACK, n-1));
-  const breakPct=rangeHigh>0?(close-rangeHigh)/rangeHigh*100:0;
+  // Consolidation range from BODIES of the prior 10 completed 4H bars (wicks ignored).
+  const o=c4.opens||c4.closes, s=n-1-BO_T.LOOKBACK, e=n-1; // [s, e) excludes the live bar
+  let bodyHigh=-Infinity, bodyLow=Infinity;
+  for(let i=s;i<e;i++){ const bh=Math.max(o[i],c4.closes[i]), bl=Math.min(o[i],c4.closes[i]);
+    if(bh>bodyHigh) bodyHigh=bh; if(bl<bodyLow) bodyLow=bl; }
+  const consolidationHigh=bodyHigh, consolidationLow=bodyLow;
+  const breakPct=consolidationHigh>0?(close-consolidationHigh)/consolidationHigh*100:0;
   const avgVol=c4.volumes.slice(n-1-20<0?0:n-1-20, n-1).reduce((a,b)=>a+b,0)/Math.min(20,n-1);
   const rvol=avgVol>0?c4.volumes[n-1]/avgVol:0;
   const barRange=high-low;
   const closeLoc=barRange>0?(close-low)/barRange:0;
-  const wickFrac=barRange>0?(high-close)/barRange:0;
+  const wickFrac=barRange>0?(high-close)/barRange:0;   // upper wick = rejection/quality check
   const atr=dm.atrDaily||barRange||1;
-  const extAtr=atr>0?(close-rangeHigh)/atr:0;
 
-  const closeOver=breakPct>=BO_T.BREAK_PCT, volOk=rvol>=BO_T.RVOL_MIN,
+  // Fresh breakout window: +2% to +6% above the body high. Above +6% = chased/extended.
+  const freshBreak = close >= consolidationHigh*1.02 && close <= consolidationHigh*1.06;
+  const chased     = close >  consolidationHigh*1.06;
+  const closeOver=freshBreak, volOk=rvol>=BO_T.RVOL_MIN,
         locOk=closeLoc>=BO_T.CLOSE_LOC_MIN, wickOk=wickFrac<=BO_T.WICK_MAX,
-        fresh=extAtr<=BO_T.FRESH_ATR_MAX && extAtr>=-0.75;
+        fresh=!chased;
 
   let score=0;
-  score += closeOver?35:boClamp(breakPct/BO_T.BREAK_PCT)*35;
+  score += closeOver?35:(breakPct>0?boClamp(breakPct/2)*35:0);
   score += volOk?25:boClamp(rvol/BO_T.RVOL_MIN)*25;
   score += locOk?20:boClamp(closeLoc/BO_T.CLOSE_LOC_MIN)*20;
   score += wickOk?10:0;
   score += fresh?10:0;
   score = Math.round(Math.min(100, score));
 
-  const fullTrigger = closeOver && volOk && locOk && wickOk && fresh;
+  const fullTrigger  = closeOver && volOk && locOk && wickOk && fresh;
   const earlyTrigger = !fullTrigger && fresh && breakPct>=-1 && rvol>=BO_T.EARLY_RVOL && closeLoc>=BO_T.EARLY_LOC;
-  return { triggerScore:score, closeOver, volOk, locOk, wickOk, fresh, fullTrigger, earlyTrigger,
-           rvol:+rvol.toFixed(2), breakPct:+breakPct.toFixed(2), closeLoc:+closeLoc.toFixed(2), rangeHigh:+rangeHigh.toFixed(2) };
+  return { triggerScore:score, closeOver, volOk, locOk, wickOk, fresh, chased, fullTrigger, earlyTrigger,
+           rvol:+rvol.toFixed(2), breakPct:+breakPct.toFixed(2), closeLoc:+closeLoc.toFixed(2),
+           consolidationHigh:+consolidationHigh.toFixed(2), consolidationLow:+consolidationLow.toFixed(2) };
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -409,14 +417,18 @@ async function runBreakoutScan(){
           const tg = boTriggerEval(c4, { atrDaily:s.atr });
           if(tg){
             s.triggerScore = tg.triggerScore;
-            const dailyConfirm = !s.extended && s.distPct <= 2;   // daily at new-high & fresh
+            const dailyConfirm = !!s.momCurl;   // daily-side confirm = your RSI+%R curl
             s.stack = s.stack.map(p=>{
               if(p.k==='CLOSE') return { k:'CLOSE', on: tg.closeOver && tg.locOk };
               if(p.k==='DAILY') return { k:'DAILY', on: dailyConfirm };
               return p;
             });
-            if(s.extended){
+            if(s.extended || tg.chased){
               s.tier = 'EXTENDED';
+              if(tg.chased){
+                s.extended = true;   // 4H broke >6% over the body high → chased
+                if(s.warnings.indexOf('CHASED_BREAKOUT') < 0) s.warnings.push('CHASED_BREAKOUT');
+              }
               if(s.warnings.indexOf('WAIT_PULLBACK') < 0) s.warnings.push('WAIT_PULLBACK');
             } else {
               if(tg.fullTrigger && dailyConfirm) s.tier='A+';
@@ -424,7 +436,7 @@ async function runBreakoutScan(){
               else s.tier='WATCH';
             }
             if(tg.fullTrigger && s.tags.indexOf('TRIGGER')<0) s.tags.unshift('TRIGGER');
-            s.trig = { rvol:tg.rvol, breakPct:tg.breakPct, closeLoc:tg.closeLoc };
+            s.trig = { rvol:tg.rvol, breakPct:tg.breakPct, closeLoc:tg.closeLoc, consolidationHigh:tg.consolidationHigh };
           }
         }
       }catch(e){}
@@ -603,4 +615,4 @@ function loadBreakout(){
 
 // Version stamp — check the console after refresh to confirm the new file loaded.
 // If you DON'T see this line in the console, your Service Worker served a cached copy.
-console.log('%c🚀 breakout.js v14 loaded — momentum curl (RSI+%R) ranking, proximity dropped', 'color:#00b0ff;font-weight:700');
+console.log('%c🚀 breakout.js v15 loaded — 4H body-high breakout (2-6% fresh, >6% chased→EXTENDED)', 'color:#00b0ff;font-weight:700');
