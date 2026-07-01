@@ -492,7 +492,7 @@ function renderBreakout(){
   if(boMeta && boMeta.savedAt){ const t=document.getElementById('bo-lastrun'); if(t) t.textContent='Last scan '+new Date(boMeta.savedAt).toLocaleString(); }
 
   let f = rows.filter(r=> boFilter==='ALL'
-    ? r.tier!=='REJECT' && r.tier!=='EXTENDED'
+    ? r.tier!=='REJECT'
     : r.tier===boFilter
   );
   if(search) f = f.filter(r=>r.sym.includes(search));
@@ -615,4 +615,4 @@ function loadBreakout(){
 
 // Version stamp — check the console after refresh to confirm the new file loaded.
 // If you DON'T see this line in the console, your Service Worker served a cached copy.
-console.log('%c🚀 breakout.js v15 loaded — 4H body-high breakout (2-6% fresh, >6% chased→EXTENDED)', 'color:#00b0ff;font-weight:700');
+console.log('%c🚀 breakout.js v16 loaded — ALL shows every setup incl. EXTENDED', 'color:#00b0ff;font-weight:700');
