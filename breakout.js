@@ -22,8 +22,8 @@ function setBOFilter(v, btn){
   renderBreakout();
 }
 function boStars(n){ let o=""; for(let i=0;i<5;i++) o += i<n?'★':'<span style="color:#2a3340">★</span>'; return o; }
-function boTierCls(t){ return t==='A+'?'bo-tA':t==='EARLY'?'bo-tE':t==='WATCH'?'bo-tW':'bo-tR'; }
-function boTierClr(t){ return t==='A+'?'var(--green)':t==='EARLY'?'var(--orange)':t==='WATCH'?'var(--blue)':'var(--muted2)'; }
+function boTierCls(t){ return t==='A+'?'bo-tA':t==='EARLY'?'bo-tE':t==='WATCH'?'bo-tW':t==='EXTENDED'?'bo-tX':'bo-tR'; }
+function boTierClr(t){ return t==='A+'?'var(--green)':t==='EARLY'?'var(--orange)':t==='WATCH'?'var(--blue)':t==='EXTENDED'?'#e0a030':'var(--muted2)'; }
 
 // ════════════════════════════════════════════════════════════════════════════
 // SCORING ENGINE (mirrors breakout-scanner-spec.md — runs client-side)
@@ -94,6 +94,18 @@ const boStarCount = s => s>=90?5:s>=75?4:s>=60?3:s>=45?2:1;
 function boGate(m, stage){
   const dv=m.avg20Vol*m.close;
   return m.close<BO_K.PRICE_FLOOR || dv<BO_K.DOLLARVOL_MIN || m.avg20Vol<BO_K.VOL_MIN || m.close<=m.ema200 || stage===4;
+}
+
+// Extension model — separates a FRESH breakout from a late-stage extended run.
+// Measures stretch three ways, including in units of the stock's own ATR (so a
+// quiet name and a jumpy name are judged fairly). "extended" → cannot be actionable.
+function boExtension(m){
+  const ext20  = m.sma20 > 0 ? (m.close - m.sma20) / m.sma20 * 100 : 0;
+  const ext50  = m.sma50 > 0 ? (m.close - m.sma50) / m.sma50 * 100 : 0;
+  const extAtr = m.atrDaily > 0 ? (m.close - m.sma20) / m.atrDaily : 0;
+  const extended     = ext20 > 12 || ext50 > 20 || extAtr > 3.0;
+  const veryExtended = ext20 > 18 || ext50 > 25 || extAtr > 4.0;
+  return { ext20:+ext20.toFixed(1), ext50:+ext50.toFixed(1), extAtr:+extAtr.toFixed(1), extended, veryExtended };
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -315,10 +327,11 @@ async function runBreakoutScan(){
             const sc = boScore(m, stage);
             if(sc.total >= BO_K.MIN_SCORE){
               const stars = boStarCount(sc.total);
-              const extended = m.close > m.sma20*1.20 || m.close > m.sma50*1.25;
+              const ex = boExtension(m);
+              const extended = ex.extended;
               const jd = jaxSignal(cd);  // JAX arrow on the DAILY timeframe
               const tags=[]; if(m.distPct<=1) tags.push('52W_HIGH'); tags.push('RANGE_BREAK'); if(stage===2 && m.distPct<=3) tags.push('STAGE_2');
-              const warnings=[]; if(extended) warnings.push('EXTENDED');
+              const warnings=[]; if(extended){ warnings.push(ex.veryExtended?'VERY_EXTENDED':'EXTENDED'); warnings.push('WAIT_PULLBACK'); }
               const stack=[
                 {k:'COIL',  on:m.atrRatio<=0.80},
                 {k:'VOL',   on:m.dryRatio<1.0 && m.accumRatio>1.2},
@@ -328,10 +341,10 @@ async function runBreakoutScan(){
                 {k:'TREND', on:stage===2 && m.close>m.ema200},
                 {k:'DAILY', on:false}
               ];
-              setups[sym] = { sym, close:+m.close.toFixed(2), tier:'WATCH', stars,
+              setups[sym] = { sym, close:+m.close.toFixed(2), tier: extended?'EXTENDED':'WATCH', stars,
                 setupScore:Math.round(sc.total),
                 parts:{ base:+sc.base.toFixed(1), vol:+sc.vol.toFixed(1), trend:+sc.trend.toFixed(1), rs:+sc.rs.toFixed(1), prox:+sc.prox.toFixed(1) },
-                tags, warnings, stack, distPct:+m.distPct.toFixed(1), atr:+m.atrDaily.toFixed(2), extended, stage:'S'+stage,
+                tags, warnings, extension:ex, stack, distPct:+m.distPct.toFixed(1), atr:+m.atrDaily.toFixed(2), extended, stage:'S'+stage,
                 jaxArrowD: jd?jd.longCond:false, jaxScoreD: jd?jd.bullScore:0, jaxRsiD: jd?jd.rsi:null,
                 jaxArrow4:false, jaxScore4:0, jaxBoth:false };
               scored++;
@@ -372,11 +385,14 @@ async function runBreakoutScan(){
               if(p.k==='DAILY') return { k:'DAILY', on: dailyConfirm };
               return p;
             });
-            if(!s.extended){
+            if(s.extended){
+              s.tier = 'EXTENDED';
+              if(s.warnings.indexOf('WAIT_PULLBACK') < 0) s.warnings.push('WAIT_PULLBACK');
+            } else {
               if(tg.fullTrigger && dailyConfirm) s.tier='A+';
               else if(tg.fullTrigger || tg.earlyTrigger) s.tier='EARLY';
               else s.tier='WATCH';
-            } else { s.tier='WATCH'; }
+            }
             if(tg.fullTrigger && s.tags.indexOf('TRIGGER')<0) s.tags.unshift('TRIGGER');
             s.trig = { rvol:tg.rvol, breakPct:tg.breakPct, closeLoc:tg.closeLoc };
           }
@@ -425,7 +441,7 @@ function renderBreakout(){
     return Object.assign({}, s, { triggerScore: tg.triggerScore||0, tier: tg.tier||s.tier||'WATCH' });
   });
 
-  const live = rows.filter(r=>r.tier!=='REJECT');
+  const live = rows.filter(r=>r.tier!=='REJECT' && r.tier!=='EXTENDED');
   boText('bo-aplus', rows.filter(r=>r.tier==='A+').length);
   boText('bo-early', rows.filter(r=>r.tier==='EARLY').length);
   boText('bo-watch', rows.filter(r=>r.tier==='WATCH').length);
@@ -433,7 +449,10 @@ function renderBreakout(){
   if(boMeta) boText('bo-gated', boMeta.gated||0);
   if(boMeta && boMeta.savedAt){ const t=document.getElementById('bo-lastrun'); if(t) t.textContent='Last scan '+new Date(boMeta.savedAt).toLocaleString(); }
 
-  let f = rows.filter(r=> boFilter==='ALL' ? r.tier!=='REJECT' : r.tier===boFilter);
+  let f = rows.filter(r=> boFilter==='ALL'
+    ? r.tier!=='REJECT' && r.tier!=='EXTENDED'
+    : r.tier===boFilter
+  );
   if(search) f = f.filter(r=>r.sym.includes(search));
   f.sort((a,b)=> sort==='ticker'?a.sym.localeCompare(b.sym) : sort==='trigger'?(b.triggerScore-a.triggerScore):(b.setupScore-a.setupScore));
   boText('bo-resCount', f.length+' shown');
@@ -513,6 +532,17 @@ function loadBreakout(){
       if(sortSel && sortSel.parentNode) sortSel.parentNode.insertBefore(sel, sortSel);
       else ctrls.appendChild(sel);
     }
+    // EXTENDED chip — review list of strong-but-stretched names (wait for pullback)
+    const chips = document.querySelectorAll('#panel-breakout .bo-chip');
+    if(chips.length && !document.getElementById('bo-chip-ext')){
+      const last = chips[chips.length-1];
+      const c = document.createElement('button');
+      c.className = 'chip bo-chip'; c.id = 'bo-chip-ext';
+      c.style.borderColor = 'rgba(224,160,48,.4)'; c.style.color = '#e0a030';
+      c.textContent = 'EXTENDED';
+      c.onclick = function(){ setBOFilter('EXTENDED', c); };
+      if(last && last.parentNode) last.parentNode.insertBefore(c, last.nextSibling);
+    }
   }catch(e){}
 
   const subEl = document.getElementById('bo-sub');
@@ -543,4 +573,4 @@ function loadBreakout(){
 
 // Version stamp — check the console after refresh to confirm the new file loaded.
 // If you DON'T see this line in the console, your Service Worker served a cached copy.
-console.log('%c🚀 breakout.js v11 loaded — JAX arrow + button fix', 'color:#00b0ff;font-weight:700');
+console.log('%c🚀 breakout.js v12 loaded — extension filter (fresh vs extended)', 'color:#00b0ff;font-weight:700');
